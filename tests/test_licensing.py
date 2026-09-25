@@ -41,6 +41,10 @@ CLASS_BY_SUFFIX = {
 
 HEADER_LINES = 5
 
+# Third-party trees keep their own licenses; each is bound by its own manifest
+# (tests/vendor/*.manifest.json), which records the upstream license.
+THIRD_PARTY_PREFIXES = ("tests/vendor/json-schema-test-suite/",)
+
 
 def project_files() -> list[str]:
     """Tracked plus untracked-but-not-ignored files, as POSIX relative paths."""
@@ -114,7 +118,7 @@ class LicensingTest(unittest.TestCase):
     def test_every_file_declares_a_license(self) -> None:
         annotations = reuse_annotations()
         for rel in project_files():
-            if rel in LICENSE_TEXTS:
+            if rel in LICENSE_TEXTS or rel.startswith(THIRD_PARTY_PREFIXES):
                 continue
             with self.subTest(file=rel):
                 in_file = header_license(ROOT / rel)

@@ -31,3 +31,17 @@ path = ["schemas/*.schema.json", "registries/*.json"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+[[annotations]]
+path = ["tests/vendor/*.manifest.json", "tests/conformance/*.json"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# tests/vendor/json-schema-test-suite/ is third-party material under its own
+# MIT license (see its LICENSE and tests/vendor/json-schema-test-suite.manifest.json).
+[[annotations]]
+path = "tests/vendor/json-schema-test-suite/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2012 Julian Berman"
+SPDX-License-Identifier = "MIT"
