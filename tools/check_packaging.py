@@ -96,6 +96,8 @@ SDIST_ALLOW = {
     "pyproject.toml",
     "uv.lock",
     "src",
+    "registries",
+    "schemas",
     "docs",
     "tests",
     "tools",

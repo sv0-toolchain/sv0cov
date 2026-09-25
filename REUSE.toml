@@ -25,3 +25,9 @@ path = "tests/fixtures/**.json"
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+[[annotations]]
+path = ["schemas/*.schema.json", "registries/*.json"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"

@@ -71,6 +71,8 @@ only-include = [
     "pyproject.toml",
     "uv.lock",
     "src",
+    "registries",
+    "schemas",
     "docs",
     "tests",
     "tools",
@@ -82,3 +84,8 @@ reproducible = true
 only-include = ["src/sv0cov"]
 sources = ["src"]
 exclude = ["__pycache__", "*.pyc"]
+
+# Canonical resources mapped beneath the installed package (SPEC 25.2.7).
+[tool.hatch.build.targets.wheel.force-include]
+"registries" = "sv0cov/_resources/registries"
+"schemas" = "sv0cov/_resources/schemas"
