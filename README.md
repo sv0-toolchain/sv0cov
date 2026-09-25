@@ -22,6 +22,9 @@ slice backlog live in the `sv0-toolchain` meta-repository:
 `task/sv0cov-coverage.Rmd` (hub) and `task/sv0cov-checklist.Rmd` (`CV-###`
 slices).
 
+The latest source audit against the SPEC's observed facts is
+[`docs/audit/2026-09-24.md`](docs/audit/2026-09-24.md).
+
 ## Ownership
 
 | Concern | Owner |
