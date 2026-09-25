@@ -36,6 +36,7 @@ CLASS_BY_SUFFIX = {
     ".py": SOFTWARE,
     ".toml": SOFTWARE,
     ".c": SOFTWARE,
+    ".sv0": SOFTWARE,
     ".h": SOFTWARE,
 }
 
@@ -97,7 +98,7 @@ def header_license(path: Path) -> str | None:
         marker = "SPDX-License-Identifier:"
         if marker in line:
             value = line.split(marker, 1)[1].strip()
-            return value.removesuffix("-->").strip()
+            return value.removesuffix("-->").removesuffix("*/").strip()
     return None
 
 

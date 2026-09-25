@@ -1,0 +1,34 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov F0 fixture (CV-027). Expected coverage: expected-map.json; reasoning: ../README.md. */
+
+enum Shape {
+  Dot(),
+  Line(i32),
+}
+
+fn classify(n: i32) -> i32 {
+  let mut total = 0;
+  if n > 10 {
+    total = total + 100;
+  };
+  let mut i = 0;
+  while i < n {
+    total = total + i;
+    i = i + 1;
+  };
+  return total;
+}
+
+fn measure(s: Shape) -> i32 {
+  return match s {
+    Shape::Dot() => 0,
+    Shape::Line(len) => len,
+  };
+}
+
+fn main() -> i32 {
+  let label = "Größe";
+  let a = classify(3);
+  let b = measure(Shape::Line(2));
+  return a + b - 5;
+}
