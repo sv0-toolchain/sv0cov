@@ -128,9 +128,12 @@ class Synth:
                     for v in self.variants(sub, file, value[i], depth + 1):
                         yield value[:i] + [v] + value[i + 1 :]
             elif isinstance(node.get("items"), dict):
+                # Vary the first element but keep the array length, so that a
+                # length rule (minItems) does not mask the item's own checks.
                 item = value[0] if value else self.minimal(node["items"], file, depth + 1)
+                rest = value[1:]
                 for v in self.variants(node["items"], file, item, depth + 1):
-                    yield [v]
+                    yield [v] + rest
         if t == "object" and isinstance(value, dict):
             for k in node.get("required", []):
                 yield {kk: vv for kk, vv in value.items() if kk != k}

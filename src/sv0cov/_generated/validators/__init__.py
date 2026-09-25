@@ -6,9 +6,12 @@
 GENERATOR_FORMAT = '2'
 
 SCHEMAS = {
-    'sv0cov_diagnostic_1_0': ('sv0cov.diagnostic-1.0.schema.json', '69a711c337e9a26ed09aad0793523fcb529daceb9c9651864be7663035702115'),
+    'sv0cov_compatibility_1_0': ('sv0cov.compatibility-1.0.schema.json', '04d468b205e235b08cbdf7322d8469391ce0af5d1a934f2baed7782a1c8ce07f'),
+    'sv0cov_diagnostic_1_0': ('sv0cov.diagnostic-1.0.schema.json', 'b81ff9d6cb7f9754830b5785f74c99d58c60800c38e909f88ee81cea2865e0e2'),
     'sv0cov_diagnostic_registry_1_0': ('sv0cov.diagnostic-registry-1.0.schema.json', '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'),
+    'sv0cov_doctor_1_0': ('sv0cov.doctor-1.0.schema.json', '12eb3144d4e875fbb7047b713191ef247cf28df23fc481d391ba271b4b6a6893'),
     'sv0cov_map_1_0': ('sv0cov.map-1.0.schema.json', 'b77082e414db15bee9a3b8b5fc114540e7e9e49199bb8b6f3994e46a6ec224c8'),
     'sv0cov_run_set_1_0': ('sv0cov.run-set-1.0.schema.json', '05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2'),
+    'sv0cov_version_1_0': ('sv0cov.version-1.0.schema.json', 'bd763071b96e95f298462744e5b113aa9888455ab698a20d600f45820ce5eee5'),
     'sv0cov_vm_binding_1_0': ('sv0cov.vm-binding-1.0.schema.json', '9835835b2c82d84e9f545bda6a71e4112731896e882d1d702116d984a7b28dd5'),
 }

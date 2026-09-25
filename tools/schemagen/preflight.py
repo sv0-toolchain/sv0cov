@@ -139,7 +139,7 @@ class _Checker:
                 self.err(f"{ptr}/{_escape(key)}", f"{key} must be a string of at most {limit} bytes")
 
         if "$ref" in s:
-            extra = set(s) - {"$ref", *ANNOTATIONS}
+            extra = set(s) - {"$ref", *ANNOTATIONS} - ({"$schema", "$defs"} if root else set())
             if extra:
                 self.err(ptr, f"$ref object has non-annotation siblings {sorted(extra)}")
             self.check_ref(s["$ref"], f"{ptr}/$ref", owner)
