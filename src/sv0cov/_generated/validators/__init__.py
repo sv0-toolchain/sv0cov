@@ -10,4 +10,5 @@ SCHEMAS = {
     'sv0cov_diagnostic_registry_1_0': ('sv0cov.diagnostic-registry-1.0.schema.json', '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'),
     'sv0cov_map_1_0': ('sv0cov.map-1.0.schema.json', 'b77082e414db15bee9a3b8b5fc114540e7e9e49199bb8b6f3994e46a6ec224c8'),
     'sv0cov_run_set_1_0': ('sv0cov.run-set-1.0.schema.json', '05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2'),
+    'sv0cov_vm_binding_1_0': ('sv0cov.vm-binding-1.0.schema.json', '9835835b2c82d84e9f545bda6a71e4112731896e882d1d702116d984a7b28dd5'),
 }
