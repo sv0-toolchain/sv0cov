@@ -18,7 +18,9 @@ missing module, or orphaned module.
 
 Per-node keyword order: $ref, type, const, enum, minimum/maximum,
 minLength/maxLength, minItems/maxItems, prefixItems, items, required,
-additionalProperties, properties, anyOf, oneOf, not.
+additionalProperties, properties, anyOf, oneOf, not. Checks that no
+instance can trigger (a zero minLength or minItems, or a tuple's items: false
+already enforced by maxItems) are not emitted.
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ import preflight  # noqa: E402
 
 from sv0cov.formats.canonical_json import decode_canonical  # noqa: E402  (path set by preflight)
 
-GENERATOR_FORMAT = "1"
+GENERATOR_FORMAT = "2"
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCHEMAS = ROOT / "schemas"
 DEFAULT_OUT = ROOT / "src" / "sv0cov" / "_generated" / "validators"
@@ -96,18 +98,21 @@ class _ModuleWriter:
             if "maximum" in s:
                 emit(f"        if v > {s['maximum']!r}:")
                 emit(f"            fail(p, 'maximum', {('above ' + str(s['maximum']))!r})")
-        if "minLength" in s or "maxLength" in s:
+        # A zero lower bound can never fail, so no check is emitted for it
+        # (the mutation gate rejects checks that no input can trigger).
+        min_length = s.get("minLength", 0)
+        if min_length or "maxLength" in s:
             emit("    if isinstance(v, str):")
-            if "minLength" in s:
+            if min_length:
                 emit(f"        if len(v) < {s['minLength']!r}:")
                 emit("            fail(p, 'minLength', 'string too short')")
             if "maxLength" in s:
                 emit(f"        if len(v) > {s['maxLength']!r}:")
                 emit("            fail(p, 'maxLength', 'string too long')")
-        array_keys = ("minItems", "maxItems", "prefixItems", "items")
-        if any(k in s for k in array_keys):
+        min_items = s.get("minItems", 0)
+        if min_items or any(k in s for k in ("maxItems", "prefixItems", "items")):
             emit("    if isinstance(v, list):")
-            if "minItems" in s:
+            if min_items:
                 emit(f"        if len(v) < {s['minItems']!r}:")
                 emit("            fail(p, 'minItems', 'array too short')")
             if "maxItems" in s:
@@ -120,7 +125,10 @@ class _ModuleWriter:
                     emit(f"        if len(v) > {i}:")
                     emit(f"            {fn}(v[{i}], child(p, {i}))")
                 start = len(s["prefixItems"])
-            if s.get("items") is False:
+            # In a tuple, maxItems == len(prefixItems) is checked first, so a
+            # separate items: false check would be unreachable; emit it only
+            # when maxItems does not already enforce it.
+            if s.get("items") is False and s.get("maxItems", start + 1) > start:
                 emit(f"        if len(v) > {start}:")
                 emit(f"            fail(child(p, {start}), 'items', 'no items are allowed here')")
             elif isinstance(s.get("items"), dict):

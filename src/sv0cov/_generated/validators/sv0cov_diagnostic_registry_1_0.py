@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.diagnostic-registry-1.0.schema.json
 # schema-sha256: 1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b
-# generator-format: 1
+# generator-format: 2
 """Structural validator for sv0cov.diagnostic-registry 1.0."""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sv0cov.formats.structural import (
 SCHEMA_NAME = 'sv0cov.diagnostic-registry'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'
-GENERATOR_FORMAT = '1'
+GENERATOR_FORMAT = '2'
 
 
 def _utf8(k: str) -> bytes:
