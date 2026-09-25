@@ -45,3 +45,9 @@ path = "tests/vendor/json-schema-test-suite/**"
 precedence = "override"
 SPDX-FileCopyrightText = "2012 Julian Berman"
 SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "tests/fixtures/**.sv0profraw"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
