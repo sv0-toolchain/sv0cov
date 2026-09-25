@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
 #
-# CV-006: 4 hosts x CPython 3.13/3.14. Checks the dependency/packaging policy
-# and runs the test suite from the locked environment. Builds the sdist (then
-# the wheel from it) twice and requires byte-identical, allowlisted artifacts.
+# CV-006: 4 hosts x CPython 3.13/3.14. Checks the dependency/packaging policy,
+# schema preflight and generated-validator currency (CV-010, CV-011), and runs
+# the test suite (with the jsonschema oracle) from the locked environment.
+# Builds the sdist (then the wheel from it) twice and requires byte-identical,
+# allowlisted artifacts.
 #
 # Third-party actions are pinned by full commit SHA (SPEC 25.4.3). Network
 # access is used only to populate the locked environment. OS-level network
@@ -74,11 +76,17 @@ jobs:
 
       - name: Locked test environment
         run: >-
-          uv sync --locked --no-default-groups --group test
+          uv sync --locked --no-default-groups --group test --group oracle
           --python "${{ steps.py.outputs.python-path }}"
 
       - name: Lock is current (offline)
         run: uv lock --check --offline
+
+      - name: Schema preflight (closed Draft 2020-12 profile + offline meta-schema)
+        run: uv run --locked --offline --no-sync python tools/schemagen/preflight.py --require-metaschema
+
+      - name: Generated validators are current
+        run: uv run --locked --offline --no-sync python tools/schemagen/generate.py --check
 
       - name: Tests (pytest, locked, offline)
         run: uv run --locked --offline --no-sync python -m pytest -p no:cacheprovider tests
