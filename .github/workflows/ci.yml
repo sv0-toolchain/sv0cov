@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
+#
+# CV-006: 4 hosts x CPython 3.13/3.14. Checks the dependency/packaging policy
+# and runs the test suite from the locked environment. Builds the sdist (then
+# the wheel from it) twice and requires byte-identical, allowlisted artifacts.
+#
+# Third-party actions are pinned by full commit SHA (SPEC 25.4.3). Network
+# access is used only to populate the locked environment. OS-level network
+# denial for the test step is deferred to the security suite (CV-237).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.host }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
+        host: [linux-x86_64, linux-arm64, macos-x86_64, macos-arm64]
+        include:
+          - { host: linux-x86_64, runner: ubuntu-24.04, machine: x86_64 }
+          - { host: linux-arm64, runner: ubuntu-24.04-arm, machine: aarch64 }
+          - { host: macos-x86_64, runner: macos-15-intel, machine: x86_64 }
+          - { host: macos-arm64, runner: macos-15, machine: arm64 }
+    env:
+      UV_NO_CONFIG: "1"
+      UV_PYTHON_DOWNLOADS: never
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: py
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.1"
+          enable-cache: false
+
+      - name: Host and interpreter identity
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import platform, sys
+          want = "${{ matrix.machine }}"
+          got = platform.machine()
+          print(sys.implementation.name, platform.python_version(), platform.system(), got)
+          assert sys.implementation.name == "cpython"
+          assert f"{sys.version_info.major}.{sys.version_info.minor}" == "${{ matrix.python }}"
+          assert got == want, (got, want)
+          assert sys.maxsize > 2**32
+          EOF
+
+      - name: Packaging and dependency-source policy
+        run: python tools/check_packaging.py policy
+
+      - name: Stdlib-only test run (no third-party packages)
+        run: python -m unittest discover -s tests
+
+      - name: Locked test environment
+        run: >-
+          uv sync --locked --no-default-groups --group test
+          --python "${{ steps.py.outputs.python-path }}"
+
+      - name: Lock is current (offline)
+        run: uv lock --check --offline
+
+      - name: Tests (pytest, locked, offline)
+        run: uv run --locked --offline --no-sync python -m pytest -p no:cacheprovider tests
+
+      - name: Reproducible sdist -> wheel build
+        run: python tools/check_packaging.py build "$RUNNER_TEMP/dist"
