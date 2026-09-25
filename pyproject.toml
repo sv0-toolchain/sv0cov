@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
+#
+# Static project metadata and the sole build/dependency configuration
+# (SPEC 25.2.1, 25.2.5-25.2.7). Policy is enforced by tools/check_packaging.py.
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sv0cov"
+version = "0.0.0"
+description = "Source-based code coverage for the sv0 language"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
+license = "MIT OR Apache-2.0"
+license-files = ["LICENSE", "LICENSE-MIT", "LICENSE-APACHE", "LICENSES/CC-BY-4.0.txt"]
+authors = [{ name = "Sasank Vishnubhatla" }]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = []
+
+[project.scripts]
+sv0cov = "sv0cov.cli:main"
+
+# Non-runtime dependencies only (SPEC 25.2.5). Exactly these ten groups; each
+# direct requirement belongs to exactly one. No group is installed by default.
+[dependency-groups]
+accessibility = []
+audit = []
+build = ["hatchling==1.32.4"]
+consumer = []
+docs = []
+fuzz = []
+generator = []
+oracle = ["jsonschema==4.26.0"]
+release = []
+test = ["pytest==9.1.1"]
+
+[tool.uv]
+default-groups = []
+index-strategy = "first-index"
+keyring-provider = "disabled"
+no-sources = true
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+# Explicit positive member allowlists (SPEC 25.2.7). Directories listed here
+# are expanded and checked member by member by tools/check_packaging.py.
+[tool.hatch.build]
+ignore-vcs = true
+
+[tool.hatch.build.targets.sdist]
+reproducible = true
+only-include = [
+    "README.md",
+    "LICENSE",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "LICENSES",
+    "REUSE.toml",
+    "pyproject.toml",
+    "uv.lock",
+    "src",
+    "docs",
+    "tests",
+    "tools",
+]
+exclude = ["tests/vendor", "__pycache__", "*.pyc"]
+
+[tool.hatch.build.targets.wheel]
+reproducible = true
+only-include = ["src/sv0cov"]
+sources = ["src"]
+exclude = ["__pycache__", "*.pyc"]

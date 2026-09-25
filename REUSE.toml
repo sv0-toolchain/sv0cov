@@ -13,3 +13,9 @@ path = "LICENSE"
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
 SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = "uv.lock"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
