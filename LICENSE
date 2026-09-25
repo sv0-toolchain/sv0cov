@@ -1,0 +1,38 @@
+sv0cov licensing
+
+Copyright (c) 2026 Sasank Vishnubhatla
+
+Project-owned content is licensed by content class:
+
+- Software: MIT OR Apache-2.0.
+  Python and later sv0 implementation source; the generated-C collection
+  runtime and headers; build, packaging, CI, validation, and development
+  scripts; schemas, protocol definitions, registries, fixture generators,
+  tests, and standalone code examples; and project-owned source fixtures
+  intended for compilation or execution.
+
+- Documentation: CC-BY-4.0.
+  Specifications, guides, explanatory prose, diagrams, tutorials, and
+  generated documentation whose principal content is documentation.
+  A substantial standalone code example extracted from documentation remains
+  available under MIT OR Apache-2.0.
+
+The complete, unmodified license texts are:
+
+- LICENSE-MIT                 (MIT)
+- LICENSE-APACHE              (Apache-2.0)
+- LICENSES/CC-BY-4.0.txt      (CC-BY-4.0)
+
+Every project-owned file that permits comments carries an
+SPDX-License-Identifier line. Files that cannot carry comments are annotated
+in REUSE.toml. The license class is stated per file, never inferred from a
+file extension.
+
+This map does not relicense third-party material. Third-party files keep their
+own notices and license declarations, which are recorded before distribution.
+
+sv0cov asserts no license over user source code, coverage counts, reports, or
+other artifacts merely because it processes or describes them. Output that
+copies project-owned bytes (for example the collection runtime, or a report
+template, stylesheet, or script) keeps that copied portion's license and
+notice.
