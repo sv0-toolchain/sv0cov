@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0 fixture (CV-028): a project with two modules whose files share a basename. */
+
+use util::doubled;
+use lib::triple;
+
+fn main() -> i32 {
+  let a = doubled(2);
+  let b = triple(a);
+  return b - 12;
+}

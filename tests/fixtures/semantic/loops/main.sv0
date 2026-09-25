@@ -1,0 +1,43 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0 fixture (CV-028): zero, one, many iterations; break; continue. */
+
+fn count_up(n: i32) -> i32 {
+  let mut i = 0;
+  while i < n {
+    i = i + 1;
+  };
+  return i;
+}
+
+fn first_over(limit: i32) -> i32 {
+  let mut i = 0;
+  while true {
+    i = i + 1;
+    if i > limit {
+      break;
+    };
+  };
+  return i;
+}
+
+fn odd_sum(n: i32) -> i32 {
+  let mut s = 0;
+  let mut i = 0;
+  while i < n {
+    i = i + 1;
+    if i == 2 {
+      continue;
+    };
+    s = s + i;
+  };
+  return s;
+}
+
+fn main() -> i32 {
+  let a = count_up(0);
+  let b = count_up(1);
+  let c = count_up(3);
+  let d = first_over(2);
+  let e = odd_sum(3);
+  return a + b + c + d + e - 11;
+}

@@ -1,0 +1,32 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0 fixture (CV-028): enum match, integer match with a default arm, arms never taken. */
+
+enum Color {
+  Red(),
+  Green(),
+  Blue(),
+}
+
+fn code(c: Color) -> i32 {
+  return match c {
+    Color::Red() => 1,
+    Color::Green() => 2,
+    Color::Blue() => 3,
+  };
+}
+
+fn bucket(n: i32) -> i32 {
+  return match n {
+    0 => 10,
+    1 => 20,
+    _ => 30,
+  };
+}
+
+fn main() -> i32 {
+  let a = code(Color::Red());
+  let b = code(Color::Blue());
+  let c = bucket(0);
+  let d = bucket(7);
+  return a + b + c + d - 44;
+}

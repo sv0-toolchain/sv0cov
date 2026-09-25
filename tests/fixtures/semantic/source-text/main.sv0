@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0 fixture (CV-028): CRLF, tabs, no final newline, CJK text, several regions on one line. */
+
+fn main() -> i32 {
+	let a = 1; let b = 2;
+	let s = "日本";
+	if a > 5 { return 9; };
+	return a + b - 3;
+}

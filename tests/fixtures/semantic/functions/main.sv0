@@ -1,0 +1,26 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0 fixture (CV-028): uncalled, once, repeated, expression-statement call. */
+
+fn never(x: i32) -> i32 {
+  return x + 1;
+}
+
+fn once(x: i32) -> i32 {
+  return x * 2;
+}
+
+fn twice(x: i32) -> i32 {
+  return x - 1;
+}
+
+fn noop() -> i32 {
+  return 0;
+}
+
+fn main() -> i32 {
+  let a = once(3);
+  let b = twice(a);
+  let c = twice(b);
+  noop();
+  return c - 4;
+}

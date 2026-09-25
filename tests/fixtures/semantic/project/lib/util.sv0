@@ -1,0 +1,6 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+module lib;
+
+fn triple(x: i32) -> i32 {
+  return x * 3;
+}
