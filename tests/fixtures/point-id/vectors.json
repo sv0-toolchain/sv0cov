@@ -1,0 +1,1097 @@
+{
+ "point_identity_version": "1.0",
+ "vectors": [
+  {
+   "discriminator": "entry",
+   "end_byte": 42,
+   "entity_kind": "function",
+   "entity_name": "main",
+   "name": "function-entry",
+   "outcome_ordinal": null,
+   "point_id": "86df912665e07c0d773df8ffb3562b148385985d8e01f9fc0968db4976d429f9",
+   "point_kind": "function_entry",
+   "preimage_length": 107,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0c000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "7372632f6d61696e2e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "offset": 36
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 68
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "04000000",
+     "offset": 69
+    },
+    {
+     "field": "entity_name",
+     "hex": "6d61696e",
+     "offset": 73
+    },
+    {
+     "field": "point_kind",
+     "hex": "01",
+     "offset": 77
+    },
+    {
+     "field": "start_byte",
+     "hex": "0000000000000000",
+     "offset": 78
+    },
+    {
+     "field": "end_byte",
+     "hex": "2a00000000000000",
+     "offset": 86
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 94
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "05000000",
+     "offset": 98
+    },
+    {
+     "field": "discriminator",
+     "hex": "656e747279",
+     "offset": 102
+    }
+   ],
+   "source_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "source_path": "src/main.sv0",
+   "start_byte": 0
+  },
+  {
+   "discriminator": "initializer",
+   "end_byte": 30,
+   "entity_kind": "function",
+   "entity_name": "main",
+   "name": "region-owned",
+   "outcome_ordinal": null,
+   "point_id": "d5e10530204829eda905de79832b4e03e6a15617a81158f00722ccc558416566",
+   "point_kind": "region",
+   "preimage_length": 113,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0c000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "7372632f6d61696e2e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "offset": 36
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 68
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "04000000",
+     "offset": 69
+    },
+    {
+     "field": "entity_name",
+     "hex": "6d61696e",
+     "offset": 73
+    },
+    {
+     "field": "point_kind",
+     "hex": "02",
+     "offset": 77
+    },
+    {
+     "field": "start_byte",
+     "hex": "1000000000000000",
+     "offset": 78
+    },
+    {
+     "field": "end_byte",
+     "hex": "1e00000000000000",
+     "offset": 86
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 94
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "0b000000",
+     "offset": 98
+    },
+    {
+     "field": "discriminator",
+     "hex": "696e697469616c697a6572",
+     "offset": 102
+    }
+   ],
+   "source_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "source_path": "src/main.sv0",
+   "start_byte": 16
+  },
+  {
+   "discriminator": "expression",
+   "end_byte": 5,
+   "entity_kind": "none",
+   "entity_name": "",
+   "name": "region-unowned",
+   "outcome_ordinal": null,
+   "point_id": "aa51fc6233ace65750276fd074f7df15f6b2c74286e277fcc7003cab0edf626a",
+   "point_kind": "region",
+   "preimage_length": 110,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0e000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "6c69622f636f6e7374732e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0000000000000000000000000000000000000000000000000000000000000000",
+     "offset": 38
+    },
+    {
+     "field": "entity_kind",
+     "hex": "00",
+     "offset": 70
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "00000000",
+     "offset": 71
+    },
+    {
+     "field": "entity_name",
+     "hex": "",
+     "offset": 75
+    },
+    {
+     "field": "point_kind",
+     "hex": "02",
+     "offset": 75
+    },
+    {
+     "field": "start_byte",
+     "hex": "0500000000000000",
+     "offset": 76
+    },
+    {
+     "field": "end_byte",
+     "hex": "0500000000000000",
+     "offset": 84
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 92
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "0a000000",
+     "offset": 96
+    },
+    {
+     "field": "discriminator",
+     "hex": "65787072657373696f6e",
+     "offset": 100
+    }
+   ],
+   "source_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+   "source_path": "lib/consts.sv0",
+   "start_byte": 5
+  },
+  {
+   "discriminator": "if",
+   "end_byte": 80,
+   "entity_kind": "function",
+   "entity_name": "positive",
+   "name": "branch-if-true",
+   "outcome_ordinal": 0,
+   "point_id": "cc8ae6d46973cff30625e5949e6e9ee452b9b2e32e20e6d6a81c36837bbcb183",
+   "point_kind": "branch_outcome",
+   "preimage_length": 108,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0c000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "7372632f6d61696e2e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "offset": 36
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 68
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "08000000",
+     "offset": 69
+    },
+    {
+     "field": "entity_name",
+     "hex": "706f736974697665",
+     "offset": 73
+    },
+    {
+     "field": "point_kind",
+     "hex": "03",
+     "offset": 81
+    },
+    {
+     "field": "start_byte",
+     "hex": "2800000000000000",
+     "offset": 82
+    },
+    {
+     "field": "end_byte",
+     "hex": "5000000000000000",
+     "offset": 90
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "00000000",
+     "offset": 98
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "02000000",
+     "offset": 102
+    },
+    {
+     "field": "discriminator",
+     "hex": "6966",
+     "offset": 106
+    }
+   ],
+   "source_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "source_path": "src/main.sv0",
+   "start_byte": 40
+  },
+  {
+   "discriminator": "if",
+   "end_byte": 80,
+   "entity_kind": "function",
+   "entity_name": "positive",
+   "name": "branch-if-false",
+   "outcome_ordinal": 1,
+   "point_id": "e884182196eb0ea52d3afcd93bde1338ea509186f0952b94e08a28d414e7f0ed",
+   "point_kind": "branch_outcome",
+   "preimage_length": 108,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0c000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "7372632f6d61696e2e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "offset": 36
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 68
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "08000000",
+     "offset": 69
+    },
+    {
+     "field": "entity_name",
+     "hex": "706f736974697665",
+     "offset": 73
+    },
+    {
+     "field": "point_kind",
+     "hex": "03",
+     "offset": 81
+    },
+    {
+     "field": "start_byte",
+     "hex": "2800000000000000",
+     "offset": 82
+    },
+    {
+     "field": "end_byte",
+     "hex": "5000000000000000",
+     "offset": 90
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "01000000",
+     "offset": 98
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "02000000",
+     "offset": 102
+    },
+    {
+     "field": "discriminator",
+     "hex": "6966",
+     "offset": 106
+    }
+   ],
+   "source_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "source_path": "src/main.sv0",
+   "start_byte": 40
+  },
+  {
+   "discriminator": "match",
+   "end_byte": 1,
+   "entity_kind": "function",
+   "entity_name": "f",
+   "name": "branch-max-ordinal",
+   "outcome_ordinal": 4294967294,
+   "point_id": "9d5f3d7f6bacfb1d47bd0666653988fb4139d2934dbc3b02ea108d4dd813755d",
+   "point_kind": "branch_outcome",
+   "preimage_length": 97,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "05000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "612e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "offset": 29
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 61
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "01000000",
+     "offset": 62
+    },
+    {
+     "field": "entity_name",
+     "hex": "66",
+     "offset": 66
+    },
+    {
+     "field": "point_kind",
+     "hex": "03",
+     "offset": 67
+    },
+    {
+     "field": "start_byte",
+     "hex": "0000000000000000",
+     "offset": 68
+    },
+    {
+     "field": "end_byte",
+     "hex": "0100000000000000",
+     "offset": 76
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "feffffff",
+     "offset": 84
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "05000000",
+     "offset": 88
+    },
+    {
+     "field": "discriminator",
+     "hex": "6d61746368",
+     "offset": 92
+    }
+   ],
+   "source_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "source_path": "a.sv0",
+   "start_byte": 0
+  },
+  {
+   "discriminator": "requires",
+   "end_byte": 118,
+   "entity_kind": "contract",
+   "entity_name": "math::div#requires0",
+   "name": "contract-true",
+   "outcome_ordinal": null,
+   "point_id": "c72aff73269509a8ef9021f034224c0b188830910970ba143e3e200d875da491",
+   "point_kind": "contract_true",
+   "preimage_length": 125,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0c000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "7372632f6d6174682e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "offset": 36
+    },
+    {
+     "field": "entity_kind",
+     "hex": "02",
+     "offset": 68
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "13000000",
+     "offset": 69
+    },
+    {
+     "field": "entity_name",
+     "hex": "6d6174683a3a64697623726571756972657330",
+     "offset": 73
+    },
+    {
+     "field": "point_kind",
+     "hex": "04",
+     "offset": 92
+    },
+    {
+     "field": "start_byte",
+     "hex": "6400000000000000",
+     "offset": 93
+    },
+    {
+     "field": "end_byte",
+     "hex": "7600000000000000",
+     "offset": 101
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 109
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "08000000",
+     "offset": 113
+    },
+    {
+     "field": "discriminator",
+     "hex": "7265717569726573",
+     "offset": 117
+    }
+   ],
+   "source_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "source_path": "src/math.sv0",
+   "start_byte": 100
+  },
+  {
+   "discriminator": "requires",
+   "end_byte": 118,
+   "entity_kind": "contract",
+   "entity_name": "math::div#requires0",
+   "name": "contract-false",
+   "outcome_ordinal": null,
+   "point_id": "113083a0edf130669242f94fc0457214c5a65a85a9a76a09665648ce175da9b4",
+   "point_kind": "contract_false",
+   "preimage_length": 125,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "0c000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "7372632f6d6174682e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "offset": 36
+    },
+    {
+     "field": "entity_kind",
+     "hex": "02",
+     "offset": 68
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "13000000",
+     "offset": 69
+    },
+    {
+     "field": "entity_name",
+     "hex": "6d6174683a3a64697623726571756972657330",
+     "offset": 73
+    },
+    {
+     "field": "point_kind",
+     "hex": "05",
+     "offset": 92
+    },
+    {
+     "field": "start_byte",
+     "hex": "6400000000000000",
+     "offset": 93
+    },
+    {
+     "field": "end_byte",
+     "hex": "7600000000000000",
+     "offset": 101
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 109
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "08000000",
+     "offset": 113
+    },
+    {
+     "field": "discriminator",
+     "hex": "7265717569726573",
+     "offset": 117
+    }
+   ],
+   "source_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "source_path": "src/math.sv0",
+   "start_byte": 100
+  },
+  {
+   "discriminator": "return",
+   "end_byte": 18446744073709551615,
+   "entity_kind": "function",
+   "entity_name": "f",
+   "name": "max-offsets",
+   "outcome_ordinal": null,
+   "point_id": "958bdaf44b19a2ee495a33c026d1d3ae90ffcb8ca99626ec16164a7b3d63c005",
+   "point_kind": "region",
+   "preimage_length": 100,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "07000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "6269672e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "offset": 31
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 63
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "01000000",
+     "offset": 64
+    },
+    {
+     "field": "entity_name",
+     "hex": "66",
+     "offset": 68
+    },
+    {
+     "field": "point_kind",
+     "hex": "02",
+     "offset": 69
+    },
+    {
+     "field": "start_byte",
+     "hex": "ffffffffffffffff",
+     "offset": 70
+    },
+    {
+     "field": "end_byte",
+     "hex": "ffffffffffffffff",
+     "offset": 78
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 86
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "06000000",
+     "offset": 90
+    },
+    {
+     "field": "discriminator",
+     "hex": "72657475726e",
+     "offset": 94
+    }
+   ],
+   "source_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "source_path": "big.sv0",
+   "start_byte": 18446744073709551615
+  },
+  {
+   "discriminator": "call→é",
+   "end_byte": 9,
+   "entity_kind": "function",
+   "entity_name": "π::√2",
+   "name": "unicode",
+   "outcome_ordinal": null,
+   "point_id": "3b3b0e275ec993fd4511eaab6307e3455e6ea843c9451d143fa04cf493c59a77",
+   "point_kind": "region",
+   "preimage_length": 133,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "1e000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "74657374732f646f6e6ec3a965732fe6b8ace8a9a62ff09f98802e737630",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0000000000000000000000000000000000000000000000000000000000000000",
+     "offset": 54
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 86
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "08000000",
+     "offset": 87
+    },
+    {
+     "field": "entity_name",
+     "hex": "cf803a3ae2889a32",
+     "offset": 91
+    },
+    {
+     "field": "point_kind",
+     "hex": "02",
+     "offset": 99
+    },
+    {
+     "field": "start_byte",
+     "hex": "0300000000000000",
+     "offset": 100
+    },
+    {
+     "field": "end_byte",
+     "hex": "0900000000000000",
+     "offset": 108
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 116
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "09000000",
+     "offset": 120
+    },
+    {
+     "field": "discriminator",
+     "hex": "63616c6ce28692c3a9",
+     "offset": 124
+    }
+   ],
+   "source_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+   "source_path": "tests/données/測試/😀.sv0",
+   "start_byte": 3
+  },
+  {
+   "discriminator": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "end_byte": 0,
+   "entity_kind": "function",
+   "entity_name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+   "name": "longest-fields",
+   "outcome_ordinal": null,
+   "point_id": "aa3d779317ea70367bc012fff63b3fda9cba2425f8cd9c8cda589573594418c2",
+   "point_kind": "region",
+   "preimage_length": 8532,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "fe0f0000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "642f707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "offset": 4118
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 4150
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "00100000",
+     "offset": 4151
+    },
+    {
+     "field": "entity_name",
+     "hex": "6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e",
+     "offset": 4155
+    },
+    {
+     "field": "point_kind",
+     "hex": "02",
+     "offset": 8251
+    },
+    {
+     "field": "start_byte",
+     "hex": "0000000000000000",
+     "offset": 8252
+    },
+    {
+     "field": "end_byte",
+     "hex": "0000000000000000",
+     "offset": 8260
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 8268
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "00010000",
+     "offset": 8272
+    },
+    {
+     "field": "discriminator",
+     "hex": "78787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+     "offset": 8276
+    }
+   ],
+   "source_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "source_path": "d/pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+   "start_byte": 0
+  },
+  {
+   "discriminator": "c",
+   "end_byte": 0,
+   "entity_kind": "function",
+   "entity_name": "b",
+   "name": "one-byte-fields",
+   "outcome_ordinal": null,
+   "point_id": "72f2767e6353df48ac026dc1e0c922189f663945ebef0f4663fceb72324ab36f",
+   "point_kind": "function_entry",
+   "preimage_length": 89,
+   "segments": [
+    {
+     "field": "domain",
+     "hex": "737630636f762e706f696e742e763100",
+     "offset": 0
+    },
+    {
+     "field": "identity_major",
+     "hex": "0100",
+     "offset": 16
+    },
+    {
+     "field": "identity_minor",
+     "hex": "0000",
+     "offset": 18
+    },
+    {
+     "field": "path_length",
+     "hex": "01000000",
+     "offset": 20
+    },
+    {
+     "field": "path",
+     "hex": "61",
+     "offset": 24
+    },
+    {
+     "field": "source_digest",
+     "hex": "0000000000000000000000000000000000000000000000000000000000000000",
+     "offset": 25
+    },
+    {
+     "field": "entity_kind",
+     "hex": "01",
+     "offset": 57
+    },
+    {
+     "field": "entity_name_length",
+     "hex": "01000000",
+     "offset": 58
+    },
+    {
+     "field": "entity_name",
+     "hex": "62",
+     "offset": 62
+    },
+    {
+     "field": "point_kind",
+     "hex": "01",
+     "offset": 63
+    },
+    {
+     "field": "start_byte",
+     "hex": "0000000000000000",
+     "offset": 64
+    },
+    {
+     "field": "end_byte",
+     "hex": "0000000000000000",
+     "offset": 72
+    },
+    {
+     "field": "outcome_ordinal",
+     "hex": "ffffffff",
+     "offset": 80
+    },
+    {
+     "field": "discriminator_length",
+     "hex": "01000000",
+     "offset": 84
+    },
+    {
+     "field": "discriminator",
+     "hex": "63",
+     "offset": 88
+    }
+   ],
+   "source_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+   "source_path": "a",
+   "start_byte": 0
+  }
+ ]
+}

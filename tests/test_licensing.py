@@ -9,6 +9,7 @@ license texts themselves are pinned by SHA-256 so an edit is caught.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import os
 import subprocess
@@ -60,6 +61,16 @@ def project_files() -> list[str]:
     return sorted(n for n in names if (ROOT / n).is_file())
 
 
+def annotation_for(rel: str, annotations: dict[str, str]) -> str | None:
+    """License from an exact REUSE.toml path, else from the first matching glob."""
+    if rel in annotations:
+        return annotations[rel]
+    for pattern, license_id in annotations.items():
+        if any(c in pattern for c in "*?[") and fnmatch.fnmatchcase(rel, pattern):
+            return license_id
+    return None
+
+
 def reuse_annotations() -> dict[str, str]:
     data = tomllib.loads((ROOT / "REUSE.toml").read_text(encoding="utf-8"))
     result: dict[str, str] = {}
@@ -107,7 +118,7 @@ class LicensingTest(unittest.TestCase):
                 continue
             with self.subTest(file=rel):
                 in_file = header_license(ROOT / rel)
-                annotated = annotations.get(rel)
+                annotated = annotation_for(rel, annotations)
                 self.assertFalse(
                     in_file and annotated,
                     "declared both in-file and in REUSE.toml",
@@ -119,9 +130,13 @@ class LicensingTest(unittest.TestCase):
                     self.assertEqual(declared, expected)
 
     def test_annotations_name_existing_files(self) -> None:
+        files = project_files()
         for rel in reuse_annotations():
             with self.subTest(file=rel):
-                self.assertTrue((ROOT / rel).is_file())
+                if any(c in rel for c in "*?["):
+                    self.assertTrue(any(fnmatch.fnmatchcase(f, rel) for f in files), "glob matches nothing")
+                else:
+                    self.assertTrue((ROOT / rel).is_file())
 
 
 if __name__ == "__main__":
