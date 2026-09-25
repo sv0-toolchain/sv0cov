@@ -8,4 +8,5 @@ GENERATOR_FORMAT = '2'
 SCHEMAS = {
     'sv0cov_diagnostic_1_0': ('sv0cov.diagnostic-1.0.schema.json', '69a711c337e9a26ed09aad0793523fcb529daceb9c9651864be7663035702115'),
     'sv0cov_diagnostic_registry_1_0': ('sv0cov.diagnostic-registry-1.0.schema.json', '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'),
+    'sv0cov_map_1_0': ('sv0cov.map-1.0.schema.json', 'b77082e414db15bee9a3b8b5fc114540e7e9e49199bb8b6f3994e46a6ec224c8'),
 }
