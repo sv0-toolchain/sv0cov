@@ -48,8 +48,11 @@ import cases as C  # noqa: E402
 from sv0cov.formats.canonical_json import encode  # noqa: E402
 
 GIT_VERSION = "2.55.0"
+# The upstream source release the oracle executable was built from. The
+# reference capture used Homebrew's git 2.55.0, whose formula builds from this
+# exact tarball; any build from these bytes is an acceptable oracle.
 GIT_SOURCE = {
-    "sha256": None,  # pinned when the source release is fetched (see corpus README)
+    "sha256": "457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357",
     "url": "https://www.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz",
 }
 CORPUS = HERE / "corpus.json"

@@ -16,6 +16,10 @@ with a Git 2.55.0 built from the checksum-pinned source release, fully
 isolated from system, global, repository, and `info/exclude` ignore sources.
 The production matcher (CV-310) must reproduce it without running Git.
 
+The reference capture (2026-09-25) used Homebrew's `git` 2.55.0, built from
+the kernel.org `git-2.55.0.tar.xz` whose SHA-256 is pinned in the tool
+(`457fdb04…7505357`); the executable's digest is recorded in `corpus.json`.
+
 Capture (needs a case-sensitive filesystem; on macOS a case-sensitive APFS
 sparse image works):
 
