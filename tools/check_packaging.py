@@ -102,6 +102,7 @@ SDIST_ALLOW = {
     "tests",
     "tools",
     "scripts",
+    "bench",
     "PKG-INFO",
 }
 
