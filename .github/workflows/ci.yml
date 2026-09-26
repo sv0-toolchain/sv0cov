@@ -71,6 +71,11 @@ jobs:
       - name: Packaging and dependency-source policy
         run: python tools/check_packaging.py policy
 
+      - name: Production import boundary (stdlib + sv0cov only)
+        run: |
+          python tools/import_audit.py
+          python tools/import_audit.py --no-site
+
       - name: Stdlib-only test run (no third-party packages)
         run: python -m unittest discover -s tests
 
