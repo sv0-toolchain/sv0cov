@@ -11,6 +11,7 @@ SCHEMAS = {
     'sv0cov_diagnostic_registry_1_0': ('sv0cov.diagnostic-registry-1.0.schema.json', '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'),
     'sv0cov_doctor_1_0': ('sv0cov.doctor-1.0.schema.json', '12eb3144d4e875fbb7047b713191ef247cf28df23fc481d391ba271b4b6a6893'),
     'sv0cov_map_1_0': ('sv0cov.map-1.0.schema.json', 'b77082e414db15bee9a3b8b5fc114540e7e9e49199bb8b6f3994e46a6ec224c8'),
+    'sv0cov_release_manifest_1_0': ('sv0cov.release-manifest-1.0.schema.json', 'a78bda572fea2095538191fb0a62d9c35d3fe3716be1cea5b1a8230588e6454c'),
     'sv0cov_run_set_1_0': ('sv0cov.run-set-1.0.schema.json', '05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2'),
     'sv0cov_version_1_0': ('sv0cov.version-1.0.schema.json', 'bd763071b96e95f298462744e5b113aa9888455ab698a20d600f45820ce5eee5'),
     'sv0cov_vm_binding_1_0': ('sv0cov.vm-binding-1.0.schema.json', '9835835b2c82d84e9f545bda6a71e4112731896e882d1d702116d984a7b28dd5'),
