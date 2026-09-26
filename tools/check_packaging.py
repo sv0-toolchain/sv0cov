@@ -101,6 +101,7 @@ SDIST_ALLOW = {
     "docs",
     "tests",
     "tools",
+    "scripts",
     "PKG-INFO",
 }
 

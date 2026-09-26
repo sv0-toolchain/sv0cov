@@ -1,0 +1,255 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
+#
+# Repository-local Python launcher for sv0cov (SPEC 20.6.3, 20.6.4).
+# scripts/sv0cov (the fixed root-selected launcher) and scripts/sv0cov-python
+# (the Python oracle launcher) are byte-identical copies written by
+# tools/launchergen.py.
+#
+# 1. Parse the inherited PATH itself. Any empty or relative entry is unsafe.
+# 2. The only candidates are python3.14, then python3.13. For a name, the
+#    first PATH directory that has an entry by that name is authoritative;
+#    an unusable entry there fails closed (no fallthrough to a later
+#    directory or to python3.13).
+# 3. Follow the link chain (bounded), require a regular executable target,
+#    and snapshot its identity and SHA-256.
+# 4. Probe the candidate in isolated mode (5 s, 4096 bytes): CPython,
+#    major 3, minor = basename, 64-bit, host = uname, and
+#    realpath(sys.executable) = the physical target (rejects shims).
+# 5. Recheck the snapshot, then exec the same absolute candidate with -I -B
+#    and a bootstrap that imports sv0cov only from this checkout's src/.
+#
+# Bootstrap failures emit exactly one diagnostic (human, or JSON Lines with
+# --diagnostic-format json-lines) built from the generated block below and
+# exit 7 (8 for COV8001). No sv0cov code is imported before step 5.
+# Host tools are called by absolute path; nothing else is looked up on PATH.
+
+set -u
+umask 077
+MAX_LINKS=32
+PROBE_SECONDS=5
+PROBE_BYTES=4096
+
+# BEGIN GENERATED BOOTSTRAP DIAGNOSTICS (tools/launchergen.py; do not edit)
+REGISTRY_REVISION=1
+REGISTRY_SHA256=440aad98c48e372d526d4aefb7c3e8cba8a0d4fc07b31797115a55044b06e3b1
+TITLE_COV0016='Unsupported Python interpreter'
+SEVERITY_COV0016='error'
+TITLE_COV5001='Unsupported installation or platform'
+SEVERITY_COV5001='error'
+TITLE_COV6001='Resource limit exceeded'
+SEVERITY_COV6001='error'
+TITLE_COV6002='Unsafe path or filesystem object'
+SEVERITY_COV6002='error'
+TITLE_COV8001='Internal invariant failed'
+SEVERITY_COV8001='error'
+# END GENERATED BOOTSTRAP DIAGNOSTICS
+
+format=human
+for arg in "$@"; do
+    case $arg in
+        --) break ;;
+        --diagnostic-format=json-lines) format=json-lines ;;
+        --diagnostic-format=*) format=human ;;
+    esac
+done
+prev=
+for arg in "$@"; do
+    [ "$arg" = -- ] && break
+    [ "$prev" = --diagnostic-format ] && { [ "$arg" = json-lines ] && format=json-lines || format=human; }
+    prev=$arg
+done
+
+tmp=
+cleanup() { [ -n "$tmp" ] && /bin/rm -rf "$tmp"; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# fail CODE CANDIDATE REASON: one diagnostic on stderr, then exit.
+fail() {
+    eval "title=\$TITLE_$1 severity=\$SEVERITY_$1"
+    if [ "$format" = json-lines ]; then
+        printf '{"code":"%s","facts":[{"name":"candidate","value":"%s"},{"name":"reason","value":"%s"}],"message":"%s","phase":"invocation","primary_location":null,"registry_revision":%s,"registry_sha256":"%s","related_locations":[],"schema":"sv0cov.diagnostic","severity":"%s","version":"1.0"}\n' \
+            "$1" "$2" "$3" "$title" "$REGISTRY_REVISION" "$REGISTRY_SHA256" "$severity" >&2
+    else
+        printf '%s %s: %s\n  candidate: %s\n  reason: %s\n' "$1" "$severity" "$title" "$2" "$3" >&2
+    fi
+    [ "$1" = COV8001 ] && exit 8
+    exit 7
+}
+
+# --- this checkout ----------------------------------------------------------
+
+case $0 in
+    */*) ;;
+    *) fail COV6002 none launcher_not_invoked_by_path ;;
+esac
+root=$(cd -P -- "${0%/*}/.." 2>/dev/null && pwd -P) || fail COV6002 none launcher_root_unresolved
+[ -f "$root/src/sv0cov/__init__.py" ] || fail COV6002 none launcher_root_unresolved
+
+# --- host -------------------------------------------------------------------
+
+case $(/usr/bin/uname -s) in
+    Darwin) host_os=darwin ;;
+    Linux) host_os=linux ;;
+    *) fail COV5001 none unsupported_host ;;
+esac
+case $(/usr/bin/uname -m) in
+    arm64 | aarch64) host_arch=arm64 ;;
+    x86_64) host_arch=x86_64 ;;
+    *) fail COV5001 none unsupported_host ;;
+esac
+
+# --- candidate --------------------------------------------------------------
+
+path_entries=$PATH
+case $path_entries in
+    '' | :* | *: | *::*) fail COV6002 none empty_path_entry ;;
+esac
+old_ifs=$IFS
+IFS=:
+set -f
+for entry in $path_entries; do
+    case $entry in
+        /*) ;;
+        *) IFS=$old_ifs; fail COV6002 none relative_path_entry ;;
+    esac
+done
+set +f
+IFS=$old_ifs
+
+candidate=
+name=
+for want in python3.14 python3.13; do
+    IFS=:
+    set -f
+    for entry in $path_entries; do
+        [ -d "$entry" ] || continue
+        if [ -e "$entry/$want" ] || [ -L "$entry/$want" ]; then
+            candidate=$entry/$want
+            break
+        fi
+    done
+    set +f
+    IFS=$old_ifs
+    if [ -n "$candidate" ]; then
+        name=$want
+        break
+    fi
+done
+[ -n "$candidate" ] || fail COV0016 none no_candidate
+
+# Follow the final-component link chain; record each link text.
+chain=
+target=$candidate
+links=0
+while [ -L "$target" ]; do
+    links=$((links + 1))
+    [ "$links" -le "$MAX_LINKS" ] || fail COV6002 "$name" link_chain_too_long
+    text=$(/usr/bin/readlink -- "$target") || fail COV6002 "$name" broken_link
+    chain="$chain/$text"
+    case $text in
+        /*) target=$text ;;
+        *) target=${target%/*}/$text ;;
+    esac
+done
+[ -e "$target" ] || fail COV6002 "$name" broken_link
+[ -f "$target" ] || fail COV6002 "$name" not_regular
+[ -x "$target" ] || fail COV6002 "$name" not_executable
+dir=$(cd -P -- "${target%/*}" 2>/dev/null && pwd -P) || fail COV6002 "$name" broken_link
+physical=$dir/${target##*/}
+
+identity() {
+    if [ "$host_os" = darwin ]; then
+        /usr/bin/stat -f '%d:%i:%p:%z:%m' -- "$physical" || return 1
+        /usr/bin/shasum -a 256 -- "$physical" || return 1
+    else
+        /usr/bin/stat -c '%d:%i:%f:%s:%Y' -- "$physical" || return 1
+        /usr/bin/sha256sum -- "$physical" || return 1
+    fi
+    printf '%s\n' "$chain"
+}
+snapshot=$(identity 2>/dev/null) || fail COV6002 "$name" target_unreadable
+
+# --- probe ------------------------------------------------------------------
+
+tmp=$(/usr/bin/mktemp -d) || fail COV8001 "$name" no_temporary_directory
+PROBE='import os, platform, sys
+v = sys.version_info
+print("sv0cov-probe-1", sys.implementation.name, v.major, v.minor, v.micro, 64 if sys.maxsize > 2**32 else 32, sys.platform, platform.machine(), os.path.realpath(sys.executable).encode("utf-8", "surrogateescape").hex())'
+# The probe is the direct child (so a timeout kills the interpreter itself);
+# a file-size limit stops a runaway writer long before it matters.
+(
+    ulimit -f 16
+    exec "$candidate" -I -B -c "$PROBE" </dev/null >"$tmp/out" 2>&1
+) &
+probe=$!
+(
+    /bin/sleep "$PROBE_SECONDS"
+    : >"$tmp/timeout"
+    /bin/kill -KILL "$probe"
+) </dev/null >/dev/null 2>&1 &
+watchdog=$!
+{ wait "$probe"; } 2>/dev/null
+{ /bin/kill -KILL "$watchdog"; wait "$watchdog"; } 2>/dev/null
+[ -e "$tmp/timeout" ] && fail COV6001 "$name" probe_timeout
+size=$(/usr/bin/wc -c <"$tmp/out" | /usr/bin/tr -d ' ')
+[ "$size" -le "$PROBE_BYTES" ] || fail COV6001 "$name" probe_output_limit
+# A failed or foreign interpreter shows as a missing probe tag.
+lines=$(/usr/bin/wc -l <"$tmp/out" | /usr/bin/tr -d ' ')
+tag= impl= major= minor= micro= bits= py_os= py_arch= exe_hex= extra=
+IFS=' ' read -r tag impl major minor micro bits py_os py_arch exe_hex extra <"$tmp/out"
+[ "$tag" = sv0cov-probe-1 ] || fail COV0016 "$name" probe_failed
+[ "$lines" = 1 ] && [ -n "$exe_hex" ] && [ -z "$extra" ] || fail COV8001 "$name" probe_output_malformed
+for n in "$major" "$minor" "$micro"; do
+    case $n in
+        0 | [1-9] | [1-9]*[0-9]) case $n in *[!0-9]*) fail COV8001 "$name" probe_output_malformed ;; esac ;;
+        *) fail COV8001 "$name" probe_output_malformed ;;
+    esac
+done
+[ "$impl" = cpython ] || fail COV0016 "$name" not_cpython
+[ "$major" = 3 ] || fail COV0016 "$name" major_mismatch
+[ "python3.$minor" = "$name" ] || fail COV0016 "$name" minor_mismatch
+[ "$bits" = 64 ] || fail COV0016 "$name" not_64bit
+case $py_arch in aarch64) py_arch=arm64 ;; esac
+[ "$py_os" = "$host_os" ] && [ "$py_arch" = "$host_arch" ] || fail COV5001 "$name" host_mismatch
+phys_hex=$(printf '%s' "$physical" | /usr/bin/od -An -tx1 -v | /usr/bin/tr -d ' \n')
+[ "$exe_hex" = "$phys_hex" ] || fail COV6002 "$name" executable_mismatch
+[ "$(identity 2>/dev/null)" = "$snapshot" ] || fail COV6002 "$name" target_changed
+
+# --- run --------------------------------------------------------------------
+
+BOOT='import os, sys
+root, fmt = sys.argv[1], sys.argv[2]
+src = os.path.join(root, "src")
+sys.argv = [os.path.join(root, "scripts", "sv0cov")] + sys.argv[3:]
+sys.path.insert(0, src)
+
+
+def foreign():
+    return sorted(
+        n for n, m in list(sys.modules.items())
+        if (n == "sv0cov" or n.startswith("sv0cov."))
+        and os.path.commonpath([src, os.path.realpath(getattr(m, "__file__", None) or "/")]) != src
+    )
+
+
+def refuse():
+    from sv0cov.diagnostics import Diagnostic, render_human, render_json_line
+    obj = Diagnostic("COV6002", "invocation", facts=(("candidate", f"python3.{sys.version_info.minor}"), ("reason", "module_outside_checkout"))).to_json()
+    sys.stderr.buffer.write(render_json_line(obj) if fmt == "json-lines" else render_human(obj).encode())
+    sys.exit(7)
+
+
+import sv0cov.cli
+if foreign():
+    refuse()
+status = sv0cov.cli.main(sys.argv[1:])
+if foreign():
+    refuse()
+sys.exit(status)'
+/bin/rm -rf "$tmp"
+tmp=
+exec "$candidate" -I -B -c "$BOOT" "$root" "$format" "$@"

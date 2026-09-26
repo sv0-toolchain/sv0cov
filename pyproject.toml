@@ -76,6 +76,7 @@ only-include = [
     "docs",
     "tests",
     "tools",
+    "scripts",
 ]
 exclude = ["tests/vendor", "__pycache__", "*.pyc"]
 
