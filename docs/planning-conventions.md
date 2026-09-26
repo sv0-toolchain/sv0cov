@@ -16,9 +16,17 @@ fixtures change together through review.
 - A single-file program's logical path is its file name (`main.sv0`); a
   project's paths are relative to the project directory. Ownership is `user`;
   `package` is `null` for the root project.
-- One `function` entity per `fn` item that has a body. Its span runs from the
-  `fn` keyword through the closing `}` of the body. The qualified name is the
-  function name; a function in module `m` is `m::name`.
+- One `function` entity per `fn` item that has a body: free functions,
+  methods of `impl` blocks, and trait methods with a default body. Its span
+  runs from the `fn` keyword through the closing `}` of the body (a leading
+  `pub` or attribute is outside the span). The qualified name is the
+  function name, prefixed by the `impl` self type or trait name for a method
+  (`Type::name`, `Trait::name`) and by the file's `module m;` declaration
+  (`m::name`, `m::Type::name`).
+- `#[extern_c]` declarations and bodyless trait methods are not entities.
+- sv0 has no nested functions yet, so every function owns itself.
+- Entities are ordered by source (sources sorted bytewise by logical path),
+  then by position in the file.
 - Enum, struct, `use`, and `module` items are not entities.
 
 ## Points and counters
