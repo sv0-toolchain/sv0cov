@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
+#
+# CV-037 (SPEC 24.1, COV-PERF-021/022): managed-CI provisional benchmarks on
+# the four host classes. Results are trend evidence only: every bundle is
+# labelled `managed-ci-provisional`, claims no conformance, and records the
+# provider-visible host identity with `unknown` for anything unobservable.
+# The bundle's series key keeps different observed hardware apart.
+#
+# sv0cov CI has no sv0 toolchain, so this job measures what is runnable here:
+# ingest of the 1,000,000 point/profile-pair merge fixture. Compile and
+# execute baselines run from the toolchain root (bench/corpus.py plan
+# --toolchain). Weekly and on demand, because the frozen protocol makes each
+# campaign long.
+
+name: Provisional performance
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  perf:
+    name: ${{ matrix.host }} (managed-ci-provisional)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [linux-x86_64, linux-arm64, macos-x86_64, macos-arm64]
+        include:
+          - { host: linux-x86_64, runner: ubuntu-24.04 }
+          - { host: linux-arm64, runner: ubuntu-24.04-arm }
+          - { host: macos-x86_64, runner: macos-15-intel }
+          - { host: macos-arm64, runner: macos-15 }
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      SV0COV_RUNNER_LABEL: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Corpus manifest and snapshots are current
+        run: python bench/corpus.py check
+
+      - name: Host descriptor (provisional)
+        run: python bench/harness.py host --stage managed-ci-provisional > "host-${{ matrix.host }}.json"
+
+      - name: Materialize the merge-scale fixture (replay digest must match the manifest)
+        run: python bench/corpus.py plan --work "$RUNNER_TEMP/bench" --dimension ingest --id scale-merge-1m-pairs > plan.json
+
+      - name: Provisional campaign
+        run: >-
+          python bench/harness.py run --plan plan.json --stage managed-ci-provisional
+          --out "results-${{ matrix.host }}.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: perf-provisional-${{ matrix.host }}
+          path: |
+            host-${{ matrix.host }}.json
+            results-${{ matrix.host }}.json
+          if-no-files-found: warn
+          retention-days: 90
