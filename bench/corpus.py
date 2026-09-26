@@ -463,8 +463,7 @@ def fixtures() -> list[Fixture]:
         Fixture("startup-multi", "startup-small", "small multi-function program", _gen("startup", 103, variant="multi"), lambda: gen_startup("multi", 103)),
         Fixture("region-small", "region-density", "straight-line code, small", _gen("straight", 201, functions=10, statements=20), lambda: gen_straight(10, 20, 201)),
         Fixture("region-medium", "region-density", "straight-line code, medium", _gen("straight", 202, functions=100, statements=20), lambda: gen_straight(100, 20, 202)),
-        Fixture("region-large", "region-density", "straight-line code, report-scale regions", _gen("straight", 203, functions=1000, statements=20), lambda: gen_straight(1000, 20, 203),
-                status="pending: the native sv0c exhausts its 262,144-handle Vec table (sv0_runtime.h SV0_VEC_MAX) compiling this program"),
+        Fixture("region-large", "region-density", "straight-line code, report-scale regions", _gen("straight", 203, functions=1000, statements=20), lambda: gen_straight(1000, 20, 203)),
     ]
     for i, v in enumerate(("if-flat", "if-nested", "loops", "match", "short-circuit")):
         fx.append(Fixture(f"decision-{v}", "decision-density", f"{v} decisions", _gen("decisions", 301 + i, variant=v, count=50), lambda v=v, s=301 + i: gen_decisions(v, 50, s)))
