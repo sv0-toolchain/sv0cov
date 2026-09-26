@@ -18,3 +18,27 @@
 
 Until coverage instrumentation exists, fixtures have only a coverage-off arm;
 those runs are baselines, never overhead evidence.
+
+## Corpus (`corpus/`, `corpus.py`)
+
+- `corpus/manifest.json`: 38 fixtures in the ten SPEC 24.3 categories, each
+  with source or generator identity, seed and parameters, tree digest,
+  expected result, scale, backends, coverage modes, timed boundary, budgets,
+  and status (`runnable-baseline`, or `pending: <reason>` naming the slice
+  that must land first). `corpus.py check` regenerates it and verifies the
+  real-project snapshots; `write --heavy` also rebuilds the 250,000-point
+  merge/report artifacts (about 3.5 minutes, 1.2 GB) and records their
+  digests.
+- `corpus/real/`: byte-for-byte copies of sv0c behavior cases and
+  sv0-mathlib v0.2.0 at pinned commits (`REDISTRIBUTION.md`).
+- `corpus.py plan --toolchain ROOT --work DIR --dimension compile|execute|ingest`
+  materializes fixtures (checking replay digests), builds what the
+  dimension needs, and prints a harness plan.
+- Expected results were checked on 2026-09-25 with sv0c `d1a5100`: every
+  runnable fixture gives its expected exit code and empty stdout on native
+  and VM-v1 (`vm_exit` for the VM).
+- Known toolchain limit: `region-large` (1,000 functions of 20 statements)
+  exhausts the native compiler's 262,144-handle Vec table, so it is pending.
+- `.github/workflows/perf-provisional.yml` runs the ingest campaign for the
+  1,000,000 point/profile-pair fixture on the four managed-CI hosts weekly
+  and on demand, as labelled provisional trend evidence.

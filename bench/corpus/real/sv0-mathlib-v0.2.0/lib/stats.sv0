@@ -1,0 +1,393 @@
+/* module::stats — streaming descriptive statistics: count, sum, mean,
+ * variance, standard deviation, min, max, range.
+ *
+ * DESIGN: two ways in. A `Stats` accumulator is threaded by value, one
+ * observation at a time (`s = stats_push(s, x);`), and answers count, sum,
+ * mean, variance, standard deviation, min, max and range from running state.
+ * A `Vec<f64>` sample (declared as such, so the toolchain selects the f64
+ * element accessors for `vec_push` / `vec_get` / `vec_set`) additionally
+ * answers the order statistics, which need the whole sample: `stats_median_f64` and
+ * `stats_percentile_f64` sort a private copy (heapsort, O(n log n)) and never
+ * modify the caller's vector. `stats_from_vec` feeds a whole sample into an
+ * accumulator.
+ *
+ * Numerics: the mean and variance use Welford's update, with the running
+ * mean carried as a double-double (`mean` + `mean_lo`, updated by an exact
+ * two-sum). A plain-double running mean loses accuracy in proportion to
+ * mean/stddev (about 1e-7 relative error in the variance of data like
+ * 1e9 + noise); the double-double mean removes that dependence, so the mean
+ * is within about 1 ULP and the variance within a few ULPs. There is no
+ * running sum to overflow. The sum uses Neumaier compensated summation.
+ *
+ * Total functions, no panics: an undefined result is NaN (empty input for
+ * mean/min/max/population variance/median/percentile; fewer than two
+ * observations for sample variance; a percentile outside [0, 100]).
+ * Callers can test `stats_count` / `vec_len` first.
+ *
+ * Non-finite input: a NaN observation makes every result NaN, including the
+ * median and any percentile. Infinite
+ * observations are counted, excluded from the Welford state, and reflected
+ * in the results: the sum is +/-infinity (NaN if both signs appear), the
+ * mean is +/-infinity (NaN if both signs appear), min/max see them, and
+ * variance/stddev are NaN.
+ *
+ * Not tied to a SPEC.md requirement ID (beyond-spec, docs/deviations.md).
+ */
+module stats;
+
+use arith::abs_f64;
+use trig::sqrt_f64;
+
+/* Accumulator state. Treat as opaque and use the functions below: `nf`
+ * counts only the finite observations (the Welford state's count),
+ * `mean` + `mean_lo` is the running mean as an unevaluated sum, and `comp`
+ * is the Neumaier running compensation for `sum`. */
+struct Stats {
+    n: i64,
+    nf: i64,
+    mean: f64,
+    mean_lo: f64,
+    m2: f64,
+    sum: f64,
+    comp: f64,
+    lo: f64,
+    hi: f64,
+    nan_seen: bool,
+    pinf: bool,
+    ninf: bool
+}
+
+/* A quiet NaN, the "undefined result" value returned by the reductions. */
+fn stats_nan() -> f64 { return 0.0 / 0.0; }
+
+/* An empty accumulator (no observations). */
+fn stats_new() -> Stats {
+    return Stats {
+        n: 0, nf: 0, mean: 0.0, mean_lo: 0.0, m2: 0.0, sum: 0.0, comp: 0.0,
+        lo: 0.0, hi: 0.0, nan_seen: false, pinf: false, ninf: false
+    };
+}
+
+/* Adds one observation and returns the updated accumulator. */
+fn stats_push(s: Stats, x: f64) -> Stats {
+    let n0: i64 = s.n;
+    let nf0: i64 = s.nf;
+    let mean0: f64 = s.mean;
+    let mlo0: f64 = s.mean_lo;
+    let m20: f64 = s.m2;
+    let sum0: f64 = s.sum;
+    let comp0: f64 = s.comp;
+    let lo0: f64 = s.lo;
+    let hi0: f64 = s.hi;
+    let mut nan1: bool = s.nan_seen;
+    let mut pinf1: bool = s.pinf;
+    let mut ninf1: bool = s.ninf;
+
+    let n1: i64 = n0 + 1;
+    let mut nf1: i64 = nf0;
+    let mut mean1: f64 = mean0;
+    let mut mlo1: f64 = mlo0;
+    let mut m21: f64 = m20;
+    let mut sum1: f64 = sum0;
+    let mut comp1: f64 = comp0;
+    let mut lo1: f64 = lo0;
+    let mut hi1: f64 = hi0;
+
+    if n0 == 0 {
+        lo1 = x;
+        hi1 = x;
+    } else {
+        if x < lo0 { lo1 = x; }
+        if x > hi0 { hi1 = x; }
+    }
+
+    /* x - x is 0.0 for every finite x, NaN for infinities and NaN. */
+    let fin: bool = (x - x) == 0.0;
+    if fin {
+        nf1 = nf0 + 1;
+        let nfd: f64 = nf1;
+        /* d = x - (mean0 + mlo0); delta is the step to the new mean. */
+        let d: f64 = (x - mean0) - mlo0;
+        let delta: f64 = d / nfd;
+        /* Exact two-sum of mean0 + delta into (sm, err), fold the error
+         * into the low part, then renormalize to (mean1, mlo1). */
+        let sm: f64 = mean0 + delta;
+        let bb: f64 = sm - mean0;
+        let err: f64 = (mean0 - (sm - bb)) + (delta - bb);
+        let lo: f64 = mlo0 + err;
+        mean1 = sm + lo;
+        mlo1 = lo - (mean1 - sm);
+        m21 = m20 + d * ((x - mean1) - mlo1);
+
+        let t: f64 = sum0 + x;
+        if (t - t) == 0.0 {
+            if abs_f64(sum0) >= abs_f64(x) {
+                comp1 = comp0 + ((sum0 - t) + x);
+            } else {
+                comp1 = comp0 + ((x - t) + sum0);
+            }
+        }
+        sum1 = t;
+    } else {
+        sum1 = sum0 + x;
+        if x != x {
+            nan1 = true;
+        } else {
+            if x > 0.0 { pinf1 = true; } else { ninf1 = true; }
+        }
+    }
+
+    return Stats {
+        n: n1, nf: nf1, mean: mean1, mean_lo: mlo1, m2: m21, sum: sum1, comp: comp1,
+        lo: lo1, hi: hi1, nan_seen: nan1, pinf: pinf1, ninf: ninf1
+    };
+}
+
+/* Number of observations pushed (finite or not). */
+fn stats_count(s: Stats) -> i64 { return s.n; }
+
+/* Sum of all observations; 0.0 when empty. */
+fn stats_sum_f64(s: Stats) -> f64 {
+    let sum: f64 = s.sum;
+    let comp: f64 = s.comp;
+    return sum + comp;
+}
+
+/* Arithmetic mean of all observations; NaN when empty (see the module
+ * header for how NaN and infinite observations propagate). */
+fn stats_mean_f64(s: Stats) -> f64 {
+    let n: i64 = s.n;
+    let nan_seen: bool = s.nan_seen;
+    let pinf: bool = s.pinf;
+    let ninf: bool = s.ninf;
+    let mean: f64 = s.mean;
+    if n == 0 { return stats_nan(); }
+    if nan_seen { return stats_nan(); }
+    if pinf && ninf { return stats_nan(); }
+    if pinf { return 1.0 / 0.0; }
+    if ninf { return 0.0 - (1.0 / 0.0); }
+    return mean;
+}
+
+/* Population variance (divides by n); NaN when empty or non-finite input
+ * was seen. */
+fn stats_variance_pop_f64(s: Stats) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    let n: i64 = s.n;
+    let nf: i64 = s.nf;
+    let m2: f64 = s.m2;
+    if n == 0 { return stats_nan(); }
+    if nf != n { return stats_nan(); }
+    let nd: f64 = n;
+    return m2 / nd;
+}
+
+/* Sample variance (divides by n - 1); NaN with fewer than two
+ * observations or when non-finite input was seen. */
+fn stats_variance_sample_f64(s: Stats) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    let n: i64 = s.n;
+    let nf: i64 = s.nf;
+    let m2: f64 = s.m2;
+    if n < 2 { return stats_nan(); }
+    if nf != n { return stats_nan(); }
+    let dof: i64 = n - 1;
+    let dd: f64 = dof;
+    return m2 / dd;
+}
+
+/* Square root of a variance value, propagating NaN instead of tripping
+ * sqrt_f64's `requires`. */
+fn stats_sqrt_nonneg(v: f64) -> f64 {
+    if v != v { return v; }
+    if v < 0.0 { return 0.0; }
+    return sqrt_f64(v);
+}
+
+/* Population standard deviation; NaN whenever the population variance is. */
+fn stats_stddev_pop_f64(s: Stats) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    return stats_sqrt_nonneg(stats_variance_pop_f64(s));
+}
+
+/* Sample standard deviation; NaN whenever the sample variance is. */
+fn stats_stddev_sample_f64(s: Stats) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    return stats_sqrt_nonneg(stats_variance_sample_f64(s));
+}
+
+/* Smallest observation; NaN when empty or if a NaN was seen. */
+fn stats_min_f64(s: Stats) -> f64 {
+    let n: i64 = s.n;
+    let nan_seen: bool = s.nan_seen;
+    let lo: f64 = s.lo;
+    if n == 0 { return stats_nan(); }
+    if nan_seen { return stats_nan(); }
+    return lo;
+}
+
+/* Largest observation; NaN when empty or if a NaN was seen. */
+fn stats_max_f64(s: Stats) -> f64 {
+    let n: i64 = s.n;
+    let nan_seen: bool = s.nan_seen;
+    let hi: f64 = s.hi;
+    if n == 0 { return stats_nan(); }
+    if nan_seen { return stats_nan(); }
+    return hi;
+}
+
+/* `max - min`; NaN when empty or if a NaN was seen. */
+fn stats_range_f64(s: Stats) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    let lo: f64 = stats_min_f64(s);
+    let hi: f64 = stats_max_f64(s);
+    return hi - lo;
+}
+
+/* ── order statistics over a Vec<f64> sample ─────────────────────────── */
+
+/* Feeds every element of `xs` into a fresh accumulator, in order. */
+fn stats_from_vec(xs: Vec<f64>) -> Stats {
+    let n: i32 = vec_len(xs);
+    let mut s: Stats = stats_new();
+    let mut i: i32 = 0;
+    while i < n loop_invariant(i >= 0) {
+        let x: f64 = vec_get(xs, i);
+        s = stats_push(s, x);
+        i = i + 1;
+    }
+    return s;
+}
+
+/* True if any element of `xs` is NaN. */
+fn stats_vec_has_nan(xs: Vec<f64>) -> bool {
+    let n: i32 = vec_len(xs);
+    let mut i: i32 = 0;
+    while i < n loop_invariant(i >= 0) {
+        let x: f64 = vec_get(xs, i);
+        if x != x { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* Swaps elements `i` and `j` of `v` in place. */
+fn stats_vec_swap(v: Vec<f64>, i: i32, j: i32) -> i32 {
+    let a: f64 = vec_get(v, i);
+    let b: f64 = vec_get(v, j);
+    vec_set(v, i, b);
+    vec_set(v, j, a);
+    return 0;
+}
+
+/* Restores the max-heap property below `root` within the first `n` elements
+ * of `v` (the standard heapsort sift-down). */
+fn stats_heap_sift_down(v: Vec<f64>, root0: i32, n: i32) -> i32 {
+    let mut root: i32 = root0;
+    let mut going: bool = true;
+    while going loop_invariant(root >= 0) {
+        let child: i32 = 2 * root + 1;
+        if child >= n {
+            going = false;
+        } else {
+            let mut big: i32 = child;
+            if child + 1 < n {
+                let right: f64 = vec_get(v, child + 1);
+                let left: f64 = vec_get(v, child);
+                if right > left { big = child + 1; }
+            }
+            let bv: f64 = vec_get(v, big);
+            let rv: f64 = vec_get(v, root);
+            if bv > rv {
+                let _sw: i32 = stats_vec_swap(v, root, big);
+                root = big;
+            } else {
+                going = false;
+            }
+        }
+    }
+    return 0;
+}
+
+/* A new vector holding the elements of `xs` in ascending order (heapsort of a
+ * private copy; `xs` is untouched). Undefined ordering if `xs` holds a NaN:
+ * callers screen for NaN first (the order statistics below do). */
+fn stats_sorted_f64(xs: Vec<f64>) -> Vec<f64> {
+    let n: i32 = vec_len(xs);
+    let v: Vec<f64> = vec_new();
+    let mut i: i32 = 0;
+    while i < n loop_invariant(i >= 0) {
+        let x: f64 = vec_get(xs, i);
+        vec_push(v, x);
+        i = i + 1;
+    }
+    let mut start: i32 = n / 2 - 1;
+    while start >= 0 loop_invariant(start >= 0 - 1) {
+        let _b: i32 = stats_heap_sift_down(v, start, n);
+        start = start - 1;
+    }
+    let mut last: i32 = n - 1;
+    while last > 0 loop_invariant(last >= 0) {
+        let _s: i32 = stats_vec_swap(v, 0, last);
+        let _d: i32 = stats_heap_sift_down(v, 0, last);
+        last = last - 1;
+    }
+    return v;
+}
+
+/* Median of the sample; NaN when empty or if any element is NaN. An even
+ * count returns the midpoint of the two middle values (`a/2 + b/2`, which
+ * cannot overflow). */
+fn stats_median_f64(xs: Vec<f64>) -> f64 {
+    let n: i32 = vec_len(xs);
+    if n == 0 { return stats_nan(); }
+    if stats_vec_has_nan(xs) { return stats_nan(); }
+    let v: Vec<f64> = stats_sorted_f64(xs);
+    let mid: i32 = n / 2;
+    let hi: f64 = vec_get(v, mid);
+    if n % 2 == 1 { return hi; }
+    let lo: f64 = vec_get(v, mid - 1);
+    return lo * 0.5 + hi * 0.5;
+}
+
+/* The `p`-th percentile (p in [0, 100]) by linear interpolation between the
+ * closest ranks: the value at position `p * (n - 1) / 100` in the sorted
+ * sample (numpy's default). `p == 0` is the minimum and `p == 100` the
+ * maximum. NaN when the sample is empty or holds a NaN, or when `p` is NaN or
+ * outside [0, 100]. */
+fn stats_percentile_f64(xs: Vec<f64>, p: f64) -> f64 {
+    let n: i32 = vec_len(xs);
+    if n == 0 { return stats_nan(); }
+    if p != p { return stats_nan(); }
+    if p < 0.0 { return stats_nan(); }
+    if p > 100.0 { return stats_nan(); }
+    if stats_vec_has_nan(xs) { return stats_nan(); }
+    let v: Vec<f64> = stats_sorted_f64(xs);
+    let nm1: i32 = n - 1;
+    let nm1f: f64 = nm1;
+    let pos: f64 = (p * nm1f) / 100.0;
+    /* k = floor(pos), found by counting: pos is at most n - 1. */
+    let mut k: i32 = 0;
+    let mut going: bool = true;
+    while going loop_invariant(k >= 0) {
+        if k >= nm1 {
+            going = false;
+        } else {
+            let kp1: i32 = k + 1;
+            let kp1f: f64 = kp1;
+            if kp1f <= pos { k = k + 1; } else { going = false; }
+        }
+    }
+    let lo: f64 = vec_get(v, k);
+    if k >= nm1 { return lo; }
+    let kf: f64 = k;
+    let frac: f64 = pos - kf;
+    if frac == 0.0 { return lo; }
+    let hi: f64 = vec_get(v, k + 1);
+    return lo * (1.0 - frac) + hi * frac;
+}

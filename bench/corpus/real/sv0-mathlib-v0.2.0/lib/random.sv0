@@ -1,0 +1,82 @@
+/* module::random — deterministic, seedable pseudo-random generator for
+ * tests and simulation. NOT cryptographically secure: the state is the
+ * whole output, so one value reveals every later one. Do not use it for
+ * keys, nonces, or anything an attacker could exploit.
+ *
+ * The generator is a 64-bit linear congruential generator with Knuth's
+ * MMIX constants. It is a pure function of the state passed in (no OS
+ * entropy, no clock, no hidden globals), so a checked-in seed reproduces
+ * the same sequence on every backend (TEST-004).
+ */
+module random;
+
+use arith::add_wrapping_u64;
+use arith::mul_wrapping_u64;
+use arith::sub_wrapping_u64;
+
+/* Advances the generator: the returned value is both the next state and
+ * the next raw 64-bit output. Wraps modulo 2^64. Full period (2^64). The
+ * low bits of an LCG are weak, so derive floats from the HIGH bits
+ * (`unit_f64` does). */
+fn next_u64(state: u64) -> u64 {
+    let a: u64 = 6364136223846793005;
+    let c: u64 = 1442695040888963407;
+    return add_wrapping_u64(mul_wrapping_u64(state, a), c);
+}
+
+/* Maps a raw u64 state to an f64 in [0.0, 1.0). Uses the top 53 bits
+ * (`state / 2^11`, exact integer division), which convert to f64 exactly,
+ * then scales by 2^-53 (a power of two, so exact). The result is always
+ * strictly below 1.0; the largest value is 1.0 - 2^-53. Dividing the full
+ * u64 by 2^64 - 1 instead would round the highest states to exactly 1.0. */
+fn unit_f64(state: u64) -> f64
+    ensures(result >= 0.0 && result < 1.0)
+{
+    let top: u64 = state / 2048;
+    let t: f64 = top;
+    return t / 9007199254740992.0;
+}
+
+/* Result of `below_u64`: the drawn value and the generator state to
+ * continue from. Rejection sampling consumes a variable number of raw
+ * draws, so the caller must carry the returned `state` forward (a plain
+ * `u64` return could not say how far the generator advanced).
+ * (Struct instead of a tuple: this compiler slice has no tuples.) */
+struct BelowU64 { value: u64, state: u64 }
+
+/* Uniform integer in [0, n) with no modulo bias. Divides the u64 range
+ * into `n` equal buckets of width `w = floor(2^64 / n)` and returns the
+ * bucket a raw draw lands in, redrawing when it falls in the leftover
+ * sliver above `n * w` (fewer than `n` values, so the expected number of
+ * draws is below 2). Bucketing by division uses the HIGH bits, which is
+ * what an LCG needs; `draw % n` would use its weak low bits. Requires
+ * `n > 0`. */
+fn below_u64(state: u64, n: u64) -> BelowU64
+    requires(n > 0)
+{
+    if n == 1 {
+        return BelowU64 { value: 0, state: next_u64(state) };
+    }
+    /* floor(2^64 / n) - 1 == (2^64 - n) / n, computed without 2^64. For
+     * n >= 2 the +1 cannot wrap. */
+    let w: u64 = add_wrapping_u64(sub_wrapping_u64(0, n) / n, 1);
+    let mut s: u64 = next_u64(state);
+    let mut bucket: u64 = s / w;
+    while bucket >= n {
+        s = next_u64(s);
+        bucket = s / w;
+    }
+    return BelowU64 { value: bucket, state: s };
+}
+
+/* Uniform f64 in [lo, hi] from one raw generator state (pass the state
+ * returned by `next_u64`). `lo + unit_f64(state) * (hi - lo)`; when the
+ * range is wide relative to `lo`, rounding can land exactly on `hi`, so
+ * the interval is closed at the top. `lo == hi` returns `lo`. `hi - lo`
+ * must be finite: an infinite span returns infinity or NaN. */
+fn uniform_f64(state: u64, lo: f64, hi: f64) -> f64
+    requires(lo <= hi)
+    ensures(result >= lo && result <= hi)
+{
+    return lo + unit_f64(state) * (hi - lo);
+}

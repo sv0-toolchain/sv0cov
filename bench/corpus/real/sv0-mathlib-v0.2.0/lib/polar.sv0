@@ -1,0 +1,83 @@
+/* module::polar — Cartesian/polar conversion, polar-form scale and rotate.
+ * Spec: sv0-mathlib SPEC.md Section 17 (POLAR-001..005).
+ *
+ * NOTE (toolchain gap, recorded in docs/deviations.md):
+ * `module math::polar;` is rejected by the current compiler (dotted
+ * module paths); this file is `module polar;`.
+ *
+ * DEVIATION (recorded in README.md): POLAR-003's `from_polar` is
+ * specified as returning a TUPLE `(f64, f64)`. This compiler slice
+ * rejects multi-element tuples outright (`E0446: multi-element tuples
+ * are not supported in this slice`, confirmed empirically before writing
+ * this file — the same limitation this library's own module-path
+ * workaround already documents elsewhere). `from_polar` returns a
+ * `Point2 { x: f64, y: f64 }` struct instead — same information, a
+ * named field instead of positional `.0`/`.1`.
+ */
+module polar;
+
+use trig::hypot_f64;
+use trig::atan2_f64;
+use trig::sin_f64;
+use trig::cos_f64;
+
+/* POLAR-001: `Copy` per SPEC.md — every field here is itself `Copy`
+ * (`f64`), and sv0 structs of all-`Copy` fields are `Copy` by the same
+ * auto-derivation rule `sv0doc/type-system/rules.md` §8.1 documents for
+ * `Complex` (Section 10.2's worked example) — no explicit annotation
+ * exists in this compiler slice to spell that out; verified structurally
+ * (a `Polar` value is used, not moved, across every call site below).
+ */
+struct Polar { r: f64, theta: f64 }
+
+/* See this file's own deviation note above. */
+struct Point2 { x: f64, y: f64 }
+
+/* POLAR-002: Cartesian (x, y) -> polar (r, theta), any finite x/y
+ * including the origin (0.0, 0.0); r via hypot_f64 (TRIG-007, so
+ * always ensures result.r >= 0.0), theta via atan2_f64 (TRIG-004). */
+fn to_polar(x: f64, y: f64) -> Polar
+    ensures(result.r >= 0.0)
+{
+    return Polar { r: hypot_f64(x, y), theta: atan2_f64(y, x) };
+}
+
+/* BUGS.md #19: a struct-literal field initializer that is itself a
+ * binop involving a struct-field access mistypes as `int` under the
+ * newer `sv0c` `53de895` revision (`scripts/ci`'s own toolchain,
+ * unpinned) — found via the property tests (`test/property/`, formerly one `property_test.sv0`). Every field
+ * used below is copied to its own local FIRST (bugs #13/#16's own
+ * established workaround), so no struct literal ever combines a raw
+ * field access with anything else.
+ */
+fn from_polar(p: Polar) -> Point2
+    requires(p.r >= 0.0)
+{
+    let pr: f64 = p.r;
+    let ptheta: f64 = p.theta;
+    return Point2 { x: pr * cos_f64(ptheta), y: pr * sin_f64(ptheta) };
+}
+
+/* Negative scale is a rotation-by-pi plus a positive scale, kept as a
+ * distinct, explicit operation (`rotate_polar` below) rather than an
+ * implicit sign flip — per POLAR-005's own wording.
+ */
+fn scale_polar(p: Polar, k: f64) -> Polar
+    requires(k >= 0.0)
+    ensures(result.r == p.r * k)
+{
+    let pr: f64 = p.r;
+    let ptheta: f64 = p.theta;
+    return Polar { r: pr * k, theta: ptheta };
+}
+
+/* POLAR-005: rotate p by delta_theta (any finite value, positive or
+ * negative) — ensures result.r == p.r (rotation never changes radius,
+ * only angle); theta is not normalized into any particular range. */
+fn rotate_polar(p: Polar, delta_theta: f64) -> Polar
+    ensures(result.r == p.r)
+{
+    let pr: f64 = p.r;
+    let ptheta: f64 = p.theta;
+    return Polar { r: pr, theta: ptheta + delta_theta };
+}

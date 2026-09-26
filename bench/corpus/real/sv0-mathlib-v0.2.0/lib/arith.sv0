@@ -1,0 +1,861 @@
+/* module::arith — absolute value, sign, min/max/clamp, rounding, integer
+ * power, checked/wrapping/saturating arithmetic, interpolation, FMA.
+ * Spec: sv0-mathlib SPEC.md Section 11 (ARITH-001..010).
+ *
+ * NOTE (toolchain gap, recorded in docs/deviations.md):
+ * `module math::arith;` (a dotted module path) is rejected by the current
+ * compiler ("E0320: module path must be a single identifier in this
+ * slice"), so this file is `module arith;`, not `module math::arith;`.
+ * Consumers write `use arith::abs_i32;`, not `use math::arith::abs_i32;`.
+ *
+ * f64 forms (abs_f64, sign_f64, min_f64, max_f64, clamp_f64) are now
+ * implemented too — BUGS.md #5 (the native compiler silently miscompiling
+ * f64 as `int`) is fixed upstream as of sv0-toolchain commit
+ * (see BUGS.md for the fix commit once landed). Verified by inspecting the
+ * emitted C for `double` end to end (params, locals, temps, call results),
+ * not just exit codes — see BUGS.md #5's verification note.
+ *
+ * C-backend only for now: the VM backend (`vm-project-compile`) still
+ * cannot type-check a non-i32/bool contract at all (BUGS.md #2, a separate,
+ * lower-priority, not-yet-fixed bug) — `abs_f64`'s `ensures(result >= 0.0)`
+ * fails to compile there. COMPAT-001/002 VM parity remains blocked on #2.
+ *
+ * abs_checked_i32 (ARITH-001's Option-returning companion) is implemented
+ * too — BUGS.md #3 (generic enums like `Option<T>` failing to resolve) is
+ * fixed upstream.
+ *
+ * abs_i64/sign_i64 are implemented too — BUGS.md #1 (integer literals wider
+ * than i32 truncating) is fixed upstream. abs_checked_i64 is still blocked,
+ * by a different, newly-found gap (BUGS.md #8: enum payload slots are
+ * always a 32-bit C `int` regardless of the payload's real type).
+ */
+module arith;
+
+use prelude::Option;
+use prelude::OptionI64;
+use prelude::OptionU32;
+use prelude::OptionU64;
+use prelude::i32_min_val;
+use prelude::i32_max_val;
+use prelude::i64_min_val;
+use prelude::i64_max_val;
+use prelude::u32_max_val;
+use prelude::u64_max_val;
+use trig::exp_f64;
+use trig::ln_f64;
+
+/* Absolute value of a signed i32.
+ *
+ * Domain: all i32 except i32::MIN, whose absolute value (2147483648) is not
+ * representable in i32. Callers that cannot statically rule out i32::MIN
+ * should use abs_checked_i32 instead.
+ */
+fn abs_i32(x: i32) -> i32
+    requires(x != (0 - 2147483648))
+    ensures(result >= 0)
+{
+    if x < 0 {
+        return 0 - x;
+    }
+    return x;
+}
+
+/* Checked absolute value: None only at i32::MIN, where abs_i32 would
+ * violate its own requires clause.
+ */
+fn abs_checked_i32(x: i32) -> Option {
+    if x == (0 - 2147483648) {
+        return Option::None;
+    }
+    return Option::Some(abs_i32(x));
+}
+
+/* Absolute value of an f64. Total function: NaN and Infinity both have a
+ * well-defined IEEE-754 absolute value, so there is no requires clause. */
+/* `NaN` input: `x < 0.0` is false for `NaN` (comparisons involving
+ * `NaN` are always false), so this falls through to `return x;`,
+ * returning `NaN` itself (the IEEE-754-correct answer — `abs(NaN)` is
+ * conventionally `NaN`). The `ensures` below needs its own `NaN`
+ * escape hatch for that, matching this codebase's established pattern
+ * elsewhere (`sin_f64`/`cos_f64`/`exp_f64`'s own `result != result`
+ * clauses) — an earlier version without it made `abs_f64(NaN)` panic
+ * on its OWN `ensures`, found via `test/fixtures/trig.csv` (TEST-003)
+ * when `exp_f64`'s own double-double machinery produced a `NaN`
+ * intermediate for `+/-Infinity` input and passed it through this
+ * pervasively-used helper.
+ */
+fn abs_f64(x: f64) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    if x < 0.0 {
+        return 0.0 - x;
+    }
+    return x;
+}
+
+/* Absolute value of a signed i64 — BUGS.md #1 is fixed upstream. */
+fn abs_i64(x: i64) -> i64
+    requires(x != (0 - 9223372036854775807 - 1))
+    ensures(result >= 0)
+{
+    if x < 0 {
+        return 0 - x;
+    }
+    return x;
+}
+
+/* Checked absolute value for i64: None only at i64::MIN, where abs_i64
+ * would violate its own requires clause. BUGS.md #8 (enum payload slots
+ * always a 32-bit `int`) is fixed upstream, but returns OptionI64, a
+ * concrete companion to the shared prelude::Option<T> — NOT Option<i64> —
+ * because sv0 generics resolve without monomorphizing (BUGS.md #9): the
+ * shared Option<T>'s payload slot type is textually "T" at its
+ * declaration, never a concrete type, so bug #8's per-slot-category
+ * resolution has nothing to key off for the generic case. See BUGS.md #9
+ * and docs/deviations.md.
+ */
+fn abs_checked_i64(x: i64) -> OptionI64 {
+    if x == (0 - 9223372036854775807 - 1) {
+        return OptionI64::None;
+    }
+    return OptionI64::Some(abs_i64(x));
+}
+
+/* Sign of a signed i32: -1, 0, or 1. Total function. */
+fn sign_i32(x: i32) -> i32
+    ensures(result == (0 - 1) || result == 0 || result == 1)
+{
+    if x < 0 {
+        return 0 - 1;
+    }
+    if x > 0 {
+        return 1;
+    }
+    return 0;
+}
+
+/* Sign of a signed i64: -1, 0, or 1. Total function. */
+fn sign_i64(x: i64) -> i64
+    ensures(result == (0 - 1) || result == 0 || result == 1)
+{
+    if x < 0 {
+        return 0 - 1;
+    }
+    if x > 0 {
+        return 1;
+    }
+    return 0;
+}
+
+/* Sign of an f64: -1.0, 0.0, or 1.0. Total function; ARITH-002 pins NaN to
+ * 0.0 explicitly (documented and tested, not left as an unspecified case
+ * per CONV-005(b)). */
+fn sign_f64(x: f64) -> f64
+    ensures(result == (0.0 - 1.0) || result == 0.0 || result == 1.0)
+{
+    if x != x {
+        return 0.0;
+    }
+    if x < 0.0 {
+        return 0.0 - 1.0;
+    }
+    if x > 0.0 {
+        return 1.0;
+    }
+    return 0.0;
+}
+
+/* Smaller of two i32s. Ties return b. */
+fn min_i32(a: i32, b: i32) -> i32
+    ensures(result == a || result == b)
+    ensures(result <= a && result <= b)
+{
+    if a < b {
+        return a;
+    }
+    return b;
+}
+
+/* Larger of two i32s. Ties return b. */
+fn max_i32(a: i32, b: i32) -> i32
+    ensures(result == a || result == b)
+    ensures(result >= a && result >= b)
+{
+    if a > b {
+        return a;
+    }
+    return b;
+}
+
+/* ARITH-004: clamp x (any i32) into [lo, hi]; requires lo <= hi;
+ * ensures the result is in [lo, hi], and equals x unchanged whenever x
+ * was already inside that range. */
+fn clamp_i32(x: i32, lo: i32, hi: i32) -> i32
+    requires(lo <= hi)
+    ensures(result >= lo && result <= hi)
+    ensures(!(lo <= x && x <= hi) || result == x)
+{
+    return min_i32(max_i32(x, lo), hi);
+}
+
+/* Smaller of two f64s, propagating NaN: if either operand is NaN, that NaN
+ * is returned (checked explicitly, not left to fall out of `<` — every NaN
+ * comparison is false, so a naive `if a < b { a } else { b }` would return
+ * b whenever EITHER operand is NaN, silently discarding a NaN a). The
+ * ordering ensures below only needs to hold on the non-NaN domain — the
+ * `|| result != result` disjunct is this function's documented,
+ * CONV-005(b)-style exception for the propagated-NaN case, not a weaker
+ * contract.
+ */
+fn min_f64(a: f64, b: f64) -> f64
+    ensures(result == a || result == b)
+    ensures((result <= a && result <= b) || result != result)
+{
+    if a != a {
+        return a;
+    }
+    if b != b {
+        return b;
+    }
+    if a < b {
+        return a;
+    }
+    return b;
+}
+
+/* Larger of two f64s, propagating NaN symmetrically — see min_f64. */
+fn max_f64(a: f64, b: f64) -> f64
+    ensures(result == a || result == b)
+    ensures((result >= a && result >= b) || result != result)
+{
+    if a != a {
+        return a;
+    }
+    if b != b {
+        return b;
+    }
+    if a > b {
+        return a;
+    }
+    return b;
+}
+
+/* Clamp x into [lo, hi]. `requires(lo <= hi)` already rules out NaN lo/hi
+ * (every NaN comparison is false, so a NaN operand there fails `lo <= hi`).
+ * NaN x is in-domain and propagates through max_f64/min_f64 as they
+ * document — hence the same `|| result != result` disjunct as min_f64/
+ * max_f64, not present in SPEC.md's literal ARITH-004 wording but required
+ * for the ensures to actually hold on NaN x (this is a spec gap, not a
+ * toolchain one — this library's own contract wording, not filed in
+ * BUGS.md).
+ */
+fn clamp_f64(x: f64, lo: f64, hi: f64) -> f64
+    requires(lo <= hi)
+    ensures((result >= lo && result <= hi) || result != result)
+    ensures(!(lo <= x && x <= hi) || result == x)
+{
+    return min_f64(max_f64(x, lo), hi);
+}
+
+/* ── ARITH-005: floor/ceil/round/trunc ───────────────────────────────
+ *
+ * No native cast/libm is available (Tier 1: pure sv0 arithmetic only —
+ * see README's Tier 1/Tier 2 section), and an f64->i64 `as` cast was
+ * checked and found to route through the SAME "everything defaults to
+ * int" codegen category the toolchain bug-hunt kept finding all session
+ * (`x as i64` emits `int _sv0tN = (x);` — a 32-bit-int-typed intermediate,
+ * silently wrong for any value outside i32's range) — not filed as a
+ * tenth BUGS.md entry since nothing in this library's actual functions
+ * needs a numeric cast once these are written in pure f64 arithmetic
+ * instead, but worth flagging here for whoever implements a `_f64` ->
+ * integer conversion function later.
+ *
+ * `frac_floor_of_nonneg` is the shared primitive: for x >= 0.0 (and,
+ * critically, x < 2^52 — see below), it reconstructs floor(x) one bit of
+ * the integer part at a time via a bounded (53-iteration) binary search,
+ * the same "fixed, documented iteration bound, not a convergence-detecting
+ * early exit" shape SPEC.md Section 15 already establishes for
+ * `sqrt_f64`'s Newton-Raphson bound. 2^52 (4503599627370496.0) is the
+ * threshold above which an IEEE-754 double has no representable
+ * fractional part at all — every value at or beyond that magnitude IS
+ * already its own floor/ceil/round/trunc, so all four public functions
+ * below short-circuit to identity there (and this also transparently
+ * covers +-Infinity, since any comparison against a finite magnitude is
+ * true for Infinity by IEEE-754 rule — no separate is_infinite_f64 check
+ * needed). NaN and +-0.0 both short-circuit to identity too: returning
+ * the ORIGINAL `x` (not a freshly-constructed 0.0/NaN) is what preserves
+ * -0.0's sign and NaN's payload bits, matching ARITH-005's own boundary
+ * fixture list (`0.0`, `-0.0` are both explicitly required cases).
+ */
+fn frac_floor_of_nonneg(x: f64) -> f64
+    requires(x >= 0.0)
+    ensures(result <= x)
+    ensures(result > x - 1.0 || result == x)
+{
+    let mut acc: f64 = 0.0;
+    let mut bit: f64 = 4503599627370496.0;
+    /* loop_invariant: acc <= x always holds (acc only ever grows by a
+     * candidate already checked <= x), and `bit` is always an exact,
+     * strictly-halving power of two. Terminates in exactly 53 iterations
+     * (bit halves from 2^52 down past 1.0), a fixed bound independent of
+     * x — the same provable-termination shape SQRT_ITERATION_BOUND uses. */
+    while bit >= 1.0 loop_invariant(acc <= x) {
+        let cand: f64 = acc + bit;
+        if cand <= x {
+            acc = cand;
+        }
+        bit = bit / 2.0;
+    }
+    return acc;
+}
+
+/* ARITH-005: truncate x (any f64, including NaN/Infinity) toward zero.
+ * Total function, no `requires` — NaN propagates, +/-Infinity and
+ * already-integer values pass through unchanged, ordinary values
+ * round toward zero within one unit. */
+fn trunc_f64(x: f64) -> f64
+    ensures(((x >= 0.0 && result <= x && result > x - 1.0) ||
+             (x < 0.0 && result >= x && result < x + 1.0) ||
+             result == x) || result != result)
+{
+    if x != x { return x; }
+    if x == 0.0 { return x; }
+    if x >= 4503599627370496.0 { return x; }
+    if x <= (0.0 - 4503599627370496.0) { return x; }
+    if x >= 0.0 { return frac_floor_of_nonneg(x); }
+    return 0.0 - frac_floor_of_nonneg(0.0 - x);
+}
+
+/* ARITH-005: round x (any f64) down toward negative infinity. Total,
+ * NaN/Infinity/already-integer pass through unchanged (see trunc_f64's
+ * own comment — the same domain-boundary reasoning applies here). */
+fn floor_f64(x: f64) -> f64
+    ensures((result <= x && result > x - 1.0) || result == x || result != result)
+{
+    if x != x { return x; }
+    if x == 0.0 { return x; }
+    if x >= 4503599627370496.0 { return x; }
+    if x <= (0.0 - 4503599627370496.0) { return x; }
+    if x >= 0.0 { return frac_floor_of_nonneg(x); }
+    let t: f64 = trunc_f64(x);
+    if t == x { return t; }
+    return t - 1.0;
+}
+
+/* ARITH-005: round x (any f64) up toward positive infinity. Total,
+ * NaN/Infinity/already-integer pass through unchanged (see trunc_f64's
+ * own comment). */
+fn ceil_f64(x: f64) -> f64
+    ensures((result >= x && result < x + 1.0) || result == x || result != result)
+{
+    if x != x { return x; }
+    if x == 0.0 { return x; }
+    if x >= 4503599627370496.0 { return x; }
+    if x <= (0.0 - 4503599627370496.0) { return x; }
+    if x <= 0.0 { return 0.0 - frac_floor_of_nonneg(0.0 - x); }
+    let t: f64 = trunc_f64(x);
+    if t == x { return t; }
+    return t + 1.0;
+}
+
+/* round-half-away-from-zero (pinned choice, per ARITH-005's requirement
+ * to pin and test one of round-half-to-even / round-half-away-from-zero
+ * explicitly): round(2.5) == 3.0, round(-2.5) == -3.0. Implemented as
+ * floor(x + 0.5) for x >= 0.0 and its negated mirror for x < 0.0 — exact
+ * for every representable x because adding 0.5 to a double is itself
+ * always exact (0.5 == 2^-1, representable with a single mantissa bit
+ * regardless of x's own exponent), so this never introduces a rounding
+ * error the way `(x + BIG) - BIG`-style tricks can. */
+fn round_f64(x: f64) -> f64
+    ensures(((result - x) >= (0.0 - 0.5) && (result - x) <= 0.5) || result != result)
+{
+    if x != x { return x; }
+    if x == 0.0 { return x; }
+    if x >= 4503599627370496.0 { return x; }
+    if x <= (0.0 - 4503599627370496.0) { return x; }
+    if x >= 0.0 { return frac_floor_of_nonneg(x + 0.5); }
+    return 0.0 - frac_floor_of_nonneg((0.0 - x) + 0.5);
+}
+
+/* ── ARITH-006: NaN/Infinity classification ──────────────────────────
+ * The library's ONLY sanctioned way to test f64 classification (CONV
+ * requirement): every other function that needs a NaN check uses
+ * `is_nan_f64`, not a bare `x != x`, from this point on in the codebase
+ * (existing functions written earlier this session — sign_f64, min_f64,
+ * max_f64 — predate this rule and keep their inline `x != x` checks
+ * rather than being churned for a naming-only change).
+ */
+fn is_nan_f64(x: f64) -> bool
+    ensures(result == (x != x))
+{
+    return x != x;
+}
+
+/* ARITH-006: true iff x is +Infinity or -Infinity; false for NaN and
+ * every finite value — the only sanctioned way this library tests for
+ * Infinity (CONV-006's own convention, applied to classification). */
+fn is_infinite_f64(x: f64) -> bool
+    ensures(!result || !is_nan_f64(x))
+{
+    if x != x { return false; }
+    let pos_inf: f64 = 1.0 / 0.0;
+    if x == pos_inf { return true; }
+    if x == (0.0 - pos_inf) { return true; }
+    return false;
+}
+
+/* ARITH-006: true iff x is neither NaN nor +/-Infinity — every ordinary
+ * finite double, including 0.0/-0.0 and subnormals. */
+fn is_finite_f64(x: f64) -> bool
+    ensures(result == (!is_nan_f64(x) && !is_infinite_f64(x)))
+{
+    if x != x { return false; }
+    return !is_infinite_f64(x);
+}
+
+/* ── ARITH-009: lerp ──────────────────────────────────────────────── */
+
+fn lerp_f64(a: f64, b: f64, t: f64) -> f64
+    requires(t >= 0.0 && t <= 1.0)
+    ensures(!(t == 0.0) || result == a)
+    ensures(!(t == 1.0) || result == b)
+{
+    return a + t * (b - a);
+}
+
+/* ── ARITH-007: exponentiation ──────────────────────────────────────── */
+
+/* Pure, recursively-defined mathematical helper used only inside
+ * `pow_i64`'s own `ensures` (legal per CONV-009's purity rule) — SPEC.md
+ * Section 14.1's own algorithm sketch names this exact helper.
+ */
+fn pow_spec(base: i64, exp: u32) -> i64 {
+    if exp == 0 { return 1; }
+    return base * pow_spec(base, exp - 1);
+}
+
+/* Exponentiation by squaring, per SPEC.md Section 14.1's algorithm
+ * sketch (mirrored here almost verbatim). `requires(exp < 63 || ...)`
+ * is deliberately informal (SPEC.md's own wording) — it doesn't rule out
+ * every overflowing `(base, exp)` pair (e.g. `pow_i64(3, 40)` still
+ * overflows silently), only the pathological large-`exp` cases; callers
+ * that can't statically rule out overflow should use `pow_checked_i64`.
+ */
+fn pow_i64(base: i64, exp: u32) -> i64
+    requires(exp < 63 || base == 0 || base == 1 || base == (0 - 1))
+    ensures(result == pow_spec(base, exp))
+{
+    let mut acc: i64 = 1;
+    let mut b: i64 = base;
+    let mut e: u32 = exp;
+    /* loop_invariant (prose, per CONV-008 — not SMT-proven by this
+     * toolchain yet): acc * pow_spec(b, e) == pow_spec(base, exp) holds
+     * at the top of every iteration — the standard exponentiation-by-
+     * squaring proof obligation SPEC.md's own sketch names. Terminates
+     * because e strictly halves (toward 0) each iteration.
+     */
+    while e > 0 loop_invariant(acc * pow_spec(b, e) == pow_spec(base, exp)) {
+        if (e % 2) == 1 {
+            acc = acc * b;
+        }
+        b = b * b;
+        e = e / 2;
+    }
+    return acc;
+}
+
+/* Checked multiply: detects overflow BEFORE multiplying (computing `a *
+ * b` first and checking after is itself undefined behavior in C on
+ * signed overflow — division-based pre-checks avoid ever forming the
+ * overflowing product at all). `a == -1`/`b == -1` are handled
+ * separately since `i64::MIN / -1` is itself the one division that
+ * overflows.
+ */
+fn mul_checked_i64(a: i64, b: i64) -> OptionI64 {
+    if a == 0 { return OptionI64::Some(0); }
+    if b == 0 { return OptionI64::Some(0); }
+    if a == (0 - 1) {
+        if b == i64_min_val() { return OptionI64::None; }
+        return OptionI64::Some(0 - b);
+    }
+    if b == (0 - 1) {
+        if a == i64_min_val() { return OptionI64::None; }
+        return OptionI64::Some(0 - a);
+    }
+    if a > 0 {
+        if b > 0 {
+            if a > (i64_max_val() / b) { return OptionI64::None; }
+        } else {
+            if b < (i64_min_val() / a) { return OptionI64::None; }
+        }
+    } else {
+        if b > 0 {
+            if a < (i64_min_val() / b) { return OptionI64::None; }
+        } else {
+            if a < (i64_max_val() / b) { return OptionI64::None; }
+        }
+    }
+    return OptionI64::Some(a * b);
+}
+
+/* BUGS.md #11 (sv0-mathlib): a `match` used AS A VALUE (`let x: T =
+ * match opt { Some(v) => v, None => dflt };`) declares its own result
+ * temp as plain C `int` regardless of the arms' real type — a match
+ * bound this way silently truncates any i64/u64/f64 arm value, the same
+ * "everything defaults to int" family bug #8 fixed for the payload
+ * BINDING itself, but for the match EXPRESSION's own overall temp
+ * instead. Worked around throughout this function (and everywhere else
+ * in this library from here on) by using `match` as a bare STATEMENT
+ * that assigns into an already-correctly-typed `let mut` local instead
+ * of binding its value directly — confirmed via inspecting the emitted
+ * C that this sidesteps the bug entirely. Not fixed upstream (a real
+ * compiler gap, but a properly general fix needs an emission-time
+ * lookahead/prepass this session ran out of budget for); see BUGS.md
+ * #11 for the full repro and root-cause trace.
+ */
+fn pow_checked_i64(base: i64, exp: u32) -> OptionI64 {
+    let mut acc: i64 = 1;
+    let mut b: i64 = base;
+    let mut e: u32 = exp;
+    let mut overflowed: bool = false;
+    while e > 0 loop_invariant(e <= exp) {
+        if (e % 2) == 1 {
+            let m1: OptionI64 = mul_checked_i64(acc, b);
+            match m1 {
+                OptionI64::Some(v) => { acc = v; },
+                OptionI64::None => { overflowed = true; },
+            }
+        }
+        if e > 1 {
+            let m2: OptionI64 = mul_checked_i64(b, b);
+            match m2 {
+                OptionI64::Some(v) => { b = v; },
+                OptionI64::None => { overflowed = true; },
+            }
+        }
+        e = e / 2;
+    }
+    if overflowed { return OptionI64::None; }
+    return OptionI64::Some(acc);
+}
+
+/* `pow_f64`, per ARITH-007's own wording: `exp_f64(exp * ln_f64(base))`
+ * for `base > 0.0`. `exp_f64`/`ln_f64` are `math::trig`'s R0.2 shared
+ * machinery (this file's own `use trig::...` below is the cross-module
+ * dependency ARITH-007's roadmap step names). Outside `base > 0.0`,
+ * documented IEEE-754-ish behavior (not a full replication of C's `pow`
+ * edge-case table — this library doesn't attempt every negative-base/
+ * non-integer-exponent corner): `base == 0.0` follows the natural
+ * `0^exp` cases (`0` for `exp > 0`, `1` for `exp == 0`, `+Infinity` for
+ * `exp < 0`); `base < 0.0` returns `NaN` unconditionally (a real
+ * simplification versus true IEEE `pow`, which special-cases integer
+ * exponents there — documented, not silently guessed, per GOV-004).
+ */
+fn pow_f64(base: f64, exp: f64) -> f64 {
+    if base > 0.0 { return exp_f64(exp * ln_f64(base)); }
+    if base == 0.0 {
+        if exp > 0.0 { return 0.0; }
+        if exp == 0.0 { return 1.0; }
+        return 1.0 / 0.0;
+    }
+    return 0.0 / 0.0;
+}
+
+/* ── ARITH-008: wrapping/checked add/sub/mul ──────────────────────────
+ * Scoped to i32/i64/u32/u64 — the four integer widths this library
+ * otherwise actually uses (SPEC.md's "per integer type" doesn't name an
+ * exact set); i8/u8/i16/u16/isize/usize are out of scope until something
+ * in this library needs them, per GOV-004's "don't silently guess, write
+ * down the deviation" — recorded in README.md.
+ *
+ * Wrapping, signed forms (i32/i64): C signed-integer overflow is
+ * undefined behavior, so "wrap on overflow" can't be done by just
+ * letting `a + b` overflow and hoping — instead, reinterpret both
+ * operands as the SAME-WIDTH UNSIGNED type (plain assignment across
+ * same-width int/uint is a well-defined, bit-pattern-preserving
+ * conversion in C — not the same thing as the `as` cast operator, which
+ * routes through a separate, currently-broken codegen category; see
+ * this function family's own comment further down for why `as` isn't
+ * used here), do the addition/subtraction/multiplication there (where
+ * unsigned overflow wraps by a well-defined modular rule), then convert
+ * the unsigned result back to signed the same way. Wrapping, unsigned
+ * forms (u32/u64) need no such trick — C unsigned arithmetic already
+ * wraps modulo 2^n by definition.
+ *
+ * Checked forms detect overflow via comparisons BEFORE computing the
+ * operation, never by computing it first and inspecting the result
+ * (checking after is itself undefined behavior on signed overflow) —
+ * same approach ARITH-007's `mul_checked_i64` already established.
+ */
+
+/* ARITH-008: add two i32 (any values), wrapping modulo 2^32 on overflow
+ * — via this file's own unsigned-round-trip technique above, never `%`
+ * or a naive `a+b` (undefined behavior on signed overflow). */
+fn add_wrapping_i32(a: i32, b: i32) -> i32 {
+    let ua: u32 = a;
+    let ub: u32 = b;
+    let usum: u32 = ua + ub;
+    let out: i32 = usum;
+    return out;
+}
+
+/* ARITH-008: subtract two i32, wrapping modulo 2^32. */
+fn sub_wrapping_i32(a: i32, b: i32) -> i32 {
+    let ua: u32 = a;
+    let ub: u32 = b;
+    let udiff: u32 = ua - ub;
+    let out: i32 = udiff;
+    return out;
+}
+
+/* ARITH-008: multiply two i32, wrapping modulo 2^32. */
+fn mul_wrapping_i32(a: i32, b: i32) -> i32 {
+    let ua: u32 = a;
+    let ub: u32 = b;
+    let uprod: u32 = ua * ub;
+    let out: i32 = uprod;
+    return out;
+}
+
+/* ARITH-008: add two i32, returning None on overflow instead of
+ * wrapping — checked BEFORE computing (see this family's own header
+ * comment for why). */
+fn add_checked_i32(a: i32, b: i32) -> Option {
+    if b > 0 {
+        if a > (i32_max_val() - b) { return Option::None; }
+    } else {
+        if a < (i32_min_val() - b) { return Option::None; }
+    }
+    return Option::Some(a + b);
+}
+
+/* ARITH-008: subtract two i32, returning None on overflow. */
+fn sub_checked_i32(a: i32, b: i32) -> Option {
+    if b < 0 {
+        if a > (i32_max_val() + b) { return Option::None; }
+    } else {
+        if a < (i32_min_val() + b) { return Option::None; }
+    }
+    return Option::Some(a - b);
+}
+
+/* ARITH-008: multiply two i32, returning None on overflow. */
+fn mul_checked_i32(a: i32, b: i32) -> Option {
+    if a == 0 { return Option::Some(0); }
+    if b == 0 { return Option::Some(0); }
+    if a == (0 - 1) {
+        if b == i32_min_val() { return Option::None; }
+        return Option::Some(0 - b);
+    }
+    if b == (0 - 1) {
+        if a == i32_min_val() { return Option::None; }
+        return Option::Some(0 - a);
+    }
+    if a > 0 {
+        if b > 0 {
+            if a > (i32_max_val() / b) { return Option::None; }
+        } else {
+            if b < (i32_min_val() / a) { return Option::None; }
+        }
+    } else {
+        if b > 0 {
+            if a < (i32_min_val() / b) { return Option::None; }
+        } else {
+            if a < (i32_max_val() / b) { return Option::None; }
+        }
+    }
+    return Option::Some(a * b);
+}
+
+/* ARITH-008: i64 forms of the same three wrapping/checked shapes above,
+ * via the u64 round-trip. */
+fn add_wrapping_i64(a: i64, b: i64) -> i64 {
+    let ua: u64 = a;
+    let ub: u64 = b;
+    let usum: u64 = ua + ub;
+    let out: i64 = usum;
+    return out;
+}
+
+/* ARITH-008: subtract two i64, wrapping modulo 2^64. */
+fn sub_wrapping_i64(a: i64, b: i64) -> i64 {
+    let ua: u64 = a;
+    let ub: u64 = b;
+    let udiff: u64 = ua - ub;
+    let out: i64 = udiff;
+    return out;
+}
+
+/* ARITH-008: multiply two i64, wrapping modulo 2^64. */
+fn mul_wrapping_i64(a: i64, b: i64) -> i64 {
+    let ua: u64 = a;
+    let ub: u64 = b;
+    let uprod: u64 = ua * ub;
+    let out: i64 = uprod;
+    return out;
+}
+
+/* ARITH-008: add two i64, returning None on overflow. */
+fn add_checked_i64(a: i64, b: i64) -> OptionI64 {
+    if b > 0 {
+        if a > (i64_max_val() - b) { return OptionI64::None; }
+    } else {
+        if a < (i64_min_val() - b) { return OptionI64::None; }
+    }
+    return OptionI64::Some(a + b);
+}
+
+/* ARITH-008: subtract two i64, returning None on overflow. */
+fn sub_checked_i64(a: i64, b: i64) -> OptionI64 {
+    if b < 0 {
+        if a > (i64_max_val() + b) { return OptionI64::None; }
+    } else {
+        if a < (i64_min_val() + b) { return OptionI64::None; }
+    }
+    return OptionI64::Some(a - b);
+}
+
+/* ARITH-008: add two u32, wrapping modulo 2^32 — C unsigned arithmetic
+ * already wraps by definition, no round-trip trick needed (unlike the
+ * signed i32/i64 forms above). */
+fn add_wrapping_u32(a: u32, b: u32) -> u32 { return a + b; }
+/* ARITH-008: subtract two u32, wrapping modulo 2^32. */
+fn sub_wrapping_u32(a: u32, b: u32) -> u32 { return a - b; }
+/* ARITH-008: multiply two u32, wrapping modulo 2^32. */
+fn mul_wrapping_u32(a: u32, b: u32) -> u32 { return a * b; }
+
+/* ARITH-008: add two u32, returning None on overflow. */
+fn add_checked_u32(a: u32, b: u32) -> OptionU32 {
+    if a > (u32_max_val() - b) { return OptionU32::None; }
+    return OptionU32::Some(a + b);
+}
+
+/* ARITH-008: subtract two u32, returning None if the result would be
+ * negative (unsigned has no negative representation to wrap into). */
+fn sub_checked_u32(a: u32, b: u32) -> OptionU32 {
+    if a < b { return OptionU32::None; }
+    return OptionU32::Some(a - b);
+}
+
+/* ARITH-008: multiply two u32, returning None on overflow. */
+fn mul_checked_u32(a: u32, b: u32) -> OptionU32 {
+    if a == 0 { return OptionU32::Some(0); }
+    if b > (u32_max_val() / a) { return OptionU32::None; }
+    return OptionU32::Some(a * b);
+}
+
+/* ARITH-008: add two u64, wrapping modulo 2^64. */
+fn add_wrapping_u64(a: u64, b: u64) -> u64 { return a + b; }
+/* ARITH-008: subtract two u64, wrapping modulo 2^64. */
+fn sub_wrapping_u64(a: u64, b: u64) -> u64 { return a - b; }
+/* ARITH-008: multiply two u64, wrapping modulo 2^64. */
+fn mul_wrapping_u64(a: u64, b: u64) -> u64 { return a * b; }
+
+/* ARITH-008: add two u64, returning None on overflow. */
+fn add_checked_u64(a: u64, b: u64) -> OptionU64 {
+    if a > (u64_max_val() - b) { return OptionU64::None; }
+    return OptionU64::Some(a + b);
+}
+
+/* ARITH-008: subtract two u64, returning None if the result would be
+ * negative. */
+fn sub_checked_u64(a: u64, b: u64) -> OptionU64 {
+    if a < b { return OptionU64::None; }
+    return OptionU64::Some(a - b);
+}
+
+/* ARITH-008: multiply two u64, returning None on overflow. */
+fn mul_checked_u64(a: u64, b: u64) -> OptionU64 {
+    if a == 0 { return OptionU64::Some(0); }
+    if b > (u64_max_val() / a) { return OptionU64::None; }
+    return OptionU64::Some(a * b);
+}
+
+/* ── ARITH-010: fused multiply-add ────────────────────────────────────
+ * No native `fma()` (or any hardware single-rounding primitive) exists
+ * anywhere in this toolchain (Tier 1: pure sv0 arithmetic only). A
+ * genuinely single-rounding `a*b+c` — the whole point of ARITH-010,
+ * which explicitly requires a fixture demonstrating the result differs
+ * from naive `a*b+c` — is still achievable in PURE `+`/`-`/`*`, though,
+ * via the standard software error-free-transformation technique (Dekker
+ * 1971 / Ogita-Rump-Oishi): `two_prod` recovers the exact rounding error
+ * of `a*b` by splitting each operand into non-overlapping high/low parts
+ * (`dekker_split`, using the classic `2^27+1` splitter constant for
+ * `f64`'s 53-bit mantissa) and reconstructing the product from the
+ * split parts; `two_sum` does the same for `p + c`. Summing the two
+ * recovered error terms and adding them back to the sum's high part
+ * recovers virtually all of the precision a true hardware `fma` would
+ * preserve — this is standard, well-established numerical practice for
+ * software-emulated fma, not a novel or unreliable trick.
+ *
+ * BUGS.md #13 (sv0-mathlib): arithmetic performed DIRECTLY on a struct
+ * field access (`sa.hi * sb.hi`, both `Pair2` fields) mistypes the
+ * binop's own temp as `int` — the same "everything defaults to int"
+ * family bug #8/#11 fixed for enum payload access, but for PLAIN struct
+ * fields, which was never covered. Worked around by copying each field
+ * into its own local (`let sa_hi: f64 = sa.hi;`) before ever using it in
+ * arithmetic — confirmed via the emitted C that this fully sidesteps the
+ * bug (a local's own DeclNamed typing is unaffected, per bug #7's fix).
+ * Not fixed upstream this session; see BUGS.md #13 for the repro and
+ * why a full fix needs new struct-field-category infrastructure
+ * mirroring bug #8's enum-slot table.
+ */
+
+/* (hi, lo) with hi + lo == a exactly, hi's low 26 mantissa bits zeroed —
+ * the Dekker/Veltkamp splitting step every other function below builds
+ * on. */
+struct Pair2 { hi: f64, lo: f64 }
+
+fn dekker_split(a: f64) -> Pair2 {
+    let splitter: f64 = 134217729.0;
+    let c: f64 = splitter * a;
+    let hi: f64 = c - (c - a);
+    let lo: f64 = a - hi;
+    return Pair2 { hi: hi, lo: lo };
+}
+
+/* Returns (p, e) with p = fl(a*b) (the ordinary rounded product) and e
+ * the EXACT rounding error, such that a*b == p + e exactly (as real
+ * numbers) — Dekker's two_prod, needing only `+`/`-`/`*`.
+ */
+fn two_prod(a: f64, b: f64) -> Pair2 {
+    let p: f64 = a * b;
+    let sa: Pair2 = dekker_split(a);
+    let sb: Pair2 = dekker_split(b);
+    let sa_hi: f64 = sa.hi;
+    let sa_lo: f64 = sa.lo;
+    let sb_hi: f64 = sb.hi;
+    let sb_lo: f64 = sb.lo;
+    let e: f64 = ((sa_hi * sb_hi - p) + sa_hi * sb_lo + sa_lo * sb_hi) + sa_lo * sb_lo;
+    return Pair2 { hi: p, lo: e };
+}
+
+/* Returns (s, e) with s = fl(a+b) and e the exact rounding error, such
+ * that a+b == s + e exactly — Knuth/Møller's two_sum.
+ */
+fn two_sum(a: f64, b: f64) -> Pair2 {
+    let s: f64 = a + b;
+    let bb: f64 = s - a;
+    let e: f64 = (a - (s - bb)) + (b - bb);
+    return Pair2 { hi: s, lo: e };
+}
+
+/* Total function, no `requires` (CONV-007's documented exemption): every
+ * finite/NaN/Infinity `f64` triple is in-domain. No `ensures` beyond
+ * that either — "MAY differ from `a*b+c` by up to the ULP bound" isn't
+ * a checkable boolean predicate (restating the algorithm inside its own
+ * contract would be circular), so ARITH-010's accuracy claim is
+ * verified by the differential fixture in main.sv0 instead (comparing
+ * against naive `a*b+c` at a value chosen to expose the gap), per
+ * ARITH-010's own testing requirement.
+ */
+fn fma_f64(a: f64, b: f64, c: f64) -> f64 {
+    let pe: Pair2 = two_prod(a, b);
+    let p: f64 = pe.hi;
+    let e1: f64 = pe.lo;
+    let se: Pair2 = two_sum(p, c);
+    let s: f64 = se.hi;
+    let e2: f64 = se.lo;
+    let v: f64 = e1 + e2;
+    return s + v;
+}

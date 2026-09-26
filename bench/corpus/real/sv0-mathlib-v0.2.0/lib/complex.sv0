@@ -1,0 +1,395 @@
+/* module::complex — Complex struct, componentwise/multiplicative
+ * arithmetic, modulus/argument, conjugate, polar interoperability.
+ * Spec: sv0-mathlib SPEC.md Section 18 (CPLX-001..006; CPLX-007 is
+ * Future, gated on TRIG accuracy budgets this library hasn't formally
+ * audited — not implemented here).
+ *
+ * NOTE (toolchain gap, recorded in README.md "Deviations from
+ * SPEC.md"): `module math::complex;` is rejected (dotted module paths);
+ * this file is `module complex;`.
+ *
+ * DEVIATION 1 (operator overloading): CPLX-002/CPLX-003 specify
+ * `impl Add for Complex`/`impl Sub for Complex`/`impl Neg for
+ * Complex`/`impl Mul for Complex`/`impl Div for Complex`, so `a + b`
+ * desugars to the trait method per `keywords/reference.md` §2.1. This
+ * compiler slice does not parse `impl <Trait> for <Type>` AT ALL —
+ * confirmed empirically (`error[E0100]: syntax error` on the bare
+ * `impl Add for T {...}` shape, not merely an unimplemented desugaring)
+ * before writing this file — matching an already-recorded gap from
+ * earlier in this project's toolchain audit (sv0doc documents the
+ * desugaring; sv0c's parser/checker don't implement it). Every operator
+ * below is instead a plain named free function (`add_complex`,
+ * `sub_complex`, `neg_complex`, `mul_complex`, `div_complex`) — same
+ * operations, called as `add_complex(a, b)` rather than `a + b`.
+ *
+ * DEVIATION 2 (Option<Complex> can't be constructed): CPLX-003's
+ * `div_checked` is specified as returning `Option<Complex>`. Beyond
+ * BUGS.md #9 (the shared generic `Option<T>` doesn't monomorphize —
+ * this library's usual workaround is a concrete companion enum, e.g.
+ * `OptionI64`), a STRUCT payload hits a deeper wall: an enum's payload
+ * "slot" in this compiler is always a single scalar C word
+ * (`int`/`int64_t`/`double`/...; see `emit_enum_td`'s slot-category
+ * scheme) — there is no slot category for "a whole struct," so even a
+ * concrete `enum OptionComplex { Some(Complex), None }` fails at the C
+ * level (`error: assigning to 'int' from incompatible type 'Complex'`,
+ * confirmed empirically before writing this file). `div_checked_complex`
+ * instead returns a `ComplexResult { ok: bool, re: f64, im: f64 }`
+ * struct directly — the same "no panic on runtime-unknown input"
+ * behavior AD-005 wants, without needing an enum payload to hold a
+ * struct at all.
+ */
+module complex;
+
+use polar::Polar;
+use trig::hypot_f64;
+use trig::atan2_f64;
+use trig::sin_f64;
+use trig::cos_f64;
+use trig::exp_f64;
+use trig::ln_f64_dd;
+use arith::Pair2;
+use arith::two_sum;
+use arith::two_prod;
+use arith::abs_f64;
+
+/* CPLX-001: matches `sv0doc/type-system/rules.md` §2.4's worked example
+ * exactly (`pub re: f64, pub im: f64`, `Copy` auto-derived) — this
+ * compiler slice has no `pub` field-visibility syntax to spell out (a
+ * separate, already-documented gap elsewhere in this project), so the
+ * fields are plain, unqualified `f64`s, structurally identical
+ * otherwise.
+ */
+struct Complex { re: f64, im: f64 }
+
+/* ── CPLX-002: componentwise arithmetic ──────────────────────────────
+ * See this file's DEVIATION 1 above for why these are free functions,
+ * not `impl Add`/`impl Sub`/`impl Neg for Complex`.
+ */
+/* BUGS.md #19: a struct-literal field initializer OR a `requires`/
+ * `ensures` clause that is itself a binop combining struct-field
+ * accesses (`Complex { re: a.re + b.re, ... }`, or
+ * `ensures(result.re == a.re + b.re ...)`) mistypes as `int` — found
+ * via `test/property/complex_algebra_property.sv0`'s (formerly `property_test.sv0`) associativity check
+ * intermittently panicking under the newer `sv0c` `53de895` revision
+ * (`scripts/ci`'s own toolchain, unpinned; "intermittently" because the
+ * bug truncates the ensures' OWN comparison value to `int`, so it only
+ * panics for seeded samples whose true sum isn't itself an exact
+ * integer). The FUNCTION BODY half of this is fixed the established
+ * way (bugs #13/#16): copy every field to its own local before use, so
+ * struct literals only ever combine LOCAL-op-LOCAL. The CONTRACT-CLAUSE
+ * half can't use that trick — `requires`/`ensures` are declared in the
+ * function signature and have no access to the body's own locals — so
+ * each one below is rewritten to call a small pure helper function
+ * (`complex_re_sum`, etc., right below) instead of inlining the
+ * field-combining binop directly in the clause; the helper's OWN body
+ * uses the local-extraction workaround internally, and a function
+ * CALL's return value resolves its type correctly everywhere this was
+ * checked (unlike a field access combined inline).
+ */
+fn complex_re_sum(a: Complex, b: Complex) -> f64 {
+    let ar: f64 = a.re;
+    let br: f64 = b.re;
+    return ar + br;
+}
+
+fn complex_im_sum(a: Complex, b: Complex) -> f64 {
+    let ai: f64 = a.im;
+    let bi: f64 = b.im;
+    return ai + bi;
+}
+
+fn complex_re_diff(a: Complex, b: Complex) -> f64 {
+    let ar: f64 = a.re;
+    let br: f64 = b.re;
+    return ar - br;
+}
+
+fn complex_im_diff(a: Complex, b: Complex) -> f64 {
+    let ai: f64 = a.im;
+    let bi: f64 = b.im;
+    return ai - bi;
+}
+
+fn complex_neg_re(a: Complex) -> f64 {
+    let ar: f64 = a.re;
+    return 0.0 - ar;
+}
+
+fn complex_neg_im(a: Complex) -> f64 {
+    let ai: f64 = a.im;
+    return 0.0 - ai;
+}
+
+/* CPLX-002: componentwise addition, any two Complex values, exact
+ * (each component is a single f64 addition — accuracy inherits from
+ * f64 `+` directly, no accuracy.md row of its own). */
+fn add_complex(a: Complex, b: Complex) -> Complex
+    ensures(result.re == complex_re_sum(a, b) && result.im == complex_im_sum(a, b))
+{
+    let are: f64 = a.re;
+    let aim: f64 = a.im;
+    let bre: f64 = b.re;
+    let bim: f64 = b.im;
+    return Complex { re: are + bre, im: aim + bim };
+}
+
+/* CPLX-002: componentwise subtraction, any two Complex values, exact. */
+fn sub_complex(a: Complex, b: Complex) -> Complex
+    ensures(result.re == complex_re_diff(a, b) && result.im == complex_im_diff(a, b))
+{
+    let are: f64 = a.re;
+    let aim: f64 = a.im;
+    let bre: f64 = b.re;
+    let bim: f64 = b.im;
+    return Complex { re: are - bre, im: aim - bim };
+}
+
+/* CPLX-002: unary negation, any Complex value, exact. */
+fn neg_complex(a: Complex) -> Complex
+    ensures(result.re == complex_neg_re(a) && result.im == complex_neg_im(a))
+{
+    let are: f64 = a.re;
+    let aim: f64 = a.im;
+    return Complex { re: 0.0 - are, im: 0.0 - aim };
+}
+
+/* ── CPLX-003: multiplication/division ────────────────────────────────
+ * `mul_complex` is the standard `(ac - bd, ad + bc)` form, per
+ * CPLX-003's own wording. `div_complex` uses Smith's algorithm (the
+ * conjugate-multiplication form, scaled by whichever of `b.re`/`b.im`
+ * is larger in magnitude) rather than the naive
+ * `(a*conj(b)) / (b.re^2 + b.im^2)` — the naive form squares BOTH
+ * components of `b` unconditionally, which overflows for any `b` whose
+ * magnitude exceeds roughly `sqrt(f64::MAX)`, exactly the same
+ * overflow shape `hypot_f64` (TRIG-007) avoids and CPLX-003 explicitly
+ * cites as the rationale to mirror.
+ */
+fn mul_complex(a: Complex, b: Complex) -> Complex {
+    let are: f64 = a.re;
+    let aim: f64 = a.im;
+    let bre: f64 = b.re;
+    let bim: f64 = b.im;
+    return Complex { re: are * bre - aim * bim, im: are * bim + aim * bre };
+}
+
+/* CPLX-003: division a/b, requires b != 0+0i (the origin — division by
+ * zero); via Smith's algorithm (this file's own comment above), so
+ * accurate for any representable b, not just moderate magnitudes. */
+fn div_complex(a: Complex, b: Complex) -> Complex
+    requires(b.re != 0.0 || b.im != 0.0)
+{
+    let are: f64 = a.re;
+    let aim: f64 = a.im;
+    let bre: f64 = b.re;
+    let bim: f64 = b.im;
+    if abs_f64(bre) >= abs_f64(bim) {
+        let r: f64 = bim / bre;
+        let denom: f64 = bre + bim * r;
+        return Complex { re: (are + aim * r) / denom, im: (aim - are * r) / denom };
+    }
+    let r2: f64 = bre / bim;
+    let denom2: f64 = bre * r2 + bim;
+    return Complex { re: (are * r2 + aim) / denom2, im: (aim * r2 - are) / denom2 };
+}
+
+/* See this file's DEVIATION 2 above for why this returns a plain
+ * struct instead of `Option<Complex>`.
+ */
+struct ComplexResult { ok: bool, re: f64, im: f64 }
+
+/* CPLX-003: division a/b for runtime-unknown b — no `requires`, returns
+ * ComplexResult { ok: false, ... } instead of panicking when b is
+ * 0+0i (see this file's own DEVIATION 2 above for why not
+ * Option<Complex>). */
+fn div_checked_complex(a: Complex, b: Complex) -> ComplexResult {
+    if b.re == 0.0 {
+        if b.im == 0.0 {
+            return ComplexResult { ok: false, re: 0.0, im: 0.0 };
+        }
+    }
+    let r: Complex = div_complex(a, b);
+    return ComplexResult { ok: true, re: r.re, im: r.im };
+}
+
+/* ── CPLX-004: modulus/argument ──────────────────────────────────────
+ * Both reuse `math::trig` directly, per CPLX-004's own wording —
+ * `argument` at the origin is `0.0`, matching `atan2_f64(0.0, 0.0)`'s
+ * own pinned behavior (TRIG-004) automatically, with no special case
+ * needed here.
+ */
+fn modulus(c: Complex) -> f64
+    ensures(result >= 0.0)
+{
+    return hypot_f64(c.re, c.im);
+}
+
+/* CPLX-004: the angle of c from the positive real axis, any Complex
+ * value including the origin (argument(0+0i) = 0.0, TRIG-004's own
+ * pinned atan2_f64(0.0,0.0) convention). Non-exact — see
+ * docs/accuracy.md's `atan2_f64` row (this function is a direct
+ * pass-through, no separate accuracy.md row of its own). */
+fn argument(c: Complex) -> f64 {
+    return atan2_f64(c.im, c.re);
+}
+
+/* ── CPLX-005: conjugate + polar interop ─────────────────────────────
+ * `to_polar_complex`/`from_polar_complex` interoperate with
+ * `math::polar`'s own `Polar` struct (POLAR-001) rather than
+ * duplicating it, per CPLX-005's own wording.
+ */
+fn complex_neg_im_of(c: Complex) -> f64 {
+    let ci: f64 = c.im;
+    return 0.0 - ci;
+}
+
+/* CPLX-005: complex conjugate, any Complex value, exact (negates the
+ * imaginary part, leaves the real part unchanged). */
+fn conjugate(c: Complex) -> Complex
+    ensures(result.re == c.re && result.im == complex_neg_im_of(c))
+{
+    let cre: f64 = c.re;
+    let cim: f64 = c.im;
+    return Complex { re: cre, im: 0.0 - cim };
+}
+
+/* CPLX-005: c in polar form (r, theta), any Complex value — see
+ * `modulus`/`argument` above for each component's own accuracy. */
+fn to_polar_complex(c: Complex) -> Polar {
+    return Polar { r: modulus(c), theta: argument(c) };
+}
+
+/* CPLX-005: polar (r, theta) back to Complex (re, im), any Polar
+ * value. Non-exact — see docs/accuracy.md's `sin_f64`/`cos_f64` rows
+ * (direct pass-through, no separate accuracy.md row of its own). */
+fn from_polar_complex(p: Polar) -> Complex {
+    let pr: f64 = p.r;
+    let ptheta: f64 = p.theta;
+    return Complex { re: pr * cos_f64(ptheta), im: pr * sin_f64(ptheta) };
+}
+
+/* ── CPLX-006: approximate equality ───────────────────────────────────
+ * The documented comparison for computed `Complex` values — never a
+ * bare `==` on the struct itself (this compiler slice has no derived
+ * structural `Eq` for structs to even fall back on, so there is nothing
+ * to guard against accidentally reaching for here beyond the discipline
+ * CPLX-006 itself asks for).
+ */
+fn complex_re_close(a: Complex, b: Complex, epsilon: f64) -> bool {
+    let d: f64 = complex_re_diff(a, b);
+    return abs_f64(d) <= epsilon;
+}
+
+fn complex_im_close(a: Complex, b: Complex, epsilon: f64) -> bool {
+    let d: f64 = complex_im_diff(a, b);
+    return abs_f64(d) <= epsilon;
+}
+
+/* CPLX-006: a and b are within epsilon componentwise (any Complex
+ * a/b, any epsilon >= 0.0) — the documented comparison for computed
+ * Complex values, never a bare `==`. */
+fn approx_eq(a: Complex, b: Complex, epsilon: f64) -> bool
+    ensures(result == (complex_re_close(a, b, epsilon) && complex_im_close(a, b, epsilon)))
+{
+    return complex_re_close(a, b, epsilon) && complex_im_close(a, b, epsilon);
+}
+
+/* ── CPLX-007: complex exponential form ──────────────────────────────
+ * Gated on `math::trig`'s `sin_f64`/`cos_f64`/`exp_f64`/`ln_f64` all
+ * meeting PERF-002's accuracy budgets first (Section 15) — see
+ * `docs/accuracy.md`: all four now pass, so this is implemented rather
+ * than left "Future".
+ *
+ * `exp_complex(c) = exp(c.re) * (cos(c.im) + i*sin(c.im))` — the
+ * standard Euler's-formula expansion, reusing `exp_f64`/`cos_f64`/
+ * `sin_f64` directly.
+ */
+fn exp_complex(c: Complex) -> Complex {
+    let cim: f64 = c.im;
+    let mag: f64 = exp_f64(c.re);
+    return Complex { re: mag * cos_f64(cim), im: mag * sin_f64(cim) };
+}
+
+/* `ln_complex(c) = ln(|c|) + i*arg(c)` for `c != 0` — undefined (a branch
+ * point) at the origin, per the standard complex logarithm's own domain;
+ * `requires` excludes it the same way `div_complex` excludes `b == 0`.
+ *
+ * The real part is deliberately NOT `ln_f64(modulus(c))` — `modulus(c)`
+ * is `hypot_f64(c.re, c.im)`, itself already correctly-rounded to ~1
+ * ULP, but that rounding is a SEPARATE step from the `ln_f64` that
+ * follows it, and near `\|c\| ~= 1` (where `ln\|c\|` itself is near
+ * zero) that extra rounding is enough to blow past this library's own
+ * informational accuracy budget — confirmed via a widened audit sweep:
+ * 234 ULP at `c.re ~= -0.694, c.im ~= -0.729` (`\|c\| ~= 1.007`), even
+ * though `ln_f64` and `hypot_f64` each independently measure within 1
+ * ULP on their own. Uses `hypot_f64`'s own overflow-safe scaling
+ * decomposition (`mx`/`mn`/`ratio`) directly against `ln_f64` instead —
+ * `ln\|c\| = ln(mx) + 0.5*ln(1 + ratio^2)` — skipping the intermediate
+ * `sqrt` (and its own rounding) entirely; `ln_f64`'s own accuracy near
+ * `1 + ratio^2 ~= 1` (proven separately in `docs/accuracy.md`) covers
+ * the case `ratio` is small.
+ */
+fn ln_complex(c: Complex) -> Complex
+    requires(c.re != 0.0 || c.im != 0.0)
+{
+    let ax: f64 = abs_f64(c.re);
+    let ay: f64 = abs_f64(c.im);
+    let mut mx: f64 = ax;
+    let mut mn: f64 = ay;
+    if ay > ax {
+        mx = ay;
+        mn = ax;
+    }
+    let ratio: f64 = mn / mx;
+    /* `ln_f64(mx) + 0.5 * ln_f64(1.0 + ratio*ratio)` (independent single
+     * roundings throughout, then a plain `+`) still lost real precision
+     * right where this decomposition needs it most: near `\|c\| ~= 1`,
+     * `ln(mx)` and `0.5*ln(1+ratio^2)` are close in magnitude and
+     * OPPOSITE in sign, so they cancel — a ~1 ULP rounding anywhere
+     * upstream becomes a much larger RELATIVE error once the (near-zero)
+     * sum is formed. Measured 234 ULP before any fix; three intermediate
+     * fixes got this to 32, then 23, then 14 ULP (see `docs/accuracy.md`
+     * for the full progression) via this version: `ratio*ratio` itself
+     * is computed via `two_prod` (not a plain, rounding `*`) and
+     * `1.0 + ratio^2` via `two_sum`, `ln_f64_dd` is used for BOTH the
+     * `mx` and `1+ratio^2` logarithms, `1+ratio^2`'s own residual
+     * (`s_lo`) is folded in as a first-order correction
+     * (`d(ln(x))/dx = 1/x`, so `s_lo/s_hi`) — mirroring `ln_f64_dd`'s own
+     * `y`/`y_lo` correction internally — and everything combines via
+     * `two_sum`, rounding to a single `f64` only once at the very end.
+     * 14 ULP against this table's own informational 3 ULP budget is a
+     * real, understood residual (`ratio` itself is still only a single,
+     * ~0.5-ULP-rounded division — going further would need its own
+     * Newton-refinement step, the same shape as this fix's own `s_lo`
+     * correction, one level down), not chased further since SPEC.md
+     * pins no ULP requirement for CPLX-007 at all.
+     */
+    let r2: Pair2 = two_prod(ratio, ratio);
+    let s: Pair2 = two_sum(1.0, r2.hi);
+    let s_hi: f64 = s.hi;
+    let s_lo: f64 = s.lo + r2.lo;
+    let a: Pair2 = ln_f64_dd(mx);
+    let b: Pair2 = ln_f64_dd(s_hi);
+    let b_corr: f64 = s_lo / s_hi;
+    let b_half_hi: f64 = 0.5 * b.hi;
+    let b_half_lo: f64 = 0.5 * (b.lo + b_corr);
+    let combined: Pair2 = two_sum(a.hi, b_half_hi);
+    let combined_lo: f64 = (combined.lo + a.lo) + b_half_lo;
+    let ln_mod: f64 = combined.hi + combined_lo;
+    return Complex { re: ln_mod, im: argument(c) };
+}
+
+/* `pow_complex(base, exp) = exp(exp * ln(base))` — the standard complex
+ * power identity, built directly on `exp_complex`/`ln_complex`/
+ * `mul_complex` above; inherits `ln_complex`'s own `requires` (`base`
+ * away from the origin) since it's the only partial step in the chain.
+ * Non-exact — see docs/accuracy.md's CPLX-007 row: the nominal
+ * measured ULP figure there is a reference-quality artifact (system
+ * libm's own cpow/cexp isn't correctly rounded either), documented in
+ * full rather than chased further, since SPEC.md pins no ULP
+ * requirement for CPLX-007.
+ */
+fn pow_complex(base: Complex, exp: Complex) -> Complex
+    requires(base.re != 0.0 || base.im != 0.0)
+{
+    return exp_complex(mul_complex(exp, ln_complex(base)));
+}

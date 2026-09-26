@@ -1,0 +1,58 @@
+/* TEST-001 property layer and TEST-004 (fixed seed). One property per file;
+ * `ROUNDS` and the seed are pinned by docs/fuzz.tsv (see
+ * trig_identity_property.sv0 for the convention). Beyond-spec module, so no
+ * REQ tag (docs/deviations.md #12). */
+use random::next_u64;
+use random::unit_f64;
+use stats::Stats;
+use stats::stats_new;
+use stats::stats_push;
+use stats::stats_count;
+use stats::stats_sum_f64;
+use stats::stats_mean_f64;
+use stats::stats_variance_pop_f64;
+use stats::stats_variance_sample_f64;
+use stats::stats_min_f64;
+use stats::stats_max_f64;
+use arith::abs_f64;
+
+fn main() -> i32 {
+    let ROUNDS: i32 = 12;
+    let mut state: u64 = 3935559000370003845;
+
+    /* For ROUNDS seeded data sets of 40 values in [-1000, 1000), pushed into
+     * a base accumulator, a copy shifted by +12345.5, and a copy scaled by 3:
+     *   min <= mean <= max; population variance >= 0 and sample variance
+     *   >= population variance; sum == mean * n; variance is shift-invariant
+     *   and scales by 9; mean shifts by the shift and scales by 3. */
+    let mut rnd: i32 = 0;
+    while rnd < ROUNDS loop_invariant(rnd >= 0) {
+        let mut sb: Stats = stats_new();
+        let mut ss: Stats = stats_new();
+        let mut sk: Stats = stats_new();
+        let mut cnt: i32 = 0;
+        while cnt < 40 loop_invariant(cnt >= 0) {
+            state = next_u64(state);
+            let x: f64 = (unit_f64(state) - 0.5) * 2000.0;
+            sb = stats_push(sb, x);
+            ss = stats_push(ss, x + 12345.5);
+            sk = stats_push(sk, x * 3.0);
+            cnt = cnt + 1;
+        }
+        let mean: f64 = stats_mean_f64(sb);
+        let vp: f64 = stats_variance_pop_f64(sb);
+        let vs: f64 = stats_variance_sample_f64(sb);
+        if stats_count(sb) != 40 { return 10; }
+        if mean < stats_min_f64(sb) { return 11; }
+        if mean > stats_max_f64(sb) { return 12; }
+        if vp < 0.0 { return 13; }
+        if vs < vp { return 14; }
+        if abs_f64(stats_sum_f64(sb) - mean * 40.0) > 0.000000001 * (1.0 + abs_f64(stats_sum_f64(sb))) { return 15; }
+        if abs_f64(stats_variance_pop_f64(ss) - vp) > 0.000001 * (1.0 + vp) { return 16; }
+        if abs_f64(stats_mean_f64(ss) - (mean + 12345.5)) > 0.000000001 * (1.0 + abs_f64(mean) + 12345.5) { return 17; }
+        if abs_f64(stats_variance_pop_f64(sk) - 9.0 * vp) > 0.000000001 * (1.0 + vp) { return 18; }
+        if abs_f64(stats_mean_f64(sk) - 3.0 * mean) > 0.000000001 * (1.0 + abs_f64(mean)) { return 19; }
+        rnd = rnd + 1;
+    }
+    return 0;
+}

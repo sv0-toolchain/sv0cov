@@ -1,0 +1,70 @@
+/* sv0-mathlib prelude: Option/Result are not yet shipped as a core/std type
+ * (see toolchain audit, README.md), so every consumer that needs them must
+ * declare its own copy. This module is that single declaration point —
+ * every other module in this library uses these, never a private copy.
+ */
+module prelude;
+
+enum Option<T> { Some(T), None }
+enum Result<T, E> { Ok(T), Err(E) }
+
+/* OptionI64: a concrete, non-generic companion to Option<T>, dedicated to
+ * i64 payloads — see sv0-toolchain BUGS.md #9 (sv0-mathlib) for why this
+ * exists. sv0 generics resolve (bug #3) but don't monomorphize: there is
+ * exactly one physical struct for Option<T>, and its payload slot's C type
+ * is resolved from the DECLARATION's own payload type token, which for a
+ * generic enum is the literal parameter name "T", never a concrete type —
+ * so an i64 value constructed via the shared Option<T> above would still
+ * silently truncate through a 32-bit `int` field/binding. abs_checked_i64
+ * (and any future _checked function returning an i64 payload) uses this
+ * type instead. Not a scalable pattern past a handful of concrete _checked
+ * return types — see BUGS.md #9's "Impact on this library" for the
+ * tradeoff and when to revisit it.
+ */
+enum OptionI64 { Some(i64), None }
+
+/* OptionU64: same rationale as OptionI64, for u64 payloads — MOD-003's
+ * `lcm_checked_u64`. */
+enum OptionU64 { Some(u64), None }
+
+/* OptionU32: same rationale, for u32 payloads — ARITH-008's
+ * `add_checked_u32`/`sub_checked_u32`/`mul_checked_u32`. */
+enum OptionU32 { Some(u32), None }
+
+/* OptionF64: same rationale, for f64 payloads — `math::trig`'s
+ * `sqrt_checked_f64` and its siblings (Appendix C's worked example). */
+enum OptionF64 { Some(f64), None }
+
+/* Integer MIN/MAX constant helpers, shared across modules — sv0 has no
+ * `T::MAX`/`T::MIN` associated-constant syntax in this compiler slice.
+ * Declared once here (not duplicated per module) after a real bug: two
+ * independent per-module copies of `u64_max_val` (one in arith.sv0, one
+ * in modular.sv0) compiled cleanly through sv0c but failed at the C
+ * compile step with "redefinition of 'u64_max_val'" — the native
+ * compiler doesn't namespace same-named functions across project files,
+ * only same-named TYPES (confirmed: no diagnostic at the sv0 level at
+ * all, only downstream from `cc`). Not filed as a numbered BUGS.md entry
+ * (a real, if minor, toolchain gap — worth a diagnostic upstream
+ * eventually) since the straightforward fix here is simply not to
+ * duplicate the name, which every module below now does.
+ */
+/* Shared i32/i64/u32/u64 MIN/MAX constant helpers, per this file's own
+ * header note above (avoiding duplicate per-module copies that fail at
+ * the `cc` link step). No domain restriction — each takes no arguments
+ * and always returns the same fixed constant for its type. */
+fn i32_min_val() -> i32 { return 0 - 2147483648; }
+/* i32::MAX — largest representable i32, per this file's shared header
+ * note above. */
+fn i32_max_val() -> i32 { return 2147483647; }
+/* i64::MIN — smallest representable i64, per this file's shared
+ * header note above. */
+fn i64_min_val() -> i64 { return 0 - 9223372036854775807 - 1; }
+/* i64::MAX — largest representable i64, per this file's shared header
+ * note above. */
+fn i64_max_val() -> i64 { return 9223372036854775807; }
+/* u32::MAX — largest representable u32, per this file's shared header
+ * note above. */
+fn u32_max_val() -> u32 { return 4294967295; }
+/* u64::MAX — largest representable u64, per this file's shared header
+ * note above. */
+fn u64_max_val() -> u64 { return 18446744073709551615; }

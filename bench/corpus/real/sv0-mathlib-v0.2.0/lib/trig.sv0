@@ -1,0 +1,1134 @@
+/* module::trig — trigonometry, hyperbolic functions, degree/radian
+ * conversion, and (see the deviation note below) sqrt.
+ * Spec: sv0-mathlib SPEC.md Section 13 (TRIG-001..007).
+ *
+ * NOTE (toolchain gap, recorded in docs/deviations.md):
+ * `module math::trig;` is rejected by the current compiler (dotted
+ * module paths); this file is `module trig;`.
+ *
+ * DEVIATION (recorded in README.md, per GOV-004 — a real spec gap, not
+ * guessed silently): `sqrt_f64`/`sqrt_checked_f64` are fully specified
+ * (Section 14.3's Newton-Raphson algorithm, Appendix C's worked
+ * `sqrt_checked_f64` contract, PERF-002's 2 ULP accuracy requirement)
+ * but were never assigned a requirement ID or a home module anywhere in
+ * SPEC.md — neither `math::arith`'s scope (Section 11) nor
+ * `math::trig`'s own scope (13.1, which lists sin/cos/tan/asin/acos/
+ * atan/atan2/sinh/cosh/tanh/degree-radian conversion/hypot, but not
+ * "sqrt") names it. Since `hypot_f64` (TRIG-007) needs it directly and
+ * AD-004 already groups "Newton-Raphson for roots" alongside "minimax
+ * polynomial + range reduction for trig" as one combined design
+ * decision, `sqrt_f64`/`sqrt_checked_f64` live here, as `math::trig`
+ * shared machinery — the same role `exp_f64`/`ln_f64` play for this
+ * module and for `pow_f64` (ARITH-007's float form).
+ */
+module trig;
+
+use arith::abs_f64;
+use arith::round_f64;
+use arith::floor_f64;
+use arith::is_infinite_f64;
+use arith::Pair2;
+use arith::two_prod;
+use arith::two_sum;
+use prelude::OptionF64;
+
+/* ln(2) to 17 significant decimal digits — the standard range-reduction
+ * step size `exp_f64`/`ln_f64` both use, defined once here rather than
+ * re-literalized at each use site (same rationale TRIG-006 states for
+ * `PI_F64`, applied to this module's other shared constant). */
+fn ln2_f64() -> f64 {
+    return 0.6931471805599453;
+}
+
+/* PI_F64: SPEC.md's TRIG-006 requires "a single correctly-rounded
+ * pi-derived constant shared with every other function in math::trig
+ * and math::polar, not a re-literalized value per call site" — this is
+ * that one constant. The literal below is pi to 21 significant decimal
+ * digits (`3.14159265358979323846...`), far more than a `f64` can hold
+ * (~17 significant digits), so it rounds to the single nearest
+ * representable double — the same value `M_PI`/`f64::consts::PI`
+ * resolve to in any other language's standard library.
+ */
+fn pi_f64() -> f64 {
+    return 3.14159265358979323846;
+}
+
+/* ── sqrt (see this file's own deviation note above for why it's here) ──
+ *
+ * Section 14.3's algorithm needs an `initial_guess` "within roughly one
+ * bit of the answer" via "exponent manipulation (bit-reinterpretation)."
+ * No safe bit-reinterpretation exists in this compiler slice today (an
+ * `as` cast was checked earlier this session — see BUGS.md #10's era of
+ * findings — and routes through the same broken "defaults to int"
+ * codegen category any numeric cast beyond i32 hits), but AD-004
+ * explicitly offers a portable alternative: "a simple exponent-halving
+ * seed." `sqrt_bracket_guess` is exactly that, using only `*`/`/`: it
+ * doubles (or halves) a running guess until `guess*guess` brackets `x`,
+ * which locates `guess` within a factor of 2 of `sqrt(x)` — quadratic
+ * convergence then makes the fixed 64-iteration Newton refinement below
+ * (SQRT_ITERATION_BOUND) enormously more than sufficient regardless of
+ * how loose that starting bracket is.
+ */
+fn sqrt_bracket_guess(x: f64) -> f64
+    requires(x > 0.0)
+    ensures(result > 0.0)
+{
+    let mut guess: f64 = 1.0;
+    if x >= 1.0 {
+        let mut i1: u32 = 0;
+        /* loop_invariant: guess is always a positive power of two, and
+         * the loop only continues while guess*guess <= x — so on exit,
+         * guess*guess > x while the PREVIOUS guess (half this one)
+         * satisfied guess*guess <= x, bracketing sqrt(x) within a
+         * factor of 2. Bounded to 1100 iterations regardless (an f64's
+         * exponent range is roughly [-1074, 1023], so doubling from 1.0
+         * can never need more than ~1023 steps to bracket even
+         * f64::MAX) — a fixed cap, not a convergence-detecting early
+         * exit, matching SQRT_ITERATION_BOUND's own design intent.
+         */
+        while (guess * guess) <= x loop_invariant(guess > 0.0) {
+            if i1 >= 1100 { return guess; }
+            guess = guess * 2.0;
+            i1 = i1 + 1;
+        }
+    } else {
+        let mut i2: u32 = 0;
+        while (guess * guess) > x loop_invariant(guess > 0.0) {
+            if i2 >= 1100 { return guess; }
+            guess = guess / 2.0;
+            i2 = i2 + 1;
+        }
+    }
+    return guess;
+}
+
+/* A deliberately generous runtime sanity bound, not a tight ULP proof —
+ * PERF-002's real 2 ULP requirement is verified by testing against a
+ * reference (main.sv0's fixtures), not by this contract clause itself
+ * (an exact ULP bound isn't practically statable as a simple arithmetic
+ * predicate here, the same reasoning ARITH-010's fma_f64 documents).
+ */
+fn sqrt_error_bound(x: f64) -> f64 {
+    let scaled: f64 = x * 0.0000000001;
+    return scaled + 0.0000000001;
+}
+
+/* `+Infinity` is a real, in-domain input (`requires(x >= 0.0)` doesn't
+ * exclude it) but breaks BOTH the algorithm and the plain `ensures`
+ * formula below if not special-cased — found writing `test/fixtures/
+ * trig.csv` (TEST-003's own boundary/Infinity fixture coverage).
+ * Bracket-then-Newton with `x = Infinity`: `sqrt_bracket_guess` doubles
+ * `guess` until `guess*guess > x`, but `guess*guess` itself overflows to
+ * `Infinity` long before that (`Infinity <= Infinity` stays true), so
+ * the bracket loop only stops at its own 1100-iteration safety cap,
+ * returning some enormous-but-finite guess; the Newton loop then
+ * computes `x / guess = Infinity / finite = Infinity` on its first
+ * iteration, then `Infinity / Infinity = NaN` on the very next one —
+ * `sqrt_f64(Infinity)` was silently returning `NaN`, not `Infinity`,
+ * and `NaN >= 0.0`/`abs_f64(NaN - x) <= ...` both being false made the
+ * `ensures` panic rather than silently propagate the wrong answer,
+ * which is how this was caught. Non-exact — see docs/accuracy.md's
+ * `sqrt_f64` row (PERF-002's 2 ULP budget).
+ */
+fn sqrt_f64(x: f64) -> f64
+    requires(x >= 0.0)
+    ensures((result >= 0.0 && abs_f64(result * result - x) <= sqrt_error_bound(x)) || is_infinite_f64(x))
+{
+    if x == 0.0 { return 0.0; }
+    if is_infinite_f64(x) { return x; }
+    let mut guess: f64 = sqrt_bracket_guess(x);
+    let mut i: u32 = 0;
+    /* loop_invariant: guess > 0.0 always holds (the bracket seed is
+     * positive per its own ensures, and the Newton update
+     * 0.5*(guess + x/guess) of a positive guess against a positive x
+     * stays positive). SQRT_ITERATION_BOUND = 64: quadratic convergence
+     * from a within-a-factor-of-2 start reaches full f64 precision in
+     * roughly 6-7 iterations in practice; 64 is a deliberately generous
+     * fixed bound, per Section 14.3's own "fixed, documented constant,
+     * not a convergence-detecting early exit" design intent.
+     */
+    while i < 64 loop_invariant(guess > 0.0) {
+        guess = 0.5 * (guess + x / guess);
+        i = i + 1;
+    }
+    return guess;
+}
+
+/* Appendix C's worked example, transcribed directly (OptionF64 in place
+ * of the doc's generic Option<f64> — BUGS.md #9). */
+fn sqrt_checked_f64(x: f64) -> OptionF64 {
+    if x < 0.0 {
+        return OptionF64::None;
+    }
+    return OptionF64::Some(sqrt_f64(x));
+}
+
+/* ── exp_f64/ln_f64 (Section 14 shared machinery, "must land before
+ * pow_f64 [...], sinh_f64/cosh_f64/tanh_f64" per the roadmap) ─────────
+ *
+ * Standard range-reduction technique (no minimax coefficients needed —
+ * a plain Taylor series suffices once the argument is reduced to a
+ * small enough range, matching AD-004's "minimax (or truncated Taylor,
+ * documented either way)" allowance):
+ *
+ * `exp_f64(x)`: write `x = k*ln(2) + r` with `k` the nearest integer to
+ * `x/ln(2)`, so `r` is confined to roughly `[-ln(2)/2, ln(2)/2]`
+ * (~[-0.347, 0.347]) regardless of `x`'s own magnitude. `exp(r)` is then
+ * a 20-term Taylor series (`r`'s smallness makes this converge far
+ * beyond double precision well before the 20th term). `exp(x) = exp(r)
+ * * 2^k`: rather than compute `2^k` via a cast/bit-reinterpretation
+ * (unavailable — see this file's sqrt deviation note), scale the Taylor
+ * result by repeated `*2.0`/`/2.0`, exactly `sqrt_bracket_guess`'s own
+ * technique, bounded the same way (an f64's exponent range is roughly
+ * [-1074, 1023], so at most ~1074 repetitions).
+ *
+ * `ln_f64(x)`: write `x = m * 2^e` with `m` in `[1.0, 2.0)`, found by
+ * the same repeated-halving/doubling bracket `sqrt_bracket_guess` uses
+ * (tracking the integer exponent `e` this time, not just the bracket
+ * value). `ln(x) = e*ln(2) + ln(m)`; `ln(m)` uses the classic
+ * fast-converging series `ln(m) = 2*atanh(y) = 2*(y + y^3/3 + y^5/5 +
+ * ...)` with `y = (m-1)/(m+1)` — since `m` in `[1,2)` bounds `y` to
+ * `[0, 1/3]`, this converges to full double precision well within the
+ * 15 terms used below (each pair of terms shrinks by roughly `y^2 <=
+ * 1/9`).
+ */
+
+/* `ln2_f64()` alone is only a single-double approximation of true
+ * ln(2) (~1e-17 rounding error) — for `x` a few hundred in magnitude
+ * (PERF-002's own `[-700, 700]` domain), `k = round(x/ln2)` can reach
+ * the high hundreds, and `x - k*ln2` in plain double arithmetic loses
+ * roughly `k`'s own bit-width worth of absolute precision in `r`, the
+ * exact same shape of error `trig_reduce_2pi` needed a double-double
+ * (Cody-Waite-style) reduction to fix (confirmed via audit: 714 ULP at
+ * `x ~ 689`, nowhere near PERF-002's 2 ULP budget). Fixed the same way:
+ * `ln2_hi`/`ln2_lo` split `ln(2)` to ~100 bits, `k * ln2_hi` computed
+ * exactly via `two_prod`, and the subtraction from `x` via `two_sum`.
+ * Non-exact — see docs/accuracy.md's `exp_f64` row (PERF-002's 2 ULP
+ * budget).
+ */
+fn exp_f64(x: f64) -> f64
+    ensures(result >= 0.0 || result != result)
+{
+    if x != x { return x; }
+    /* `+Infinity`/`-Infinity` input breaks the double-double range
+     * reduction below the same way `sqrt_f64`'s own Infinity gap did
+     * (see that function's comment) — `k = round_f64(x/ln2_hi)` becomes
+     * `+/-Infinity` too, and `two_prod`/`dekker_split`'s own
+     * `splitter*a - a`-style arithmetic on an infinite `k` produces
+     * `NaN`, which then makes `abs_f64`'s own unguarded-for-NaN
+     * `ensures` panic deep inside the compensated-summation loop below
+     * — found via `test/fixtures/trig.csv` (TEST-003). `exp(+Infinity)
+     * = +Infinity`, `exp(-Infinity) = 0.0` per ordinary IEEE-754
+     * semantics, both handled directly here instead.
+     */
+    let pos_inf: f64 = 1.0 / 0.0;
+    if x == pos_inf { return pos_inf; }
+    if x == (0.0 - pos_inf) { return 0.0; }
+    let ln2_hi: f64 = 0.6931471805599453;
+    let ln2_lo: f64 = 2.3190468138462996e-17;
+    let k: f64 = round_f64(x / ln2_hi);
+    let prod: Pair2 = two_prod(k, ln2_hi);
+    let p_hi: f64 = prod.hi;
+    let p_lo: f64 = prod.lo + k * ln2_lo;
+    let s: Pair2 = two_sum(x, 0.0 - p_hi);
+    let comp: Pair2 = two_sum(s.hi, s.lo - p_lo);
+    let r: f64 = comp.hi;
+    let r_lo: f64 = comp.lo;
+    let mut term: f64 = 1.0;
+    let mut sum: f64 = 1.0;
+    let mut c: f64 = 0.0;
+    let mut n: f64 = 1.0;
+    /* loop_invariant: sum holds the partial Taylor sum for exp(r)
+     * through the n-th term; terminates after exactly 20 fixed
+     * iterations (not convergence-detected), matching this library's
+     * established "fixed, documented bound" style for series
+     * evaluation (SQRT_ITERATION_BOUND's own design intent). Summed via
+     * Neumaier compensated summation (see sin_poly/cos_poly's own fix
+     * for why), tracking a running correction `c`.
+     */
+    while n <= 20.0 loop_invariant(n >= 1.0) {
+        term = term * r / n;
+        let t: f64 = sum + term;
+        if abs_f64(sum) >= abs_f64(term) {
+            c = c + ((sum - t) + term);
+        } else {
+            c = c + ((term - t) + sum);
+        }
+        sum = t;
+        n = n + 1.0;
+    }
+    /* `exp(r + r_lo) ~= exp(r) * (1 + r_lo)` — first-order correction
+     * for the double-double residual `r_lo` the reduction above computed
+     * but the single-double `r` alone would otherwise discard, mirroring
+     * `trig_apply_quadrant`'s own `sin(r+e) ~= sin(r) + e*cos(r)`.
+     */
+    let base: f64 = sum + c;
+    let mut rv: f64 = base + base * r_lo;
+    let mut kk: f64 = k;
+    /* loop_invariant: rv always holds exp(r) * 2^(k - kk) so far;
+     * bounded to an f64's exponent range (~1074 max iterations either
+     * direction), same shape as sqrt_bracket_guess's own bracket loops.
+     */
+    while kk > 0.0 loop_invariant(rv >= 0.0) {
+        rv = rv * 2.0;
+        kk = kk - 1.0;
+    }
+    while kk < 0.0 loop_invariant(rv >= 0.0) {
+        rv = rv / 2.0;
+        kk = kk + 1.0;
+    }
+    return rv;
+}
+
+/* `ln_f64_dd` is `ln_f64`'s actual implementation, carried in
+ * double-double precision throughout — `ln_f64` itself just rounds the
+ * result once, at the very end. Exposed separately (not just inlined
+ * into `ln_f64`) so `math::complex`'s `ln_complex` can combine TWO calls
+ * to this (`ln(mx)` and `0.5*ln(1+ratio^2)`, per its own
+ * overflow-avoiding decomposition) in double-double before rounding
+ * once, rather than adding two already-rounded `ln_f64` results and
+ * losing precision a second time right where `ln_complex`'s own
+ * cancellation is worst (`\|c\| ~= 1`, where `ln\|c\|` itself is near
+ * zero) — see `complex.sv0`'s own comment on `ln_complex` for the
+ * measured before/after.
+ */
+fn ln_f64_dd(x: f64) -> Pair2
+    requires(x > 0.0)
+{
+    let mut m: f64 = x;
+    let mut e: f64 = 0.0;
+    /* loop_invariant: x == m * 2^e always holds (each step halves/
+     * doubles m while adjusting e oppositely); bounded to an f64's
+     * exponent range, same shape as sqrt_bracket_guess.
+     */
+    while m >= 2.0 loop_invariant(m > 0.0) {
+        m = m / 2.0;
+        e = e + 1.0;
+    }
+    while m < 1.0 loop_invariant(m > 0.0) {
+        m = m * 2.0;
+        e = e - 1.0;
+    }
+    let ln2_hi: f64 = 0.6931471805599453;
+    let ln2_lo: f64 = 2.3190468138462996e-17;
+    let num: f64 = m - 1.0;
+    /* `m - 1.0` is exact for `m` in `[1, 2)` (Sterbenz's lemma), but
+     * `m + 1.0` is NOT — confirmed via a direct bit-level check (e.g.
+     * `m = 1.9725589712623937`: `m + 1.0` as a plain double rounds to a
+     * value ~2.2e-16 off the true `m+1`). Using the plain-double `m+1.0`
+     * directly in the residual computation below could only recover `y`
+     * relative to that ALREADY-ROUNDED denominator, not the true `m+1`
+     * — the dominant remaining error (confirmed via audit: still 27 ULP
+     * even after every other fix in this function). `two_sum` captures
+     * `m+1.0` exactly as a double-double pair instead.
+     */
+    let den_pair: Pair2 = two_sum(m, 1.0);
+    let den: f64 = den_pair.hi;
+    let den_lo: f64 = den_pair.lo;
+    let y: f64 = num / den;
+    /* `y`'s own division rounds to nearest (an unavoidable single ~0.5
+     * ULP error) — normally negligible, but `2*atanh(y)`'s derivative
+     * (`2/(1-y^2)`, ~2.2 near this series' `y` bound of 1/3) amplifies
+     * it enough on its own to blow PERF-002's 2 ULP budget even with the
+     * series summation itself fully compensated. Recover `y`'s
+     * rounded-off remainder (`y_lo`, via one Newton-style residual step
+     * against the FULL double-double `den`: `y_lo = (num - y*den_hi -
+     * y*den_lo) / den`, computed with `two_prod`/`two_sum` for full
+     * precision) and fold it back in as a first-order correction on the
+     * FINAL series result, the same "propagate the low word, correct
+     * once at the end" shape as `trig_apply_quadrant`'s
+     * `e*cos(r)`/`exp_f64`'s `base*r_lo`.
+     */
+    let yd: Pair2 = two_prod(y, den);
+    let yd_lo: f64 = yd.lo + y * den_lo;
+    let resid: Pair2 = two_sum(num, 0.0 - yd.hi);
+    let rem: f64 = (resid.hi - yd_lo) + resid.lo;
+    let y_lo: f64 = rem / den;
+    let y2: f64 = y * y;
+    let mut term: f64 = y;
+    let mut sum: f64 = y;
+    let mut c: f64 = 0.0;
+    let mut denom: f64 = 1.0;
+    let mut i: u32 = 0;
+    /* loop_invariant: sum holds the partial atanh series for ln(m)/2
+     * through the current term; fixed 20-iteration bound (m in [1,2)
+     * bounds y to [0, 1/3], so mathematical truncation error is already
+     * negligible well before the 15th term — the 20-term bound isn't
+     * about convergence, it's headroom: even with every double-double
+     * fix in this function applied, each additional term's own
+     * (compensated) rounding still nudges the last bit or two, and 20
+     * terms measured comfortably within PERF-002's 2 ULP budget where 15
+     * did not (5 ULP, confirmed via audit). Summed via Neumaier
+     * compensated summation (see sin_poly/cos_poly's own fix for why a
+     * plain running sum alone isn't enough).
+     */
+    while i < 20 loop_invariant(i <= 20) {
+        term = term * y2;
+        denom = denom + 2.0;
+        let addend: f64 = term / denom;
+        let t: f64 = sum + addend;
+        if abs_f64(sum) >= abs_f64(addend) {
+            c = c + ((sum - t) + addend);
+        } else {
+            c = c + ((addend - t) + sum);
+        }
+        sum = t;
+        i = i + 1;
+    }
+    let atanh_correction: f64 = y_lo / (1.0 - y2);
+    /* Keep `ln(m)/2` as a normalized double-double pair (`two_sum` on
+     * the compensated `sum`/`c` plus the `y_lo` correction) rather than
+     * rounding to a single double here — an earlier version of this
+     * function did `let ln_m: f64 = 2.0 * ((sum + c) + atanh_correction)`
+     * and combined that with `e*ln2` via a second, independent single
+     * rounding below; confirmed via audit that BOTH of those single
+     * roundings threw away real precision (each ~2-6e-17, i.e. tens of
+     * ULP at this function's scale) that the double-double machinery
+     * above had already computed. `*2.0` is exact (only the exponent
+     * changes), so doubling a normalized pair stays normalized.
+     */
+    let lnm_pair: Pair2 = two_sum(sum, c + atanh_correction);
+    let lnm_hi: f64 = 2.0 * lnm_pair.hi;
+    let lnm_lo: f64 = 2.0 * lnm_pair.lo;
+    /* `e * ln2` uses the same double-double `ln2_hi`/`ln2_lo` split
+     * `exp_f64` uses, computed via `two_prod` — `e` reaches the high
+     * hundreds at the extreme end of this function's magnitude domain
+     * (`x` from `1e-300` to `1e300`), where a plain single-double
+     * `ln2_f64()` multiply would lose precision the same way `exp_f64`'s
+     * range reduction did before its own double-double fix. Combined
+     * with `ln(m)`'s own double-double pair via `two_sum`, rounding to a
+     * single double only ONCE, at this function's final return.
+     */
+    let eprod: Pair2 = two_prod(e, ln2_hi);
+    let e_lo: f64 = eprod.lo + e * ln2_lo;
+    let total: Pair2 = two_sum(eprod.hi, lnm_hi);
+    let total_lo: f64 = (total.lo + e_lo) + lnm_lo;
+    return Pair2 { hi: total.hi, lo: total_lo };
+}
+
+/* TRIG-002ish (Section 14): natural log, requires(x > 0.0). Non-exact
+ * — see docs/accuracy.md's `ln_f64` row (PERF-002's 2 ULP budget). */
+fn ln_f64(x: f64) -> f64
+    requires(x > 0.0)
+{
+    let p: Pair2 = ln_f64_dd(x);
+    /* `p.hi + p.lo` as a bare binop-of-two-struct-field-accesses hits
+     * sv0c's bug #13 territory again (see BUGS.md #16) — copy fields
+     * into locals first, the same established workaround this codebase
+     * already uses elsewhere.
+     */
+    let p_hi: f64 = p.hi;
+    let p_lo: f64 = p.lo;
+    return p_hi + p_lo;
+}
+
+/* Unchecked-domain companion to `ln_f64`: None for x <= 0.0 (outside
+ * ln's own domain) instead of the panic `ln_f64`'s own `requires`
+ * would raise. */
+fn ln_checked_f64(x: f64) -> OptionF64 {
+    if x <= 0.0 { return OptionF64::None; }
+    return OptionF64::Some(ln_f64(x));
+}
+
+/* ── TRIG-001: sin_f64/cos_f64 ────────────────────────────────────────
+ * AD-004's four-step design (Section 14.4), each step its own private
+ * function with its own contract, "so a fixture failure localizes to
+ * range reduction, quadrant folding, or polynomial evaluation instead
+ * of 'sin is wrong somewhere'":
+ *   1. trig_reduce_2pi   — reduce x modulo 2*PI_F64 into [0, 2*PI_F64).
+ *   2. trig_fold_quadrant — fold the reduced angle into [-pi/4, pi/4],
+ *      tracking which quadrant (0-3) it came from.
+ *   3. sin_poly/cos_poly — Taylor polynomial evaluation on the small
+ *      reduced argument (AD-004 allows "minimax (or truncated Taylor,
+ *      documented either way)" — this uses Taylor: no minimax
+ *      coefficients are needed once the argument is this small, and
+ *      Taylor coefficients (1/n!) need no numerical fitting to derive).
+ *   4. trig_apply_quadrant — apply the quadrant's sign/swap pattern
+ *      (the standard angle-addition-formula expansion of
+ *      sin/cos(k*pi/2 + r) for k = 0,1,2,3) to produce the final value.
+ */
+
+/* f64-domain adaptation of MOD-001's floor_mod contract shape, per
+ * Section 14.4 step 1's own wording. */
+/* A single double only holds 2*pi to ~53 bits of precision — for `x` a
+ * few thousand in magnitude (PERF-002's own [-1000*pi, 1000*pi] test
+ * domain), naively computing `x - floor(x/two_pi)*two_pi` in plain
+ * double arithmetic loses roughly as many bits of ABSOLUTE precision in
+ * the reduced angle as `x/two_pi`'s own bit-width consumes — confirmed
+ * via a full ULP audit sweep: at `x ~ 3022.18`, the naive reduction was
+ * off by ~3.2e-13 (tens of thousands of ULP once propagated through
+ * `sin_f64`/`cos_f64`, nowhere near PERF-002's 3 ULP budget). Fixed with
+ * a DOUBLE-DOUBLE (Cody-Waite-style) reduction instead, reusing the same
+ * `Pair2`/`two_prod`/`two_sum` error-free-transformation machinery
+ * `arith.sv0`'s `fma_f64` already needed: represent `2*pi` as a
+ * `(TWO_PI_HI, TWO_PI_LO)` pair whose sum is accurate to ~106 bits (~32
+ * decimal digits, computed once via a high-precision reference — see
+ * this file's own commit message for provenance), compute `q *
+ * TWO_PI_HI` EXACTLY via `two_prod` (not a plain, rounding `*`), fold in
+ * the smaller `q * TWO_PI_LO` correction, and subtract from `x` via
+ * `two_sum` (compensated, not a plain `-`) before rounding to the final
+ * single-double result. `q` is the NEAREST integer multiple (not
+ * `floor`), keeping the pre-shift reduced value small and symmetric
+ * (standard Cody-Waite practice) before the final shift into
+ * `[0, 2*pi)`.
+ */
+/* Returns the reduced angle as a DOUBLE-DOUBLE `Pair2 { hi, lo }` — NOT
+ * collapsed to a single f64 — so the extra ~53 bits of precision this
+ * function computes internally survive into quadrant folding and
+ * polynomial evaluation instead of being thrown away at the return
+ * boundary (see this module's own header note on why a single-double
+ * result still wasn't within PERF-002's 3 ULP budget even after this
+ * function's own reduction became double-double internally).
+ */
+fn trig_reduce_2pi(x: f64) -> Pair2
+    requires(x == x)
+    ensures(result.hi >= 0.0 && result.hi < 2.0 * pi_f64())
+{
+    let two_pi_hi: f64 = 6.283185307179586;
+    let two_pi_lo: f64 = 2.4492935982947064e-16;
+    let q: f64 = round_f64(x / two_pi_hi);
+    let prod: Pair2 = two_prod(q, two_pi_hi);
+    let p_hi: f64 = prod.hi;
+    let p_lo: f64 = prod.lo + q * two_pi_lo;
+    let s: Pair2 = two_sum(x, 0.0 - p_hi);
+    let s_hi: f64 = s.hi;
+    let s_lo: f64 = s.lo;
+    let comp: Pair2 = two_sum(s_hi, s_lo - p_lo);
+    let mut r_hi: f64 = comp.hi;
+    let mut r_lo: f64 = comp.lo;
+    /* The shift into [0, 2*pi) below adds/subtracts an O(1)-magnitude
+     * `two_pi_hi` to/from a near-zero `r_hi` — a PLAIN double `+`/`-`
+     * there would itself round away up to ~0.5 ULP of the ~2*pi-magnitude
+     * result (untracked, since it happens after `comp` already carries
+     * the full double-double precision), reintroducing the exact class of
+     * error this whole function exists to eliminate. Use `two_sum` here
+     * too, folding its own correction term into `r_lo` alongside the
+     * `two_pi_lo` shift.
+     */
+    if r_hi < 0.0 {
+        let shift: Pair2 = two_sum(r_hi, two_pi_hi);
+        r_hi = shift.hi;
+        r_lo = r_lo + two_pi_lo + shift.lo;
+    }
+    if r_hi >= two_pi_hi {
+        let shift2: Pair2 = two_sum(r_hi, 0.0 - two_pi_hi);
+        r_hi = shift2.hi;
+        r_lo = r_lo - two_pi_lo + shift2.lo;
+    }
+    return Pair2 { hi: r_hi, lo: r_lo };
+}
+
+struct QuadrantFold { r: f64, r_lo: f64, quadrant: f64 }
+
+/* Step 2: fold `reduced` (a double-double angle already in
+ * [0, 2*PI_F64), `reduced.hi + reduced.lo`) into [-pi/4, pi/4] by
+ * locating the nearest quarter-turn boundary `k*(pi/2)` and taking the
+ * residual — `quadrant` records `k mod 4` (as an f64, matching this
+ * module's all-f64 loop-counter convention elsewhere) for
+ * trig_apply_quadrant to read. `reduced.lo` (tiny, at most a few ULP of
+ * `reduced.hi`) passes through into `r_lo` essentially unchanged —
+ * `k*(pi/2)` is a small (0-3 term) exact-ish correction, nowhere near
+ * the magnitude that needed double-double treatment in the first place.
+ *
+ * `half_pi` here is deliberately derived as `two_pi_hi/4.0` /
+ * `two_pi_lo/4.0` (exact operations — dividing a double by a power of 2
+ * changes only the exponent, no rounding) from the SAME double-double
+ * `2*pi` basis `trig_reduce_2pi` uses, rather than `pi_f64() / 2.0`.
+ * `pi_f64()` alone is only a single-double approximation of true pi
+ * (~1e-17 rounding error); using it here made `k*half_pi` (k up to 3)
+ * disagree with `reduced.hi + reduced.lo`'s own already-double-double-
+ * accurate `2*pi` basis by a comparable amount — confirmed via a direct
+ * higher-precision audit (see this function's own commit message) — so
+ * every "multiple of 2*pi" in this file, from full turns down to quarter
+ * turns, is now measured against the identical `(two_pi_hi, two_pi_lo)`
+ * pair.
+ */
+fn trig_fold_quadrant(reduced: Pair2) -> QuadrantFold
+    requires(reduced.hi >= 0.0 && reduced.hi < 2.0 * pi_f64())
+{
+    let two_pi_hi: f64 = 6.283185307179586;
+    let two_pi_lo: f64 = 2.4492935982947064e-16;
+    let half_pi_hi: f64 = two_pi_hi / 4.0;
+    let half_pi_lo: f64 = two_pi_lo / 4.0;
+    let k: f64 = round_f64(reduced.hi / half_pi_hi);
+    /* `reduced.hi - k*half_pi` is itself a subtraction of two nearby
+     * magnitudes near a quadrant boundary (catastrophic cancellation),
+     * the same shape of precision loss `trig_reduce_2pi` needed
+     * double-double treatment for — so this subtraction reuses the same
+     * `two_prod`/`two_sum` compensated machinery rather than a plain
+     * double `-`, folding the correction into `reduced.lo`.
+     */
+    let kp: Pair2 = two_prod(k, half_pi_hi);
+    let kp_lo: f64 = kp.lo + k * half_pi_lo;
+    let d: Pair2 = two_sum(reduced.hi, 0.0 - kp.hi);
+    let r: f64 = d.hi;
+    let r_lo: f64 = (d.lo - kp_lo) + reduced.lo;
+    let mut kmod: f64 = k;
+    let k_start: f64 = k;
+    /* loop_invariant: `kmod` only ever decreases here (subtracting
+     * exactly 4.0 per iteration), so it never exceeds where it
+     * started — true regardless of how many iterations run, and shows
+     * each iteration makes real progress toward the `< 4.0` exit
+     * condition. */
+    while kmod >= 4.0 loop_invariant(kmod <= k_start) { kmod = kmod - 4.0; }
+    /* loop_invariant: entering this loop `kmod < 4.0` already holds
+     * (the first loop's own exit condition); each iteration here only
+     * fires while `kmod < 0.0`, and adding `4.0` to a value `< 0.0`
+     * always stays `< 4.0` — so `kmod < 4.0` holds throughout,
+     * regardless of iteration count, without needing to reason about
+     * how many steps the first loop above took. */
+    while kmod < 0.0 loop_invariant(kmod < 4.0) { kmod = kmod + 4.0; }
+    return QuadrantFold { r: r, r_lo: r_lo, quadrant: kmod };
+}
+
+/* Step 3: Taylor series for sin/cos on a small `r` (|r| <= pi/4 after
+ * folding). Fixed 12-term bound — |r| <= pi/4 (~0.785) makes each
+ * successive term shrink by roughly r^2/((2n)(2n+1)), well past double
+ * precision long before the 12th term.
+ *
+ * Summed via Neumaier (improved Kahan) compensated summation (running
+ * correction `c` for whichever addend was too small to fully register
+ * against the accumulator, folded back in every iteration), and
+ * returned as a normalized double-double `Pair2` (via `two_sum` on the
+ * final `sum`/`c`) rather than rounded to a single double here —
+ * `trig_apply_quadrant_dd` needs the extra precision because `tan_f64`
+ * (sin/cos division, TRIG-002) amplifies each operand's own
+ * final-rounding error. Confirmed via audit: rounding `sin_poly`/
+ * `cos_poly` to a single double immediately (an earlier version of this
+ * function) got `sin_f64`/`cos_f64` individually to 1 ULP, comfortably
+ * within PERF-002's 3 ULP budget on their own, but `tan_f64` near
+ * `tan(x) ~= 1` (where `sin_f64(x) ~= cos_f64(x)` in magnitude, so their
+ * independent ~1 ULP rounding errors don't cancel in the quotient) still
+ * exceeded it — rounding only once, at the very end of sin_f64/cos_f64
+ * (after the quadrant sign/swap, which is exact), removes that
+ * intermediate rounding step entirely.
+ */
+fn sin_poly_dd(r: f64) -> Pair2 {
+    let r2: f64 = r * r;
+    let mut term: f64 = r;
+    let mut sum: f64 = r;
+    let mut c: f64 = 0.0;
+    let mut n: f64 = 1.0;
+    let mut i: u32 = 0;
+    while i < 12 loop_invariant(i <= 12) {
+        term = 0.0 - term * r2 / ((2.0 * n) * (2.0 * n + 1.0));
+        let t: f64 = sum + term;
+        if abs_f64(sum) >= abs_f64(term) {
+            c = c + ((sum - t) + term);
+        } else {
+            c = c + ((term - t) + sum);
+        }
+        sum = t;
+        n = n + 1.0;
+        i = i + 1;
+    }
+    return two_sum(sum, c);
+}
+
+fn cos_poly_dd(r: f64) -> Pair2 {
+    let r2: f64 = r * r;
+    let mut term: f64 = 1.0;
+    let mut sum: f64 = 1.0;
+    let mut c: f64 = 0.0;
+    let mut n: f64 = 0.0;
+    let mut i: u32 = 0;
+    while i < 12 loop_invariant(i <= 12) {
+        term = 0.0 - term * r2 / ((2.0 * n + 1.0) * (2.0 * n + 2.0));
+        let t: f64 = sum + term;
+        if abs_f64(sum) >= abs_f64(term) {
+            c = c + ((sum - t) + term);
+        } else {
+            c = c + ((term - t) + sum);
+        }
+        sum = t;
+        n = n + 1.0;
+        i = i + 1;
+    }
+    return two_sum(sum, c);
+}
+
+struct SinCosDD { s_hi: f64, s_lo: f64, c_hi: f64, c_lo: f64 }
+
+/* Step 4: the standard angle-addition-formula expansion of
+ * sin/cos(k*(pi/2) + r) for k mod 4 = 0,1,2,3 — kept double-double
+ * throughout (both the first-order `r_lo` correction and the sign/swap
+ * relabeling), so sin_f64/cos_f64 round to a single double exactly once,
+ * at the very end.
+ *
+ * `fold.r_lo` is the tiny double-double residual `trig_reduce_2pi`
+ * would otherwise have discarded — applied here as a first-order
+ * Taylor correction (`sin(r+e) ~= sin(r) + e*cos(r)`, `cos(r+e) ~=
+ * cos(r) - e*sin(r)`, valid since `|e|` is at most a few ULP of `r`);
+ * `e*cp.lo`/`e*sp.lo` are second-order-tiny (both factors already near
+ * the bottom of double precision) and dropped.
+ */
+fn trig_apply_quadrant_dd(fold: QuadrantFold) -> SinCosDD {
+    let r: f64 = fold.r;
+    let e: f64 = fold.r_lo;
+    let q: f64 = fold.quadrant;
+    let sp: Pair2 = sin_poly_dd(r);
+    let cp: Pair2 = cos_poly_dd(r);
+    let sc: Pair2 = two_sum(sp.hi, sp.lo + e * cp.hi);
+    let cc: Pair2 = two_sum(cp.hi, cp.lo - e * sp.hi);
+    let s_hi: f64 = sc.hi;
+    let s_lo: f64 = sc.lo;
+    let c_hi: f64 = cc.hi;
+    let c_lo: f64 = cc.lo;
+    if q == 0.0 { return SinCosDD { s_hi: s_hi, s_lo: s_lo, c_hi: c_hi, c_lo: c_lo }; }
+    if q == 1.0 { return SinCosDD { s_hi: c_hi, s_lo: c_lo, c_hi: 0.0 - s_hi, c_lo: 0.0 - s_lo }; }
+    if q == 2.0 { return SinCosDD { s_hi: 0.0 - s_hi, s_lo: 0.0 - s_lo, c_hi: 0.0 - c_hi, c_lo: 0.0 - c_lo }; }
+    return SinCosDD { s_hi: 0.0 - c_hi, s_lo: 0.0 - c_lo, c_hi: s_hi, c_lo: s_lo };
+}
+
+/* Total functions over all finite f64 (no `requires` on domain, per
+ * TRIG-001's own wording); NaN/Infinity input propagates NaN.
+ * Non-exact — see docs/accuracy.md's `sin_f64`/`cos_f64` rows
+ * (PERF-002's 2 ULP budget).
+ */
+fn sin_f64(x: f64) -> f64
+    ensures((result >= (0.0 - 1.0) && result <= 1.0) || result != result)
+{
+    if x != x { return x; }
+    let pos_inf: f64 = 1.0 / 0.0;
+    if x == pos_inf { return 0.0 / 0.0; }
+    if x == (0.0 - pos_inf) { return 0.0 / 0.0; }
+    let reduced: Pair2 = trig_reduce_2pi(x);
+    let fold: QuadrantFold = trig_fold_quadrant(reduced);
+    let sc: SinCosDD = trig_apply_quadrant_dd(fold);
+    /* See ln_f64's own comment (BUGS.md #16) for why this isn't a bare
+     * `return sc.s_hi + sc.s_lo;`.
+     */
+    let s_hi: f64 = sc.s_hi;
+    let s_lo: f64 = sc.s_lo;
+    return s_hi + s_lo;
+}
+
+/* See sin_f64's own comment above (same domain, contract shape, and
+ * docs/accuracy.md accuracy budget). */
+fn cos_f64(x: f64) -> f64
+    ensures((result >= (0.0 - 1.0) && result <= 1.0) || result != result)
+{
+    if x != x { return x; }
+    let pos_inf: f64 = 1.0 / 0.0;
+    if x == pos_inf { return 0.0 / 0.0; }
+    if x == (0.0 - pos_inf) { return 0.0 / 0.0; }
+    let reduced: Pair2 = trig_reduce_2pi(x);
+    let fold: QuadrantFold = trig_fold_quadrant(reduced);
+    let sc: SinCosDD = trig_apply_quadrant_dd(fold);
+    /* See ln_f64's own comment (BUGS.md #16) for why this isn't a bare
+     * `return sc.c_hi + sc.c_lo;`.
+     */
+    let c_hi: f64 = sc.c_hi;
+    let c_lo: f64 = sc.c_lo;
+    return c_hi + c_lo;
+}
+
+/* TRIG-002: `tan_f64(x)` is `sin_f64(x) / cos_f64(x)` — deliberately
+ * WITHOUT a `requires` excluding the asymptote (`cos_f64(x) == 0.0`):
+ * TRIG-002's own wording notes a `requires` there isn't practical (the
+ * domain is dense reals, no input is "statically known" to hit the
+ * asymptote), so `tan_f64` is instead a total function, returning
+ * `Infinity`/`-Infinity`/`NaN` at the asymptote per ordinary IEEE-754
+ * division semantics — the CONV-005(b) path (documented propagation),
+ * not 5(a) (a `requires`/`_checked` pair). `tan_checked_f64` is kept
+ * anyway for API consistency with every other domain-adjacent function
+ * in this module, even though TRIG-002 doesn't require it (`cos_f64(x)
+ * == 0.0` is itself the only "domain violation," already handled by the
+ * unchecked form's own IEEE-754 behavior). Non-exact — see
+ * docs/accuracy.md's `tan_f64` row (PERF-002's 2 ULP budget).
+ */
+fn tan_f64(x: f64) -> f64 {
+    return sin_f64(x) / cos_f64(x);
+}
+
+/* Checked companion to `tan_f64`, per this section's own comment above
+ * — None exactly where cos_f64(x) == 0.0 (the asymptote), Some
+ * otherwise. */
+fn tan_checked_f64(x: f64) -> OptionF64 {
+    let c: f64 = cos_f64(x);
+    if c == 0.0 { return OptionF64::None; }
+    return OptionF64::Some(sin_f64(x) / c);
+}
+
+/* ── TRIG-006: degree/radian conversion ──────────────────────────────
+ * Both use the one shared `pi_f64()` constant (TRIG-006's own
+ * "not a re-literalized value per call site" requirement) — no separate
+ * `180.0`-based constant is introduced, just `pi_f64()` scaled inline.
+ */
+fn to_radians_f64(deg: f64) -> f64 {
+    return deg * (pi_f64() / 180.0);
+}
+
+/* TRIG-006: radians to degrees, any finite rad — see this section's
+ * own header comment above. */
+fn to_degrees_f64(rad: f64) -> f64 {
+    return rad * (180.0 / pi_f64());
+}
+
+/* ── TRIG-007: hypot ──────────────────────────────────────────────────
+ * The standard overflow/underflow-avoiding SCALED form: factor out the
+ * larger magnitude first (`mx`), so the only squaring performed is on
+ * `mn/mx`, a ratio always in `[0.0, 1.0]` — `x*x + y*y` directly would
+ * overflow to Infinity for any `x`/`y` whose magnitude exceeds roughly
+ * `sqrt(f64::MAX)` (~1.34e154) even when the TRUE hypot result is still
+ * comfortably representable. Non-exact — see docs/accuracy.md's
+ * `hypot_f64` row (PERF-002's 2 ULP budget).
+ */
+fn hypot_f64(x: f64, y: f64) -> f64
+    ensures(result >= 0.0)
+{
+    let ax: f64 = abs_f64(x);
+    let ay: f64 = abs_f64(y);
+    let mut mx: f64 = ax;
+    let mut mn: f64 = ay;
+    if ay > ax {
+        mx = ay;
+        mn = ax;
+    }
+    if mx == 0.0 { return 0.0; }
+    let ratio: f64 = mn / mx;
+    return mx * sqrt_f64(1.0 + ratio * ratio);
+}
+
+/* ── TRIG-004: atan/atan2 ─────────────────────────────────────────────
+ * `atan_f64`'s own Taylor series (`x - x^3/3 + x^5/5 - ...`) converges
+ * far too slowly near `|x| = 1` for any practical fixed term count (the
+ * error only shrinks like `1/n`, not geometrically) — so this reduces
+ * the argument down to `|x| <= tan(pi/12) ~ 0.268` first, via at most
+ * two classical identities, before evaluating the series:
+ *   1. `atan(x) = -atan(-x)` for `x < 0` (work with `x >= 0` from here).
+ *   2. `atan(x) = pi/2 - atan(1/x)` for `x > 1` (now `x` in `[0, 1]`).
+ *   3. `atan(x) = pi/6 + atan((x*sqrt(3) - 1) / (sqrt(3) + x))` for
+ *      `x > tan(pi/12)` (the tangent-subtraction-formula identity for
+ *      `atan(x) - pi/6`) — the reduced argument is now within
+ *      `[0, tan(pi/12)]`, where the series converges to well past
+ *      double precision within 20 terms.
+ */
+/* Neumaier-compensated summation, mirroring `sin_poly`/`cos_poly`'s own
+ * fix above — a plain running `sum = sum + ...` over 20 terms was
+ * accumulating enough rounding to push `atan_f64` to 4 ULP right at the
+ * `tan_pi12` reduction boundary, 1 over PERF-002's 3 ULP budget.
+ */
+fn atan_small_series_dd(x: f64) -> Pair2 {
+    let x2: f64 = x * x;
+    let mut term: f64 = x;
+    let mut sum: f64 = x;
+    let mut c: f64 = 0.0;
+    let mut n: f64 = 1.0;
+    let mut sign: f64 = 0.0 - 1.0;
+    let mut i: u32 = 0;
+    while i < 20 loop_invariant(i <= 20) {
+        term = term * x2;
+        let addend: f64 = sign * term / (2.0 * n + 1.0);
+        let t: f64 = sum + addend;
+        if abs_f64(sum) >= abs_f64(addend) {
+            c = c + ((sum - t) + addend);
+        } else {
+            c = c + ((addend - t) + sum);
+        }
+        sum = t;
+        sign = 0.0 - sign;
+        n = n + 1.0;
+        i = i + 1;
+    }
+    return two_sum(sum, c);
+}
+
+/* `atan_f64_dd` is `atan_f64`'s actual (recursive) implementation,
+ * carried in double-double precision throughout — `atan_f64` itself
+ * just rounds the result once, at the very end. Two single-double
+ * constants used to feed the `x > tan_pi12` reduction identity
+ * (`atan(x) = pi/6 + atan((x*sqrt3-1)/(sqrt3+x))`) turned out to matter
+ * more than expected: BOTH `sqrt_f64(3.0)` (only correct to ~1 ULP) and
+ * `pi_f64()/6.0` (only correct to ~1 ULP) are independently-rounded
+ * approximations of two DIFFERENT irrational constants, and the
+ * identity's own exactness depends on them agreeing with each other —
+ * confirmed via a direct higher-precision check: even feeding the
+ * identity an EXACT `xp` still landed ~2.5e-17 off `atan(x)`, purely
+ * from `sqrt_f64(3.0)`'s rounding not matching `pi_f64()/6.0`'s
+ * rounding. Using double-double `sqrt3`/`pi/6` (each split hi/lo,
+ * computed once via a high-precision reference) resolves this the same
+ * way `trig_reduce_2pi`'s `two_pi_hi`/`two_pi_lo` resolved the analogous
+ * mismatch there.
+ */
+fn atan_f64_dd(x: f64) -> Pair2 {
+    if x != x { return Pair2 { hi: x, lo: 0.0 }; }
+    if x < 0.0 {
+        let inner: Pair2 = atan_f64_dd(0.0 - x);
+        /* BUGS.md #19: extract fields to locals first — see
+         * lib/complex.sv0's own #19 comment for the full writeup. */
+        let inner_hi: f64 = inner.hi;
+        let inner_lo: f64 = inner.lo;
+        return Pair2 { hi: 0.0 - inner_hi, lo: 0.0 - inner_lo };
+    }
+    let pi_hi: f64 = 3.141592653589793;
+    let pi_lo: f64 = 1.2246467991473532e-16;
+    if x > 1.0 {
+        let inner: Pair2 = atan_f64_dd(1.0 / x);
+        let half_hi: f64 = pi_hi / 2.0;
+        let half_lo: f64 = pi_lo / 2.0;
+        let t: Pair2 = two_sum(half_hi, 0.0 - inner.hi);
+        let lo: f64 = (t.lo + half_lo) - inner.lo;
+        return Pair2 { hi: t.hi, lo: lo };
+    }
+    let sqrt3_hi: f64 = 1.7320508075688772;
+    let sqrt3_lo: f64 = 1.0035084221806903e-16;
+    let tan_pi12: f64 = 2.0 - sqrt3_hi;
+    if x > tan_pi12 {
+        /* `xp = (x*sqrt3 - 1) / (sqrt3 + x)`, kept double-double: both
+         * the numerator and denominator use the full `(sqrt3_hi,
+         * sqrt3_lo)` pair, and `xp` itself gets one Newton-style
+         * residual-correction step (the same shape as `ln_f64`'s own
+         * `y`/`y_lo` fix) before feeding the series.
+         */
+        let xp1: Pair2 = two_prod(x, sqrt3_hi);
+        let xp1_lo: f64 = xp1.lo + x * sqrt3_lo;
+        let numd: Pair2 = two_sum(xp1.hi, 0.0 - 1.0);
+        let num_hi: f64 = numd.hi;
+        let num_lo: f64 = numd.lo + xp1_lo;
+        let dend: Pair2 = two_sum(sqrt3_hi, x);
+        let den_hi: f64 = dend.hi;
+        let den_lo: f64 = dend.lo + sqrt3_lo;
+        let xp: f64 = num_hi / den_hi;
+        let xd: Pair2 = two_prod(xp, den_hi);
+        let xd_lo: f64 = xd.lo + xp * den_lo;
+        let rd: Pair2 = two_sum(num_hi, 0.0 - xd.hi);
+        let rem: f64 = (rd.hi - xd_lo) + (rd.lo + num_lo);
+        let xp_lo: f64 = rem / den_hi;
+        let series: Pair2 = atan_small_series_dd(xp);
+        let corr: f64 = xp_lo / (1.0 + xp * xp);
+        let series_norm: Pair2 = two_sum(series.hi, series.lo + corr);
+        let sixth_hi: f64 = 0.5235987755982989;
+        let sixth_lo: f64 = 0.0 - 2.6922892769453416e-17;
+        let t: Pair2 = two_sum(sixth_hi, series_norm.hi);
+        let lo: f64 = (t.lo + sixth_lo) + series_norm.lo;
+        return Pair2 { hi: t.hi, lo: lo };
+    }
+    return atan_small_series_dd(x);
+}
+
+/* DEVIATION (recorded in README.md): TRIG-004 specifies a STRICT
+ * `result > -pi/2 && result < pi/2` (the true mathematical range of
+ * atan is the open interval). At `f64` precision this is unsatisfiable
+ * for a correctly-rounded implementation: for sufficiently large `|x|`,
+ * `atan(x)` is within less than half a ULP of true `pi/2`, so it rounds
+ * to EXACTLY the nearest representable double to `pi/2` — confirmed
+ * this isn't a bug specific to this library by checking the system libm
+ * directly (`atan(1e50)`, `atan(1e300)`, etc. all return bit-identical
+ * `1.5707963267948966`, `== M_PI/2`, in plain C). Tightening this
+ * function further (as this file's own accuracy work just did) makes
+ * hitting that boundary MORE likely, not less — an earlier, less
+ * accurate version of this function happened to round just short of the
+ * boundary by coincidence, masking the same underlying issue. The
+ * `ensures` below uses `>=`/`<=` instead, matching `sin_f64`/`cos_f64`'s
+ * own boundary-inclusive convention. Non-exact — see
+ * docs/accuracy.md's `atan_f64` row (PERF-002's 2 ULP budget).
+ */
+fn atan_f64(x: f64) -> f64
+    ensures((result >= (0.0 - pi_f64()) / 2.0 && result <= pi_f64() / 2.0) || result != result)
+{
+    let p: Pair2 = atan_f64_dd(x);
+    /* See ln_f64's own comment (BUGS.md #16) for why this isn't a bare
+     * `return p.hi + p.lo;`.
+     */
+    let p_hi: f64 = p.hi;
+    let p_lo: f64 = p.lo;
+    return p_hi + p_lo;
+}
+
+/* Standard four-quadrant form, per TRIG-004's own wording; `atan2_f64(0.0,
+ * 0.0)` is explicitly defined as `0.0` rather than left unspecified.
+ * Non-exact — see docs/accuracy.md's `atan2_f64` row (a direct
+ * pass-through of `atan_f64`'s own PERF-002 2 ULP budget).
+ */
+fn atan2_f64(y: f64, x: f64) -> f64
+    ensures(result >= (0.0 - pi_f64()) && result <= pi_f64())
+{
+    if x > 0.0 { return atan_f64(y / x); }
+    if x < 0.0 {
+        if y >= 0.0 { return atan_f64(y / x) + pi_f64(); }
+        return atan_f64(y / x) - pi_f64();
+    }
+    if y > 0.0 { return pi_f64() / 2.0; }
+    if y < 0.0 { return 0.0 - pi_f64() / 2.0; }
+    return 0.0;
+}
+
+/* ── TRIG-003: asin/acos ──────────────────────────────────────────────
+ * `asin_f64` uses `atan(x / sqrt(1 - x^2))` (special-cased at the exact
+ * endpoints `x = 1.0`/`x = -1.0`, where `1 - x^2 == 0.0` would otherwise
+ * divide by zero) — but `1.0 - x*x`, not `(1.0-x)*(1.0+x)`, loses
+ * relative precision near `|x| = 1`: `x*x` rounds to within ~1 ULP of
+ * `x^2`, and subtracting THAT from `1.0` amplifies the absolute rounding
+ * of `x*x` into a much larger RELATIVE error once the result is small
+ * (classic catastrophic cancellation) — confirmed via audit: 12 ULP near
+ * `x ~ -0.99998`, nowhere near PERF-002's 3 ULP budget. `(1.0-x)*(1.0+x)`
+ * computes the same mathematical quantity but each factor is its own
+ * well-conditioned subtraction (no cancellation — `x` isn't close to
+ * `-1`/`1` in a single factor the way `x*x` is close to `1` in the naive
+ * form), so the product retains full relative precision. Non-exact —
+ * see docs/accuracy.md's `asin_f64` row (PERF-002's 3 ULP budget).
+ */
+fn asin_f64(x: f64) -> f64
+    requires(x >= (0.0 - 1.0) && x <= 1.0)
+    ensures(result >= (0.0 - pi_f64()) / 2.0 && result <= pi_f64() / 2.0)
+{
+    if x == 1.0 { return pi_f64() / 2.0; }
+    if x == (0.0 - 1.0) { return 0.0 - pi_f64() / 2.0; }
+    return atan_f64(x / sqrt_f64((1.0 - x) * (1.0 + x)));
+}
+
+/* `acos_f64` is deliberately NOT `pi/2 - asin_f64(x)` — near `x ~= 1`,
+ * `asin_f64(x) ~= pi/2`, so that subtraction catastrophically cancels
+ * (confirmed via audit: 3029 ULP near `x ~ 0.99998`, wildly over
+ * PERF-002's 3 ULP budget, versus `asin_f64`'s own well-behaved error
+ * there). Uses the standard half-angle reformulation instead — `acos(x)
+ * = 2*asin(sqrt((1-x)/2))` for `x >= 0`, `acos(x) = pi - 2*asin(sqrt((1+x)/2))`
+ * for `x < 0` — which never subtracts two close-in-magnitude values:
+ * `(1-x)/2`/`(1+x)/2` are each well-conditioned (the SAME well-behaved
+ * shape `asin_f64`'s own `(1.0-x)*(1.0+x)` fix relies on), and reuses
+ * `asin_f64`'s own accuracy directly instead of independently
+ * re-deriving the angle. Non-exact — see docs/accuracy.md's
+ * `acos_f64` row (PERF-002's 3 ULP budget).
+ */
+fn acos_f64(x: f64) -> f64
+    requires(x >= (0.0 - 1.0) && x <= 1.0)
+    ensures(result >= 0.0 && result <= pi_f64())
+{
+    if x >= 0.0 {
+        return 2.0 * asin_f64(sqrt_f64((1.0 - x) / 2.0));
+    }
+    return pi_f64() - 2.0 * asin_f64(sqrt_f64((1.0 + x) / 2.0));
+}
+
+/* Checked companion to `asin_f64` — None outside [-1.0, 1.0], Some
+ * otherwise. */
+fn asin_checked_f64(x: f64) -> OptionF64 {
+    if x < (0.0 - 1.0) { return OptionF64::None; }
+    if x > 1.0 { return OptionF64::None; }
+    return OptionF64::Some(asin_f64(x));
+}
+
+/* Checked companion to `acos_f64` — None outside [-1.0, 1.0], Some
+ * otherwise. */
+fn acos_checked_f64(x: f64) -> OptionF64 {
+    if x < (0.0 - 1.0) { return OptionF64::None; }
+    if x > 1.0 { return OptionF64::None; }
+    return OptionF64::Some(acos_f64(x));
+}
+
+/* ── TRIG-005: hyperbolic forms ───────────────────────────────────────
+ * `sinh_f64` near zero: the naive `(exp(x) - exp(-x)) / 2` form
+ * catastrophically cancels for small `|x|` (`exp(x)` and `exp(-x)` are
+ * both near `1.0`, so their difference loses most of its significant
+ * digits before the subtraction even happens) — so for `|x| < 1.0` this
+ * uses `sinh`'s own Taylor series instead (`x + x^3/3! + x^5/5! + ...`,
+ * no cancellation, converges to well past double precision in 15 terms
+ * given `|x| < 1.0`), falling back to the `exp_f64`-based form only once
+ * `exp(x)` genuinely dominates `exp(-x)` and cancellation isn't a
+ * concern.
+ *
+ * `tanh_f64` for large `|x|`: `exp_f64(2x)` overflows to `Infinity` well
+ * before `tanh(x)` itself would ever meaningfully differ from its
+ * asymptote (`tanh(20.0)` already differs from `1.0` by less than
+ * `1e-17`, past `f64` precision) — clamped explicitly rather than
+ * letting `(Infinity - 1) / (Infinity + 1)` produce `NaN`.
+ * Non-exact — see docs/accuracy.md's `sinh_f64`/`cosh_f64`/`tanh_f64`
+ * rows (informational 3 ULP budgets).
+ */
+fn sinh_f64(x: f64) -> f64 {
+    if abs_f64(x) < 1.0 {
+        /* Neumaier-compensated summation (see sin_poly/cos_poly's own
+         * fix for why) — found via the widened sinh/cosh/tanh/hypot
+         * audit sweep that a plain running sum here left enough
+         * rounding for tanh_f64 (dividing this by cosh_f64) to exceed
+         * its own informational 3 ULP budget even after tanh_f64's
+         * near-zero cancellation fix.
+         */
+        let x2: f64 = x * x;
+        let mut term: f64 = x;
+        let mut sum: f64 = x;
+        let mut c: f64 = 0.0;
+        let mut n: f64 = 1.0;
+        let mut i: u32 = 0;
+        while i < 15 loop_invariant(i <= 15) {
+            term = term * x2 / ((2.0 * n) * (2.0 * n + 1.0));
+            let t: f64 = sum + term;
+            if abs_f64(sum) >= abs_f64(term) {
+                c = c + ((sum - t) + term);
+            } else {
+                c = c + ((term - t) + sum);
+            }
+            sum = t;
+            n = n + 1.0;
+            i = i + 1;
+        }
+        return sum + c;
+    }
+    let ex: f64 = exp_f64(x);
+    let enx: f64 = exp_f64(0.0 - x);
+    return (ex - enx) / 2.0;
+}
+
+/* See sinh_f64's own comment above (same section, same
+ * docs/accuracy.md accuracy budget). */
+fn cosh_f64(x: f64) -> f64
+    ensures(result >= 1.0)
+{
+    let ex: f64 = exp_f64(x);
+    let enx: f64 = exp_f64(0.0 - x);
+    return (ex + enx) / 2.0;
+}
+
+/* `tanh_f64`'s clamp branches return the nearest double STRICTLY inside
+ * `(-1.0, 1.0)` (`0.9999999999999999`, one ULP below `1.0` — the
+ * largest double `< 1.0`), not literally `1.0`/`-1.0`. Mathematically
+ * `tanh(20.0)` is already indistinguishable from `1.0` at double
+ * precision (differs by under `1e-17`), so `1.0` itself would be the
+ * more numerically "honest" rounding — but TRIG-005's own `ensures`
+ * demands a STRICT bound, so this favors satisfying the contract as
+ * written over that extra, unobservable-at-this-precision honesty.
+ *
+ * The `|x| > 20.0` pre-clamp alone is NOT sufficient — found via a
+ * widened accuracy-audit sweep ([-50,50], not just near the original
+ * clamp boundary) that `exp_f64(2*x)` underflows enough for
+ * `(e2x-1)/(e2x+1)` to round to exactly `+/-1.0` starting around `|x| ~=
+ * 19.98`, a real `ensures` panic ("sv0 contract violation: ensures
+ * failed in tanh_f64") for input as unremarkable as `x = -19.999`. Kept
+ * the pre-clamp anyway (it's still needed: without it, `x` large enough
+ * that `exp_f64(2*x)` itself overflows to `Infinity` computes
+ * `(Infinity-1)/(Infinity+1) = Infinity/Infinity = NaN`, a DIFFERENT
+ * failure mode entirely) and ADDED a post-hoc check on the actual
+ * computed `t` for the narrower gap the pre-clamp's threshold doesn't
+ * quite reach — belt-and-suspenders, since the post-hoc check alone
+ * (were the pre-clamp removed) would let large-`x` inputs reach the
+ * `Infinity/Infinity` `NaN` case before ever getting a chance to clamp.
+ *
+ * `|x| < 1.0` ALSO needed its own fix, same shape as `sinh_f64`'s own
+ * near-zero branch above: `exp_f64(2*x)` near `x = 0` is close to
+ * `1.0`, so `e2x - 1.0` catastrophically cancels — found via the same
+ * widened sweep, 121 ULP against a 3 ULP informational budget at `x ~=
+ * 0.001`. Delegates to `sinh_f64(x) / cosh_f64(x)` there instead:
+ * `sinh_f64` already has its own cancellation-free Taylor branch for
+ * `|x| < 1.0` (see above), and `cosh_f64` near zero has no cancellation
+ * to begin with (`exp(x) + exp(-x)` near `2.0`, nothing subtracts).
+ * Non-exact — see docs/accuracy.md's `tanh_f64` row (informational 3
+ * ULP budget).
+ */
+fn tanh_f64(x: f64) -> f64
+    ensures(result > (0.0 - 1.0) && result < 1.0)
+{
+    if x > 20.0 { return 0.9999999999999999; }
+    if x < (0.0 - 20.0) { return 0.0 - 0.9999999999999999; }
+    if abs_f64(x) < 1.0 {
+        let t0: f64 = sinh_f64(x) / cosh_f64(x);
+        if t0 >= 1.0 { return 0.9999999999999999; }
+        if t0 <= (0.0 - 1.0) { return 0.0 - 0.9999999999999999; }
+        return t0;
+    }
+    let e2x: f64 = exp_f64(2.0 * x);
+    let t: f64 = (e2x - 1.0) / (e2x + 1.0);
+    if t >= 1.0 { return 0.9999999999999999; }
+    if t <= (0.0 - 1.0) { return 0.0 - 0.9999999999999999; }
+    return t;
+}

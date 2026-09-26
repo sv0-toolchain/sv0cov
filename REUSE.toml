@@ -63,3 +63,11 @@ path = "bench/**.json"
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# Content-addressed copies of sv0-toolchain projects for the benchmark corpus
+# (bench/corpus/REDISTRIBUTION.md); same author and license as their origin.
+[[annotations]]
+path = "bench/corpus/real/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"

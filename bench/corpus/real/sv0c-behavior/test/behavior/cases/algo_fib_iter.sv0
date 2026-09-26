@@ -1,0 +1,2 @@
+/* iterative fibonacci fib(10) — exits 55. */
+fn main() -> i32 { let mut a: i32 = 0; let mut b: i32 = 1; let mut i: i32 = 0; while i < 10 { let t: i32 = a + b; a = b; b = t; i = i + 1; } return a; }

@@ -1,0 +1,55 @@
+/* TEST-001 property layer and TEST-004 (fixed seed). One property per file;
+ * `ROUNDS` and the seed are pinned by docs/fuzz.tsv (see
+ * trig_identity_property.sv0 for the convention). */
+use random::next_u64;
+use random::unit_f64;
+use complex::Complex;
+use complex::add_complex;
+use complex::mul_complex;
+use complex::approx_eq;
+
+fn main() -> i32 {
+    let ROUNDS: i32 = 20;
+    let mut state: u64 = 4101842887655102017;
+
+    /* REQ: CPLX-002 property — Complex addition is commutative and
+     * associative, and multiplication commutative and associative, each
+     * within f64 tolerance, over seeded triples. */
+    let mut n: i32 = 0;
+    while n < ROUNDS loop_invariant(n <= ROUNDS) {
+        state = next_u64(state);
+        let ua: f64 = unit_f64(state);
+        state = next_u64(state);
+        let ub: f64 = unit_f64(state);
+        state = next_u64(state);
+        let uc: f64 = unit_f64(state);
+        state = next_u64(state);
+        let ud: f64 = unit_f64(state);
+        state = next_u64(state);
+        let ue: f64 = unit_f64(state);
+        state = next_u64(state);
+        let uf: f64 = unit_f64(state);
+        let ca: Complex = Complex { re: (ua - 0.5) * 200.0, im: (ub - 0.5) * 200.0 };
+        let cb: Complex = Complex { re: (uc - 0.5) * 200.0, im: (ud - 0.5) * 200.0 };
+        let cc_: Complex = Complex { re: (ue - 0.5) * 200.0, im: (uf - 0.5) * 200.0 };
+
+        let ab: Complex = add_complex(ca, cb);
+        let ba: Complex = add_complex(cb, ca);
+        if !approx_eq(ab, ba, 0.0000001) { return 4; }
+
+        let ab_c: Complex = add_complex(add_complex(ca, cb), cc_);
+        let a_bc: Complex = add_complex(ca, add_complex(cb, cc_));
+        if !approx_eq(ab_c, a_bc, 0.00001) { return 5; }
+
+        let mab: Complex = mul_complex(ca, cb);
+        let mba: Complex = mul_complex(cb, ca);
+        if !approx_eq(mab, mba, 0.00001) { return 6; }
+
+        let mab_c: Complex = mul_complex(mul_complex(ca, cb), cc_);
+        let ma_bc: Complex = mul_complex(ca, mul_complex(cb, cc_));
+        if !approx_eq(mab_c, ma_bc, 0.001) { return 7; }
+
+        n = n + 1;
+    }
+    return 0;
+}
