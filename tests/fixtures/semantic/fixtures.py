@@ -271,7 +271,7 @@ def source_text() -> Fixture:
     p.region(main, "expression", p.find(m, "a > 5"), e)
     p.region(main, "branch_body", p.through_block(m, "{", after=if_span[0]), b["true"], lc=False)
     p.region(main, "return", p.find(m, "return 9;"), b["true"])
-    p.region(main, "return", p.find(m, "return a + b - 3;"), e)
+    p.region(main, "return", p.find(m, "return a + b - 3;"), e, (b["true"], -1))
     counts = {e: 1, b["false"]: 1}
     lines = [N, N, N, N, C, C, P, C, N]
     return Fixture(p, counts, {m: lines}, 0, ["source text: CRLF line endings", "source text: tabs", "source text: no final newline", "source text: CJK multibyte string", "regions: several on one line", "regions: partial line"])

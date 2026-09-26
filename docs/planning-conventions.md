@@ -87,3 +87,25 @@ Counter expressions:
 
 Calls inside a statement are owned by the statement region; no separate
 `call` region is planned for them.
+
+Constructs beyond the F0 fixtures (planned by sv0c since CV-108):
+
+- An `if` nested inside an expression (a `let` initializer, a call argument,
+  a `return` value) is a `conditional_expression` branch with outcomes
+  `true`, `false`; an `if` in statement or tail position is an `if`. An
+  `else if` belongs to its chain's kind, and its condition and bodies count
+  from the enclosing `false` outcome (no `branch_body` for the `else if`
+  itself).
+- A block's tail expression (no `;` before the closing `}`) is an
+  `expression` region at the enclosing position.
+- `for p in e { … }` is a `loop` branch; `e` is an `expression` region
+  counted at the enclosing position (it is evaluated once per loop entry).
+- `loop { … }` is a `loop` branch with a `loop_body` and no condition
+  region.
+- A match arm whose result is a block has a `match_arm` region over the
+  block, and the block's statements are planned at the arm's outcome.
+- A `while` condition ends before any `loop_invariant(…)` clause.
+- A block used as an expression (`let x = { … };`) is planned like any
+  block at the enclosing position: its statements get their regions and
+  its tail an `expression` region; the block itself has no region of its
+  own.
