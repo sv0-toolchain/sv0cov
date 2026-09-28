@@ -13,11 +13,13 @@ C/native executables and `.sv0b` bytecode on `sv0vm`.
 
 ## Status
 
-**Pre-F0 bootstrap. Nothing is implemented yet.** This repository currently
-holds only its governance and licensing skeleton.
+**F0 in progress.** The protocol-freeze track (canonical JSON, point
+identities, schemas, raw-profile and VM codecs) and the upstream planner work
+in sv0c are underway. The slice-by-slice status is in the checklist named
+below. Nothing is released.
 
 The governing contract is the sv0cov specification
-(`project-specs/sv0cov/SPEC.md`, version `0.1.71-draft`). Planning and the
+(`project-specs/sv0cov/SPEC.md`, version `0.1.73-draft`). Planning and the
 slice backlog live in the `sv0-toolchain` meta-repository:
 `task/sv0cov-coverage.Rmd` (hub) and `task/sv0cov-checklist.Rmd` (`CV-###`
 slices).
