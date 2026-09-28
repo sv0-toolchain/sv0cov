@@ -78,6 +78,7 @@ only-include = [
     "tools",
     "scripts",
     "bench",
+    "runtime",
 ]
 exclude = ["tests/vendor", "__pycache__", "*.pyc"]
 

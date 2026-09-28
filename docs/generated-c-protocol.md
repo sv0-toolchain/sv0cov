@@ -5,7 +5,7 @@
 
 This page describes the interface between the C that `sv0c` emits under
 `--coverage=instrument` and the native coverage runtime. `sv0c` emits it as
-of CV-113. The runtime (`runtime/c`, CV-114) implements it. The normative
+of CV-113. The runtime `runtime/c/sv0cov_rt.c` (CV-114) implements it. The normative
 rules are SPEC §14.1 and §14.2.
 
 ## What the generated C contains
@@ -67,6 +67,51 @@ then has zero elements, and no hit is ever called.
 arithmetic. It then increments the shared arena with the saturating relaxed
 compare-and-exchange that SPEC §14.2 specifies.
 
+## What `runtime/c/sv0cov_rt.c` does
+
+`__sv0cov_start` runs four checks in order. On the first failure it prints
+one diagnostic to stderr, `sv0cov: error[<code>]: <title>: <detail>`. The
+detail names the variable or field at fault but never shows a transport
+value.
+
+| Step | Rule | Code |
+|---|---|---|
+| Transport | Only `SV0COV_PROFILE_DIR`, `SV0COV_RUN_ID`, `SV0COV_CONTEXT` and `SV0COV_REQUIRED` are allowed. No other `SV0COV_*` name, no duplicates. | COV2001 |
+| | `SV0COV_PROFILE_DIR` must be set, absolute, and an existing directory. | COV2001 |
+| | `SV0COV_RUN_ID` must be set, exactly 32 lowercase hex digits, and nonzero. | COV2001 |
+| | `SV0COV_REQUIRED` is `0` or `1`, or absent (not required). Any other value is an error, and required mode applies (fail closed). | COV2001 |
+| | `SV0COV_CONTEXT` is at most 256 bytes of strict UTF-8. Set but empty is distinct from absent. | COV2001 |
+| Registration | The rules in "Runtime obligations" above. The target is nonempty, and the compiler identity is 1-255 printable non-space ASCII bytes. A second `__sv0cov_start` is also refused. | COV1015 |
+| Arena | One `_Atomic uint64_t` per program counter, plus an atomic overflow bitmap of `ceil(count / 64)` words. | COV2011 on allocation failure |
+| Profile ID | 16 bytes from `getentropy`, with no fallback. An all-zero result is refused. | COV2002 |
+
+In required mode (`SV0COV_REQUIRED=1`), any failure exits the process with
+status 1 before user code runs. Status 1 is the sv0 runtime's failure
+status, the same one panics and contract failures use. Otherwise
+collection stays off: hits are no-ops, and no complete profile can be
+published. The same applies after a hit that names an unregistered module
+or an index outside its slice, which generated code never produces.
+
+`__sv0cov_hit` is the SPEC 14.2 saturating compare-and-exchange with
+relaxed ordering. A counter that is already at `UINT64_MAX` stays there, and
+its overflow bit is set.
+
+The flush and publication of the raw profile is CV-115.
+
+Two builds exist:
+
+- **Production:** C11, no test hooks.
+- **Test:** `-DSV0COV_RT_TESTING`. It adds inspection functions and an
+  entropy override, `SV0COVRT_TEST_ENTROPY=fail|zero`.
+
+`tests/test_native_runtime.py` drives the test build through
+`runtime/c/tests/rt_driver.c`. It covers:
+
+- counting, saturation, and contended increments across 8 threads;
+- zero-counter programs and two-module programs;
+- the transport and registration rejection matrices;
+- entropy failure and all-zero profile IDs.
+
 ## The current `sv0c` shape
 
 `sv0c` compiles a whole program, including every source of a project, into
@@ -77,6 +122,10 @@ Several separately compiled modules (COV-C-004, R1) would reuse the same
 records, with one entry per module in `__sv0cov_modules`.
 
 `sv0c/test/coverage/plan/run_emit_c.py` checks the emitted C against each
-fixture's map. It also links the C against a test-only stub of this
-interface (`stub_rt.c`) and checks the counts against the fixtures'
-`expected-counts.json`.
+fixture's map. It links every program twice:
+
+- **Against this runtime.** Under a valid transport, the program must behave
+  exactly like the uninstrumented build. With a malformed run ID in
+  required mode, it must exit 1 before any output.
+- **Against a counting stub** (`stub_rt.c`). The counts must equal the
+  fixtures' `expected-counts.json`.
