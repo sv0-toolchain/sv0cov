@@ -5,8 +5,8 @@
 
 This page describes the interface between the C that `sv0c` emits under
 `--coverage=instrument` and the native coverage runtime. `sv0c` emits it as
-of CV-113. The runtime `runtime/c/sv0cov_rt.c` (CV-114) implements it. The normative
-rules are SPEC §14.1 and §14.2.
+of CV-113. The runtime `runtime/c/sv0cov_rt.c` (CV-114, CV-115) implements it. The
+normative rules are SPEC §14.1-14.3, §16.4, and §23.4.
 
 ## What the generated C contains
 
@@ -96,7 +96,59 @@ or an index outside its slice, which generated code never produces.
 relaxed ordering. A counter that is already at `UINT64_MAX` stays there, and
 its overflow bit is set.
 
-The flush and publication of the raw profile is CV-115.
+### Flush and publication
+
+`__sv0cov_start` registers an `atexit` handler once it succeeds. The
+handler runs when `main` returns, on `exit()`, and on the sv0 runtime's
+panic and contract-failure paths, which call `exit(1)`. Nothing is
+published after `_exit`, a signal, or a crash. A killed run leaves no
+profile and no temporary file.
+
+The handler writes one raw profile 1.0 (SPEC §16.4) into
+`SV0COV_PROFILE_DIR` as `<run_id>-<profile_id>.sv0profraw`, both IDs in
+lowercase hex:
+
+1. It streams the bytes into a mode-0600 `mkstemp` file named
+   `.<name>.tmp-XXXXXX`, with a running CRC32C.
+2. It fsyncs and closes that file.
+3. It commits it under the final name with an atomic no-replace
+   operation: `renamex_np(RENAME_EXCL)` on macOS, `renameat2(RENAME_NOREPLACE)`
+   on Linux, and otherwise `link` followed by `unlink`.
+4. It fsyncs the directory.
+
+The profile's contents:
+
+- **Backend:** the backend flag is `BACKEND_NATIVE`.
+- **Context:** the context is written when `SV0COV_CONTEXT` was set, even
+  if it was empty.
+- **Counts:** only nonzero counts are written, as (index, count) pairs.
+- **Overflow bitmap:** it marks exactly the written counts equal to
+  `UINT64_MAX`, as the format requires.
+
+The counters are read twice, once to size the profile and once to write
+it. Each read takes one relaxed load per counter, in index order. If the
+set of nonzero counters changes between the two passes, hits ran during
+the flush, so nothing is published. The program should join its worker
+threads before exiting.
+
+| Failure at exit | Code |
+|---|---|
+| The temporary file cannot be created or written (for example, the directory is gone) | COV2010 |
+| Hits ran during the flush, or a hit named an unregistered counter | COV2011 |
+| A profile with the final name already exists (the existing file is left alone) | COV2112 |
+| A forked child exits; it never publishes its parent's counters | COV2120 |
+
+In required mode, each of these ends the process with `_exit(1)`. Outside
+required mode, the diagnostic is printed and the exit status is left
+unchanged.
+
+A map with more than 4,194,304 counters (the standard raw-profile tier) is
+refused at start with COV6001. The runtime has no configuration, and the
+transport may not raise the tier.
+
+`sv0 native-compile --coverage=instrument` compiles this file with
+`-std=c11 -O2` and links it into the executable. The program C itself stays
+`-std=gnu99`.
 
 Two builds exist:
 
@@ -110,7 +162,12 @@ Two builds exist:
 - counting, saturation, and contended increments across 8 threads;
 - zero-counter programs and two-module programs;
 - the transport and registration rejection matrices;
-- entropy failure and all-zero profile IDs.
+- entropy failure and all-zero profile IDs;
+- profiles published on normal exit and on `exit(1)`, decoded by
+  `sv0cov.formats.rawprofile`: counts, context, overflow bitmap, and the
+  zero-counter case;
+- nothing published after SIGKILL or `_exit`;
+- name collisions, a vanished directory, and forked children.
 
 ## The current `sv0c` shape
 
@@ -125,7 +182,8 @@ records, with one entry per module in `__sv0cov_modules`.
 fixture's map. It links every program twice:
 
 - **Against this runtime.** Under a valid transport, the program must behave
-  exactly like the uninstrumented build. With a malformed run ID in
-  required mode, it must exit 1 before any output.
+  exactly like the uninstrumented build and publish one profile with the
+  stub's counts. With a malformed run ID in required mode, it must exit 1
+  before any output.
 - **Against a counting stub** (`stub_rt.c`). The counts must equal the
   fixtures' `expected-counts.json`.

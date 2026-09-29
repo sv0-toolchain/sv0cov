@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
-"""Native coverage runtime: arena and transport (CV-114; SPEC 14.1-14.3, 16.4).
+"""Native coverage runtime: arena, transport, flush, publication (CV-114,
+CV-115; SPEC 14.1-14.3, 16.4, 23.4).
 
 Builds runtime/c/sv0cov_rt.c twice with the host C compiler: strictly as a
 production object (C11, -Wall -Wextra -Werror -pedantic, no test hooks),
@@ -13,13 +14,20 @@ COV-INS-005 (saturation), COV-INS-006/009 (relaxed atomic saturating CAS and
 overflow bitmap, under contention), COV-C-005/006 (registration matrix,
 zero-counter program), COV-FMT-031 (nonzero OS-entropy profile ID, no
 fallback), COV-FMT-035 (exact run-ID decoding), SPEC 14.3 (the four
-transport names, required mode, no values in diagnostics).
+transport names, required mode, no values in diagnostics); CV-115:
+COV-INS-007 (normal exit and exit(1) flush one complete profile, decoded
+by sv0cov.formats.rawprofile), COV-INS-008 (SIGKILL and _exit publish
+nothing and leave no temporary), SPEC 23.4 (mode 0600, <run>-<profile>
+name, no-replace commit: a collision is COV2112 and leaves the existing
+file alone), and a forked child never publishing inherited counters.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import stat
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -28,6 +36,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RT = ROOT / "runtime" / "c"
+sys.path.insert(0, str(ROOT / "src"))
+
+from sv0cov.formats.rawprofile import decode  # noqa: E402
+
+MAP_ID = bytes.fromhex("4f5da9345b6f601cba7b19e442e4b26352c18a1fb2044e8141685a2915b81b6c")
 RUN_ID = "0123456789abcdef0123456789abcdef"
 MAX = 2**64 - 1
 REPORT = re.compile(
@@ -63,6 +76,12 @@ class NativeRuntimeTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         cls.tmp.cleanup()
+
+    def fresh_dir(self) -> str:
+        return tempfile.mkdtemp(dir=self.tmp.name)
+
+    def profiles(self, d: str) -> list[str]:
+        return sorted(os.listdir(d))
 
     def run_driver(self, *args: str, env: dict | None = None, **transport) -> subprocess.CompletedProcess:
         """Run the driver with a clean SV0COV_* environment plus `transport`
@@ -147,7 +166,16 @@ class NativeRuntimeTest(unittest.TestCase):
     def test_bad_hits_make_the_run_incomplete(self) -> None:
         for scenario in ("bad-hit", "foreign-hit"):
             with self.subTest(scenario):
-                self.assertEqual(self.report(self.run_driver(scenario))["state"], 2)
+                d = self.fresh_dir()
+                p = self.run_driver(scenario, SV0COV_PROFILE_DIR=d)
+                # Required: the exit-time flush refuses and fails the process.
+                self.assertEqual(p.returncode, 1)
+                self.assertIn("error[COV2011]", p.stderr.decode())
+                self.assertEqual(os.listdir(d), [])
+                r = self.report(self.run_driver(scenario, SV0COV_REQUIRED="0", SV0COV_PROFILE_DIR=d))
+                self.assertEqual(r["state"], 2)
+                self.assertIn("error[COV2011]", r["stderr"])
+                self.assertEqual(os.listdir(d), [])
 
     def test_second_start_is_refused(self) -> None:
         p = self.run_driver("twice")
@@ -220,6 +248,100 @@ class NativeRuntimeTest(unittest.TestCase):
         r = self.report(self.run_driver("ok", SV0COV_REQUIRED=None, SV0COV_RUN_ID=None, SV0COV_PROFILE_DIR=None))
         self.assertEqual(r["state"], 2)
         self.assertIn("SV0COV_PROFILE_DIR is not set", r["stderr"])
+
+    # ── flush and publication (CV-115) ─────────────────────────────────────
+
+    def published(self, d: str, report: dict) -> object:
+        """The one complete profile in `d`, decoded against the fixture map."""
+        names = self.profiles(d)
+        self.assertEqual(names, [f"{RUN_ID}-{report['profile_id']}.sv0profraw"])
+        path = os.path.join(d, names[0])
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        with open(path, "rb") as f:
+            prof = decode(f.read(), map_counter_count=70, expected_map_id=MAP_ID)
+        self.assertEqual((prof.run_id.hex(), prof.profile_id.hex(), prof.backend),
+                         (RUN_ID, report["profile_id"], "native"))
+        return prof
+
+    def test_normal_exit_publishes_one_profile(self) -> None:
+        d = self.fresh_dir()
+        r = self.report(self.run_driver("ok", SV0COV_PROFILE_DIR=d, SV0COV_CONTEXT="shard-1"))
+        prof = self.published(d, r)
+        self.assertEqual(prof.context, "shard-1")
+        self.assertEqual(list(prof.counts), [(i, i % 5 + 1) for i in range(70)])
+        self.assertEqual(prof.saturated(), [])
+
+    def test_sparse_counts_and_absent_context(self) -> None:
+        d = self.fresh_dir()
+        r = self.report(self.run_driver("two-modules", SV0COV_PROFILE_DIR=d))
+        prof = self.published(d, r)
+        self.assertIsNone(prof.context)
+        self.assertEqual(list(prof.counts), [(0, 1), (39, 1), (40, 1), (69, 2)])
+
+    def test_saturated_counts_carry_the_overflow_bitmap(self) -> None:
+        d = self.fresh_dir()
+        prof = self.published(d, self.report(self.run_driver("saturate", SV0COV_PROFILE_DIR=d)))
+        # 66 reached UINT64_MAX exactly: the format marks every count at the
+        # maximum, since the value is only a lower bound from then on.
+        self.assertEqual(prof.saturated(), [3, 65, 66])
+
+    def test_zero_counter_program_publishes_an_empty_profile(self) -> None:
+        d = self.fresh_dir()
+        r = self.report(self.run_driver("zero", SV0COV_PROFILE_DIR=d))
+        with open(os.path.join(d, self.profiles(d)[0]), "rb") as f:
+            prof = decode(f.read(), map_counter_count=0, expected_map_id=MAP_ID)
+        self.assertEqual((prof.counts, prof.profile_id.hex()), ((), r["profile_id"]))
+
+    def test_exit_1_path_publishes(self) -> None:
+        # The sv0 runtime's panic and contract failures end with exit(1).
+        d = self.fresh_dir()
+        p = self.run_driver("exit1", SV0COV_PROFILE_DIR=d)
+        self.assertEqual(p.returncode, 1)
+        self.assertEqual(p.stderr, b"")
+        report = REPORT.match(p.stdout.decode().splitlines()[-1])
+        self.assertEqual(len(self.published(d, {"profile_id": report.group(4)}).counts), 70)
+
+    def test_killed_or_underscore_exit_publishes_nothing(self) -> None:
+        for scenario, want in (("kill", -9), ("underscore-exit", 0)):
+            with self.subTest(scenario):
+                d = self.fresh_dir()
+                p = self.run_driver(scenario, SV0COV_PROFILE_DIR=d)
+                self.assertEqual(p.returncode, want)
+                self.assertIn(b"user-code", p.stdout)
+                self.assertEqual(self.profiles(d), [])  # no profile, no temporary
+
+    def test_collision_is_refused_and_keeps_the_existing_file(self) -> None:
+        d = self.fresh_dir()
+        p = self.run_driver("collide", SV0COV_PROFILE_DIR=d)
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("error[COV2112]", p.stderr.decode())
+        names = self.profiles(d)
+        self.assertEqual(len(names), 1)
+        with open(os.path.join(d, names[0]), "rb") as f:
+            self.assertEqual(f.read(), b"occupied")
+        p = self.run_driver("collide", SV0COV_PROFILE_DIR=self.fresh_dir(), SV0COV_REQUIRED="0")
+        self.assertEqual(p.returncode, 0)
+        self.assertIn("error[COV2112]", p.stderr.decode())
+
+    def test_missing_directory_at_exit(self) -> None:
+        for required, rc in (("1", 1), ("0", 0)):
+            with self.subTest(required=required):
+                d = self.fresh_dir()
+                p = self.run_driver("rmdir", SV0COV_PROFILE_DIR=d, SV0COV_REQUIRED=required)
+                self.assertEqual(p.returncode, rc)
+                self.assertIn("error[COV2010]", p.stderr.decode())
+                self.assertFalse(os.path.exists(d))
+
+    def test_forked_child_does_not_publish(self) -> None:
+        for required, child in (("1", 1), ("0", 0)):
+            with self.subTest(required=required):
+                d = self.fresh_dir()
+                p = self.run_driver("fork", SV0COV_PROFILE_DIR=d, SV0COV_REQUIRED=required)
+                self.assertEqual(p.returncode, 0, p.stderr.decode())
+                self.assertIn(f"child-status={child}".encode(), p.stdout)
+                self.assertIn("error[COV2120]", p.stderr.decode())
+                report = REPORT.match([x for x in p.stdout.decode().splitlines() if x.startswith("state=")][0])
+                self.published(d, {"profile_id": report.group(4)})  # the parent's, exactly one
 
     # ── registration ───────────────────────────────────────────────────────
 

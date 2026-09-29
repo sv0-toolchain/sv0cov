@@ -10,15 +10,27 @@
  *   state=<0|1|2> required=<0|1> run_id=<hex> profile_id=<hex>
  *   context=<absent|len:<n>:<hex>> counts=<c0,c1,...> overflow=<o0,o1,...>
  *
+ * The exit scenarios (CV-115) end the process in a specific way after the
+ * "ok" hit pattern: kill (SIGKILL), underscore-exit (_exit(0)), exit1
+ * (exit(1), as the sv0 runtime's panic and contract-failure paths do),
+ * collide (the final profile name already exists), rmdir (the profile
+ * directory is gone), fork (a child exits normally after forking).
+ *
  * The fixture program has 70 counters (so the overflow bitmap has two
  * words) in two fragments.
  */
+#define _POSIX_C_SOURCE 200809L /* fork, rmdir, open under -std=c11 */
+
 #include "../sv0cov_rt.h"
 
+#include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 extern char **environ;
 
@@ -197,6 +209,46 @@ int main(int argc, char **argv) {
     __sv0cov_hit(&mod, N);
   } else if (strcmp(scenario, "foreign-hit") == 0) {
     __sv0cov_hit(&mod_lo, 0);
+  } else if (strcmp(scenario, "kill") == 0 || strcmp(scenario, "underscore-exit") == 0 ||
+             strcmp(scenario, "exit1") == 0 || strcmp(scenario, "collide") == 0 ||
+             strcmp(scenario, "rmdir") == 0 || strcmp(scenario, "fork") == 0) {
+    for (uint32_t i = 0; i < N; i++)
+      for (uint32_t k = 0; k <= i % 5; k++)
+        __sv0cov_hit(&mod, i);
+    report();
+    fflush(stdout);
+    if (strcmp(scenario, "kill") == 0)
+      raise(SIGKILL);
+    if (strcmp(scenario, "underscore-exit") == 0)
+      _exit(0);
+    if (strcmp(scenario, "exit1") == 0)
+      exit(1);
+    if (strcmp(scenario, "collide") == 0) {
+      char path[4096], hex[65];
+      const uint8_t *r = sv0cov_rt_test_run_id(), *q = sv0cov_rt_test_profile_id();
+      for (int i = 0; i < 16; i++)
+        sprintf(hex + 2 * i, "%02x", r[i]);
+      int n = snprintf(path, sizeof path, "%s/%s-", sv0cov_rt_test_profile_dir(), hex);
+      for (int i = 0; i < 16; i++)
+        sprintf(hex + 2 * i, "%02x", q[i]);
+      snprintf(path + n, sizeof path - (size_t)n, "%s.sv0profraw", hex);
+      int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+      if (fd < 0 || write(fd, "occupied", 8) != 8)
+        return 3;
+      close(fd);
+    }
+    if (strcmp(scenario, "rmdir") == 0 && rmdir(sv0cov_rt_test_profile_dir()) != 0)
+      return 3;
+    if (strcmp(scenario, "fork") == 0) {
+      pid_t child = fork();
+      if (child == 0)
+        exit(0); /* must not publish the inherited counters */
+      int status;
+      if (child < 0 || waitpid(child, &status, 0) != child)
+        return 3;
+      printf("child-status=%d\n", WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+    }
+    return 0;
   } else {
     return 2;
   }

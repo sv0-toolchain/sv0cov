@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT OR Apache-2.0 */
 /* SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla */
 /*
- * sv0cov native coverage runtime: arena and transport (CV-114).
+ * sv0cov native coverage runtime: arena, transport, flush and publication
+ * (CV-114, CV-115).
  *
  * __sv0cov_start runs once, from the generated hosted main before user code:
  *
@@ -22,16 +23,36 @@
  *   4. the profile ID (SPEC 16.4): 16 bytes from getentropy, never all zero
  *      and never a predictable fallback. Else COV2002.
  *
+ * The map must fit the standard raw-profile tier (4,194,304 counters), else
+ * COV6001: a runtime has no configuration, and the transport may not set a
+ * tier.
+ *
  * A failure prints one diagnostic that names the variable or field, never
  * a transport value. In required mode the process then exits with status 1
  * (the sv0 runtime's failure status) before user code; otherwise collection
- * stays off and no complete profile can be published (CV-115 flushes).
+ * stays off and no complete profile can be published.
+ *
+ * Flush (SPEC 16.4, 23.4): an atexit handler, so it runs on return from
+ * main, exit(), and the sv0 runtime's panic and contract-failure paths
+ * (both exit(1)); _exit, signals and crashes publish nothing. It writes
+ * <run_id>-<profile_id>.sv0profraw into SV0COV_PROFILE_DIR: a mode-0600
+ * mkstemp temporary (.<name>.tmp-XXXXXX) is streamed with a running CRC32C,
+ * fsynced, closed, and committed with an atomic no-replace rename
+ * (renamex_np RENAME_EXCL / renameat2 RENAME_NOREPLACE, else link+unlink);
+ * the directory is then fsynced. Counters are read with one index-ordered
+ * relaxed load each, in two passes (size, then write); a nonzero set that
+ * changes between them means hits ran during the flush, and the profile is
+ * withheld as incomplete. The overflow bitmap marks exactly the written
+ * counts equal to UINT64_MAX. A process image forked from the registering
+ * one never publishes the inherited counters. When the profile cannot be
+ * published (COV2010, COV2011, COV2112, COV2120) required mode ends the
+ * process with status 1.
  *
  * __sv0cov_hit is the SPEC 14.2 saturating relaxed compare-and-exchange: a
  * counter at UINT64_MAX stays there and sets its overflow bit.
  */
-#if !defined(_DEFAULT_SOURCE)
-#define _DEFAULT_SOURCE 1 /* getentropy, environ (glibc) */
+#if !defined(_GNU_SOURCE)
+#define _GNU_SOURCE 1 /* getentropy, environ, renameat2 (glibc) */
 #endif
 #if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
 #define _DARWIN_C_SOURCE 1
@@ -43,6 +64,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/random.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -50,6 +73,7 @@
 extern char **environ;
 
 #define SV0COV_CONTEXT_MAX 256u
+#define SV0COV_TIER_MAX_COUNTERS 4194304u /* standard tier (SPEC 16.4) */
 
 static struct {
   atomic_int state;
@@ -64,6 +88,8 @@ static struct {
   char *profile_dir;
   char *context;
   int context_len; /* -1 = absent */
+  uint8_t map_id[32];
+  pid_t pid;       /* the process image that registered */
 } rt = {.context_len = -1};
 
 /* ── diagnostics ───────────────────────────────────────────────────────── */
@@ -366,6 +392,236 @@ static int rt_entropy(uint8_t out[16]) {
   return getentropy(out, 16);
 }
 
+/* ── flush and publication ─────────────────────────────────────────────── */
+
+static uint32_t rt_crc_table[256];
+
+static void rt_crc_init(void) {
+  for (uint32_t i = 0; i < 256; i++) {
+    uint32_t c = i;
+    for (int k = 0; k < 8; k++)
+      c = (c & 1u) ? (c >> 1) ^ 0x82f63b78u : c >> 1;
+    rt_crc_table[i] = c;
+  }
+}
+
+/* Buffered writer with a running CRC32C (reflected Castagnoli; the state
+   starts at 0xffffffff and is inverted once at the end). */
+struct rt_out {
+  int fd;
+  int failed;
+  uint32_t crc;
+  size_t used;
+  unsigned char buf[65536];
+};
+
+static void rt_out_flush(struct rt_out *o) {
+  size_t off = 0;
+  while (off < o->used && !o->failed) {
+    ssize_t w = write(o->fd, o->buf + off, o->used - off);
+    if (w < 0 && errno == EINTR)
+      continue;
+    if (w <= 0)
+      o->failed = 1;
+    else
+      off += (size_t)w;
+  }
+  o->used = 0;
+}
+
+static void rt_out_bytes(struct rt_out *o, const void *data, size_t n, int in_crc) {
+  const unsigned char *p = data;
+  for (size_t i = 0; i < n; i++) {
+    if (in_crc)
+      o->crc = (o->crc >> 8) ^ rt_crc_table[(o->crc ^ p[i]) & 0xffu];
+    if (o->used == sizeof o->buf)
+      rt_out_flush(o);
+    o->buf[o->used++] = p[i];
+  }
+}
+
+static void rt_out_u32(struct rt_out *o, uint32_t v) {
+  unsigned char b[4] = {(unsigned char)v, (unsigned char)(v >> 8), (unsigned char)(v >> 16),
+                        (unsigned char)(v >> 24)};
+  rt_out_bytes(o, b, 4, 1);
+}
+
+static void rt_out_u64(struct rt_out *o, uint64_t v) {
+  unsigned char b[8];
+  for (int i = 0; i < 8; i++)
+    b[i] = (unsigned char)(v >> (8 * i));
+  rt_out_bytes(o, b, 8, 1);
+}
+
+static void rt_hex(char *out, const uint8_t *b, size_t n) {
+  static const char digits[] = "0123456789abcdef";
+  for (size_t i = 0; i < n; i++) {
+    out[2 * i] = digits[b[i] >> 4];
+    out[2 * i + 1] = digits[b[i] & 15];
+  }
+  out[2 * n] = '\0';
+}
+
+/* Commit tmp as dst only if dst does not exist. 0, or -1 with errno. */
+static int rt_publish_noreplace(const char *tmp, const char *dst) {
+#if defined(__APPLE__)
+  if (renamex_np(tmp, dst, RENAME_EXCL) == 0)
+    return 0;
+  if (errno != ENOTSUP && errno != EINVAL)
+    return -1;
+#elif defined(__linux__) && defined(RENAME_NOREPLACE)
+  if (renameat2(AT_FDCWD, tmp, AT_FDCWD, dst, RENAME_NOREPLACE) == 0)
+    return 0;
+  if (errno != ENOSYS && errno != EINVAL && errno != ENOTSUP)
+    return -1;
+#endif
+  /* link() never replaces an existing name. */
+  if (link(tmp, dst) != 0)
+    return -1;
+  unlink(tmp);
+  return 0;
+}
+
+/* Publication failed: say why; required mode turns it into status 1. */
+static void rt_unpublished(const char *code, const char *title, const char *detail) {
+  rt_diag(code, title, detail);
+  if (rt.required) {
+    fprintf(stderr, "sv0cov: coverage is required (SV0COV_REQUIRED=1); failing the process\n");
+    fflush(stderr);
+    _exit(1);
+  }
+}
+
+static void rt_flush(void) {
+  if (getpid() != rt.pid) {
+    /* A forked child must not publish the counters it inherited. */
+    rt_unpublished("COV2120", "unsupported process lifecycle",
+                   "a forked process image does not publish its parent's counters");
+    return;
+  }
+  if (atomic_load_explicit(&rt.state, memory_order_acquire) != SV0COV_RT_STATE_ACTIVE) {
+    rt_unpublished("COV2011", "raw profile incomplete",
+                   "a coverage hit named an unregistered counter; the counts are not trustworthy");
+    return;
+  }
+  /* Pass 1: size. */
+  uint32_t n = rt.count;
+  uint32_t pairs = 0;
+  int saturated = 0;
+  for (uint32_t i = 0; i < n; i++) {
+    uint64_t c = atomic_load_explicit(&rt.counters[i], memory_order_relaxed);
+    pairs += c != 0;
+    saturated |= c == UINT64_MAX;
+  }
+  uint32_t words = saturated ? (uint32_t)(((uint64_t)n + 63) / 64) : 0;
+  uint64_t *bitmap = NULL;
+  if (words > 0 && (bitmap = calloc(words, sizeof(uint64_t))) == NULL) {
+    rt_unpublished("COV2011", "raw profile incomplete", "out of memory for the overflow bitmap");
+    return;
+  }
+
+  char name[32 * 2 + 1 + 32 + 16];
+  char run_hex[33], profile_hex[33];
+  rt_hex(run_hex, rt.run_id, 16);
+  rt_hex(profile_hex, rt.profile_id, 16);
+  snprintf(name, sizeof name, "%s-%s.sv0profraw", run_hex, profile_hex);
+  size_t dlen = strlen(rt.profile_dir);
+  char *dst = malloc(dlen + 1 + strlen(name) + 1);
+  char *tmp = malloc(dlen + 2 + strlen(name) + 16);
+  struct rt_out *o = malloc(sizeof *o);
+  if (dst == NULL || tmp == NULL || o == NULL) {
+    free(bitmap), free(dst), free(tmp), free(o);
+    rt_unpublished("COV2011", "raw profile incomplete", "out of memory preparing the profile");
+    return;
+  }
+  sprintf(dst, "%s/%s", rt.profile_dir, name);
+  sprintf(tmp, "%s/.%s.tmp-XXXXXX", rt.profile_dir, name);
+  int fd = mkstemp(tmp); /* mode 0600, unpredictable name */
+  if (fd < 0) {
+    free(bitmap), free(dst), free(tmp), free(o);
+    rt_unpublished("COV2010", "raw profile unavailable", "cannot create a temporary file in SV0COV_PROFILE_DIR");
+    return;
+  }
+  fchmod(fd, 0600);
+
+  /* Pass 2: write. */
+  rt_crc_init();
+  o->fd = fd, o->failed = 0, o->crc = 0xffffffffu, o->used = 0;
+  uint32_t flags = 0x04u; /* BACKEND_NATIVE */
+  if (rt.context_len >= 0)
+    flags |= 0x01u; /* CONTEXT_PRESENT */
+  if (saturated)
+    flags |= 0x02u; /* OVERFLOW_PRESENT */
+  rt_out_bytes(o, "SV0PRF\0\0", 8, 1);
+  rt_out_bytes(o, "\x01\x00\x00\x00", 4, 1); /* major 1, minor 0 */
+  rt_out_u32(o, flags);
+  rt_out_bytes(o, rt.map_id, 32, 1);
+  rt_out_bytes(o, rt.run_id, 16, 1);
+  rt_out_bytes(o, rt.profile_id, 16, 1);
+  rt_out_u32(o, rt.context_len >= 0 ? (uint32_t)rt.context_len : 0u);
+  if (rt.context_len > 0)
+    rt_out_bytes(o, rt.context, (size_t)rt.context_len, 1);
+  rt_out_u32(o, pairs);
+  uint32_t written = 0;
+  int saw_saturated = 0;
+  for (uint32_t i = 0; i < n; i++) {
+    uint64_t c = atomic_load_explicit(&rt.counters[i], memory_order_relaxed);
+    if (c == 0)
+      continue;
+    written++;
+    if (written <= pairs) {
+      rt_out_u32(o, i);
+      rt_out_u64(o, c);
+    }
+    if (c == UINT64_MAX) {
+      saw_saturated = 1;
+      if (bitmap != NULL)
+        bitmap[i / 64] |= (uint64_t)1 << (i % 64);
+    }
+  }
+  int racing = written != pairs || saw_saturated != saturated;
+  rt_out_u32(o, words);
+  for (uint32_t w = 0; w < words; w++)
+    rt_out_u64(o, bitmap[w]);
+  rt_out_bytes(o, "SV0DONE!", 8, 1);
+  uint32_t crc = o->crc ^ 0xffffffffu;
+  unsigned char cb[4] = {(unsigned char)crc, (unsigned char)(crc >> 8), (unsigned char)(crc >> 16),
+                         (unsigned char)(crc >> 24)};
+  rt_out_bytes(o, cb, 4, 0);
+  rt_out_flush(o);
+  int io_failed = o->failed || fsync(fd) != 0;
+  io_failed |= close(fd) != 0;
+  free(bitmap);
+  free(o);
+
+  if (racing || io_failed) {
+    unlink(tmp);
+    free(dst), free(tmp);
+    if (racing)
+      rt_unpublished("COV2011", "raw profile incomplete",
+                     "coverage hits ran while the profile was being written; join worker threads before exit");
+    else
+      rt_unpublished("COV2010", "raw profile unavailable", "writing the profile failed");
+    return;
+  }
+  if (rt_publish_noreplace(tmp, dst) != 0) {
+    int collided = errno == EEXIST;
+    unlink(tmp);
+    free(dst), free(tmp);
+    if (collided)
+      rt_unpublished("COV2112", "raw-profile identity collision", "a profile with this run and profile ID already exists");
+    else
+      rt_unpublished("COV2010", "raw profile unavailable", "committing the profile failed");
+    return;
+  }
+  int dfd = open(rt.profile_dir, O_RDONLY);
+  if (dfd >= 0) {
+    fsync(dfd); /* where the filesystem supports it */
+    close(dfd);
+  }
+  free(dst), free(tmp);
+}
+
 /* ── entry points ──────────────────────────────────────────────────────── */
 
 void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t module_count) {
@@ -383,6 +639,11 @@ void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t modul
     return;
   }
   uint32_t n = modules[0]->program_counter_count;
+  if (n > SV0COV_TIER_MAX_COUNTERS) {
+    rt_fail("COV6001", "resource limit exceeded",
+            "the map has more counters than the standard raw-profile tier allows (4194304)");
+    return;
+  }
   size_t words = ((size_t)n + 63) / 64;
   rt.counters = calloc(n ? n : 1, sizeof(_Atomic uint64_t));
   rt.overflow = calloc(words ? words : 1, sizeof(_Atomic uint64_t));
@@ -401,9 +662,16 @@ void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t modul
     rt_fail("COV2002", "runtime entropy unavailable", "the secure random source returned an all-zero profile ID");
     return;
   }
+  for (int i = 0; i < 32; i++)
+    rt.map_id[i] = (uint8_t)(rt_hexval(modules[0]->map_id[2 * i]) * 16 + rt_hexval(modules[0]->map_id[2 * i + 1]));
   rt.count = n;
   rt.modules = modules;
   rt.module_count = module_count;
+  rt.pid = getpid();
+  if (atexit(rt_flush) != 0) {
+    rt_fail("COV2011", "raw profile incomplete", "cannot register the exit-time flush");
+    return;
+  }
   atomic_store_explicit(&rt.state, SV0COV_RT_STATE_ACTIVE, memory_order_release);
 }
 
