@@ -153,8 +153,14 @@ transport may not raise the tier.
 Two builds exist:
 
 - **Production:** C11, no test hooks.
-- **Test:** `-DSV0COV_RT_TESTING`. It adds inspection functions and an
-  entropy override, `SV0COVRT_TEST_ENTROPY=fail|zero`.
+- **Test:** `-DSV0COV_RT_TESTING`. It adds inspection functions and three
+  environment overrides:
+  - `SV0COVRT_TEST_ENTROPY=fail|zero` forces an entropy failure or an
+    all-zero profile ID;
+  - `SV0COVRT_TEST_PROFILE_ID=<32 hex>` supplies a fixture profile ID;
+  - `SV0COVRT_TEST_BACKEND=vm-v1|vm-v2` writes another backend flag.
+
+  The last two exist only for the byte-parity tests.
 
 `tests/test_native_runtime.py` drives the test build through
 `runtime/c/tests/rt_driver.c`. It covers:
@@ -167,7 +173,12 @@ Two builds exist:
   `sv0cov.formats.rawprofile`: counts, context, overflow bitmap, and the
   zero-counter case;
 - nothing published after SIGKILL or `_exit`;
-- name collisions, a vanished directory, and forked children.
+- name collisions, a vanished directory, and forked children;
+- byte parity (CV-116, F0-G8). With fixture IDs, the C writer's output
+  equals all five CV-024 golden profiles byte for byte. It also equals
+  `sv0cov.formats.rawprofile.encode` for 40 seeded random native profiles,
+  which vary the size, sparse and saturated counts, and absent, empty and
+  multibyte contexts.
 
 ## The current `sv0c` shape
 

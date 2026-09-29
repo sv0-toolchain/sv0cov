@@ -15,6 +15,8 @@
  * (exit(1), as the sv0 runtime's panic and contract-failure paths do),
  * collide (the final profile name already exists), rmdir (the profile
  * directory is gone), fork (a child exits normally after forking).
+ * "write" (CV-116) registers a map of a given size and counts, for byte
+ * parity with the Python writer.
  *
  * The fixture program has 70 counters (so the overflow bitmap has two
  * words) in two fragments.
@@ -161,6 +163,33 @@ int main(int argc, char **argv) {
     env[k++] = "SV0COV_RUN_ID=0123456789abcdef0123456789abcdef";
     env[k] = NULL;
     environ = env;
+  }
+  if (strcmp(scenario, "write") == 0) {
+    /* write <map_id> <counters> [<index>=<count> ...]: register a
+       one-fragment program of that size, give the listed counters those
+       counts (through hits below 1000, else set directly), and exit. */
+    if (argc < 4)
+      return 2;
+    static struct __sv0cov_fragment wf[1] = {{FRAG_A, 0, 0}};
+    static struct __sv0cov_module wm = {1u, NULL, 0u, "fixture", "sv0c+test", 0u, 0u, 1u, wf};
+    static const struct __sv0cov_module *wms[1] = {&wm};
+    uint32_t n = (uint32_t)strtoul(argv[3], NULL, 10);
+    wm.map_id = argv[2];
+    wm.program_counter_count = n, wm.slice_length = n, wf[0].slice_length = n;
+    __sv0cov_start(wms, 1u);
+    for (int a = 4; a < argc; a++) {
+      char *eq = strchr(argv[a], '=');
+      if (eq == NULL)
+        return 2;
+      uint32_t i = (uint32_t)strtoul(argv[a], NULL, 10);
+      unsigned long long c = strtoull(eq + 1, NULL, 10);
+      if (c < 1000)
+        for (unsigned long long k = 0; k < c; k++)
+          __sv0cov_hit(&wm, i);
+      else
+        sv0cov_rt_test_set_counter(i, c);
+    }
+    return 0;
   }
   if (strcmp(scenario, "zero") == 0) {
     /* A zero-counter program: a zero-length fragment, no hit ever. */

@@ -379,8 +379,14 @@ static int rt_check_registration(const struct __sv0cov_module *const *modules, u
 
 /* ── entropy ───────────────────────────────────────────────────────────── */
 
+static int rt_decode_run_id(const char *s, uint8_t out[16]);
+
 static int rt_entropy(uint8_t out[16]) {
 #ifdef SV0COV_RT_TESTING
+  /* CV-116 byte parity: a fixture-supplied profile ID. */
+  const char *fixed = getenv("SV0COVRT_TEST_PROFILE_ID");
+  if (fixed != NULL)
+    return rt_decode_run_id(fixed, out) ? 0 : -1;
   const char *force = getenv("SV0COVRT_TEST_ENTROPY");
   if (force != NULL && strcmp(force, "fail") == 0)
     return -1;
@@ -548,6 +554,14 @@ static void rt_flush(void) {
   rt_crc_init();
   o->fd = fd, o->failed = 0, o->crc = 0xffffffffu, o->used = 0;
   uint32_t flags = 0x04u; /* BACKEND_NATIVE */
+#ifdef SV0COV_RT_TESTING
+  /* CV-116 byte parity against the VM goldens' flag variants. */
+  const char *backend = getenv("SV0COVRT_TEST_BACKEND");
+  if (backend != NULL && strcmp(backend, "vm-v1") == 0)
+    flags = 0x08u;
+  if (backend != NULL && strcmp(backend, "vm-v2") == 0)
+    flags = 0x10u;
+#endif
   if (rt.context_len >= 0)
     flags |= 0x01u; /* CONTEXT_PRESENT */
   if (saturated)

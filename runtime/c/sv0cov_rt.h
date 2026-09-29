@@ -55,7 +55,9 @@ void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);
 #ifdef SV0COV_RT_TESTING
 /* Test-only inspection, compiled only with -DSV0COV_RT_TESTING. The testing
    build also reads SV0COVRT_TEST_ENTROPY=fail|zero to force an entropy
-   failure or an all-zero profile ID (never in a production build). */
+   failure or an all-zero profile ID, SV0COVRT_TEST_PROFILE_ID=<32 hex> to
+   use a fixture profile ID, and SV0COVRT_TEST_BACKEND=vm-v1|vm-v2 to write
+   another backend flag (CV-116 byte parity); never in a production build. */
 int sv0cov_rt_test_state(void);
 uint32_t sv0cov_rt_test_counter_count(void);
 uint64_t sv0cov_rt_test_counter(uint32_t index);

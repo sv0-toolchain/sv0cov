@@ -19,12 +19,18 @@ COV-INS-007 (normal exit and exit(1) flush one complete profile, decoded
 by sv0cov.formats.rawprofile), COV-INS-008 (SIGKILL and _exit publish
 nothing and leave no temporary), SPEC 23.4 (mode 0600, <run>-<profile>
 name, no-replace commit: a collision is COV2112 and leaves the existing
-file alone), and a forked child never publishing inherited counters.
+file alone), and a forked child never publishing inherited counters;
+CV-116 (F0-G8, COV-FMT-007): with fixture-supplied IDs the C writer's bytes
+equal every CV-024 golden (the VM goldens through a test-only backend-flag
+override) and sv0cov.formats.rawprofile.encode for 40 seeded random native
+profiles (sizes, sparse and saturated counts, absent/empty/UTF-8 context).
 """
 
 from __future__ import annotations
 
+import json
 import os
+import random
 import re
 import stat
 import sys
@@ -38,7 +44,9 @@ ROOT = Path(__file__).resolve().parent.parent
 RT = ROOT / "runtime" / "c"
 sys.path.insert(0, str(ROOT / "src"))
 
-from sv0cov.formats.rawprofile import decode  # noqa: E402
+from sv0cov.formats.rawprofile import RawProfile, decode, encode  # noqa: E402
+
+GOLDEN_DIR = ROOT / "tests" / "fixtures" / "rawprofile"
 
 MAP_ID = bytes.fromhex("4f5da9345b6f601cba7b19e442e4b26352c18a1fb2044e8141685a2915b81b6c")
 RUN_ID = "0123456789abcdef0123456789abcdef"
@@ -342,6 +350,74 @@ class NativeRuntimeTest(unittest.TestCase):
                 self.assertIn("error[COV2120]", p.stderr.decode())
                 report = REPORT.match([x for x in p.stdout.decode().splitlines() if x.startswith("state=")][0])
                 self.published(d, {"profile_id": report.group(4)})  # the parent's, exactly one
+
+    # ── writer byte parity (CV-116) ───────────────────────────────────────
+
+    def write_profile(self, map_id: str, n: int, counts: list[tuple[int, int]], run_id: str, profile_id: str,
+                      context: str | None, backend: str | None = None) -> bytes:
+        """Run the driver's `write` scenario; return the one published profile's bytes."""
+        d = self.fresh_dir()
+        env = {"SV0COVRT_TEST_PROFILE_ID": profile_id}
+        if backend is not None:
+            env["SV0COVRT_TEST_BACKEND"] = backend
+        p = self.run_driver("write", map_id, str(n), *(f"{i}={c}" for i, c in counts), env=env,
+                            SV0COV_PROFILE_DIR=d, SV0COV_RUN_ID=run_id, SV0COV_CONTEXT=context)
+        self.assertEqual((p.returncode, p.stderr), (0, b""))
+        self.assertEqual(self.profiles(d), [f"{run_id}-{profile_id}.sv0profraw"])
+        with open(os.path.join(d, self.profiles(d)[0]), "rb") as f:
+            return f.read()
+
+    def test_goldens_byte_parity(self) -> None:
+        goldens = json.loads((GOLDEN_DIR / "goldens.json").read_text(encoding="utf-8"))["goldens"]
+        self.assertEqual(len(goldens), 5)
+        for g in goldens:
+            with self.subTest(g["file"]):
+                got = self.write_profile(g["map_id"], g["map_counter_count"], [tuple(c) for c in g["counts"]],
+                                         g["run_id"], g["profile_id"], g["context"],
+                                         None if g["backend"] == "native" else g["backend"])
+                self.assertEqual(got, (GOLDEN_DIR / g["file"]).read_bytes())
+
+    def test_random_profiles_match_the_python_writer(self) -> None:
+        rng = random.Random(116)
+        alphabet = "abcXYZ019 -_/.é€😀"
+        for case in range(40):
+            with self.subTest(case=case):
+                n = rng.choice([0, 1, 2, 63, 64, 65, 127, 128, 129, rng.randrange(1, 300)])
+                counts = []
+                for i in range(n):
+                    roll = rng.random()
+                    if roll < 0.55:
+                        continue
+                    if roll < 0.9:
+                        c = rng.randrange(1, 40)
+                    elif roll < 0.95:
+                        c = rng.randrange(1000, 2**64 - 1)
+                    else:
+                        c = 2**64 - 1
+                    counts.append((i, c))
+                ctx_roll = rng.random()
+                if ctx_roll < 0.3:
+                    context = None
+                elif ctx_roll < 0.4:
+                    context = ""
+                else:
+                    context = "".join(rng.choice(alphabet) for _ in range(rng.randrange(1, 60)))
+                    while len(context.encode()) > 256:
+                        context = context[:-1]
+                map_id = rng.randbytes(32).hex()
+                run_id = (b"\x01" + rng.randbytes(15)).hex()
+                profile_id = (b"\x02" + rng.randbytes(15)).hex()
+                want = encode(RawProfile(bytes.fromhex(map_id), bytes.fromhex(run_id), bytes.fromhex(profile_id),
+                                         "native", context, tuple(counts)), n)
+                self.assertEqual(self.write_profile(map_id, n, counts, run_id, profile_id, context), want)
+
+    def test_production_build_ignores_the_parity_hooks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            obj = Path(td) / "rt.o"
+            subprocess.run([cc(), "-std=c11", "-c", str(RT / "sv0cov_rt.c"), "-o", str(obj)], check=True)
+            data = obj.read_bytes()
+        self.assertNotIn(b"SV0COVRT_TEST_PROFILE_ID", data)
+        self.assertNotIn(b"SV0COVRT_TEST_BACKEND", data)
 
     # ── registration ───────────────────────────────────────────────────────
 
