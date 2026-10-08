@@ -13,10 +13,13 @@ C/native executables and `.sv0b` bytecode on `sv0vm`.
 
 ## Status
 
-**F0 in progress.** The protocol-freeze track (canonical JSON, point
-identities, schemas, raw-profile and VM codecs) and the upstream planner work
-in sv0c are underway. The slice-by-slice status is in the checklist named
-below. Nothing is released.
+**F0 complete (2026-10-08).** The protocols are frozen (canonical JSON,
+point identities, schemas, raw-profile and VM codecs). sv0c plans, maps and
+instruments programs for generated C and `sv0vm-v1-coverage`. The native
+runtime (`runtime/c`) and sv0vm publish raw profiles, and one fixture gives
+identical point identities and counts on both backends (F0-G4). R0, the
+developer preview, is next. The slice-by-slice status is in the checklist
+named below. Nothing is released.
 
 The governing contract is the sv0cov specification
 (`project-specs/sv0cov/SPEC.md`, version `0.1.73-draft`). Planning and the
