@@ -188,10 +188,13 @@ def loops() -> Fixture:
 
     fo = p.function(m, "first_over")
     a = fo.span[0]
-    fo_loop = p.branch(fo, "loop", p.through_block(m, "while true {", after=a))
+    # `while true` can never evaluate false: its exit is statically
+    # unreachable, uncounted, and the condition counts body only (CV-203).
+    fo_loop = p.branch(fo, "loop", p.through_block(m, "while true {", after=a),
+                       unreachable={"exit": "sv0c:loop:condition-literal-true"})
     fo_if = p.branch(fo, "if", p.through_block(m, "if i > limit {", after=a))
     p.region(fo, "initializer", p.find(m, "let mut i = 0;", after=a), fo.entry)
-    p.region(fo, "expression", p.find(m, "true", after=fo_loop.span[0]), fo_loop["body"], fo_loop["exit"])
+    p.region(fo, "expression", p.find(m, "true", after=fo_loop.span[0]), fo_loop["body"])
     p.region(fo, "loop_body", p.through_block(m, "{", after=fo_loop.span[0]), fo_loop["body"], lc=False)
     p.region(fo, "assignment", p.find(m, "i = i + 1;", after=a), fo_loop["body"])
     p.region(fo, "expression", p.find(m, "i > limit"), fo_loop["body"])
@@ -203,7 +206,7 @@ def loops() -> Fixture:
     a = od.span[0]
     od_loop = p.branch(od, "loop", p.through_block(m, "while i < n {", after=a))
     od_if = p.branch(od, "if", p.through_block(m, "if i == 2 {", after=a))
-    p.region(od, "initializer", p.find(m, "let mut s = 0;"), od.entry)
+    p.region(od, "initializer", p.find(m, "let mut s = 0;", after=a), od.entry)
     p.region(od, "initializer", p.find(m, "let mut i = 0;", after=a), od.entry)
     p.region(od, "expression", p.find(m, "i < n", after=a), od_loop["body"], od_loop["exit"])
     p.region(od, "loop_body", p.through_block(m, "{", after=od_loop.span[0]), od_loop["body"], lc=False)
@@ -214,15 +217,49 @@ def loops() -> Fixture:
     p.region(od, "assignment", p.find(m, "s = s + i;"), od_loop["body"], (od_if["true"], -1))
     p.region(od, "return", p.find(m, "return s;"), od.entry)
 
+    # for: the iterable is evaluated once per entry; body counts iterations
+    # entered, exit an exhausted iterator (not a break).
+    fs = p.function(m, "for_sum")
+    a = fs.span[0]
+    fs_loop = p.branch(fs, "loop", p.through_block(m, "for k in 0..n {", after=a))
+    fs_if = p.branch(fs, "if", p.through_block(m, "if k == 3 {", after=a))
+    p.region(fs, "initializer", p.find(m, "let mut s = 0;", after=a), fs.entry)
+    p.region(fs, "expression", p.find(m, "0..n", after=a), fs.entry)
+    p.region(fs, "loop_body", p.through_block(m, "{", after=p.find(m, "0..n", after=a)[1]), fs_loop["body"], lc=False)
+    p.region(fs, "expression", p.find(m, "k == 3", after=a), fs_loop["body"])
+    p.region(fs, "branch_body", p.through_block(m, "{", after=fs_if.span[0]), fs_if["true"], lc=False)
+    p.region(fs, "break", p.find(m, "break;", after=a), fs_if["true"])
+    p.region(fs, "assignment", p.find(m, "s = s + k;", after=a), fs_loop["body"], (fs_if["true"], -1))
+    p.region(fs, "return", p.find(m, "return s;", after=a), fs.entry)
+
+    # loop { }: no condition, so no condition region and an unreachable exit.
+    un = p.function(m, "until")
+    a = un.span[0]
+    un_loop = p.branch(un, "loop", p.through_block(m, "loop {", after=a),
+                       unreachable={"exit": "sv0c:loop:no-condition"})
+    un_if = p.branch(un, "if", p.through_block(m, "if i >= n {", after=a))
+    p.region(un, "initializer", p.find(m, "let mut i = 0;", after=a), un.entry)
+    p.region(un, "loop_body", p.through_block(m, "{", after=un_loop.span[0]), un_loop["body"], lc=False)
+    p.region(un, "assignment", p.find(m, "i = i + 1;", after=a), un_loop["body"])
+    p.region(un, "expression", p.find(m, "i >= n", after=a), un_loop["body"])
+    p.region(un, "branch_body", p.through_block(m, "{", after=un_if.span[0]), un_if["true"], lc=False)
+    p.region(un, "break", p.find(m, "break;", after=a), un_if["true"])
+    p.region(un, "return", p.find(m, "return i;", after=a), un.entry)
+
     main = p.function(m, "main")
-    for stmt in ("let a = count_up(0);", "let b = count_up(1);", "let c = count_up(3);", "let d = first_over(2);", "let e = odd_sum(3);"):
+    for stmt in ("let a = count_up(0);", "let b = count_up(1);", "let c = count_up(3);", "let d = first_over(2);", "let e = odd_sum(3);",
+                 "let f = for_sum(0);", "let g = for_sum(2);", "let h = for_sum(5);", "let u = until(2);"):
         p.region(main, "initializer", p.find(m, stmt), main.entry)
-    p.region(main, "return", p.find(m, "return a + b + c + d + e - 11;"), main.entry)
+    p.region(main, "return", p.find(m, "return a + b + c + d + e + f + g + h + u - 17;"), main.entry)
 
     counts = {
         cu.entry: 3, cu_loop["body"]: 4, cu_loop["exit"]: 3,
         fo.entry: 1, fo_loop["body"]: 3, fo_if["true"]: 1, fo_if["false"]: 2,
         od.entry: 1, od_loop["body"]: 3, od_loop["exit"]: 1, od_if["true"]: 1, od_if["false"]: 2,
+        # for_sum(0): exit; (2): k=0,1, exit; (5): k=0..3, break at 3.
+        fs.entry: 3, fs_loop["body"]: 6, fs_loop["exit"]: 2, fs_if["true"]: 1, fs_if["false"]: 5,
+        # until(2): i=1 (continue), i=2 (break).
+        un.entry: 1, un_loop["body"]: 2, un_if["true"]: 1, un_if["false"]: 1,
         main.entry: 1,
     }
     lines = [
@@ -230,9 +267,11 @@ def loops() -> Fixture:
         N, C, C, C, N, C, N,  # 4-10 count_up
         N, N, C, C, C, C, C, N, N, C, N,  # 11-21 first_over
         N, N, C, C, C, C, C, C, N, C, N, C, N,  # 22-34 odd_sum
-        N, N, C, C, C, C, C, C, N,  # 35-43 main
+        N, N, C, C, C, C, N, C, N, C, N,  # 35-45 for_sum
+        N, N, C, N, C, C, C, N, N, C, N,  # 46-56 until (`loop {` has no region of its own)
+        N, N, C, C, C, C, C, C, C, C, C, C, N,  # 57-69 main
     ]
-    return Fixture(p, counts, {m: lines}, 0, ["loops: zero iterations", "loops: one iteration", "loops: many iterations", "loops: break", "loops: continue", "regions: break", "regions: continue"])
+    return Fixture(p, counts, {m: lines}, 0, ["loops: zero iterations", "loops: one iteration", "loops: many iterations", "loops: break", "loops: continue", "loops: for", "loops: loop", "loops: unreachable exit", "regions: break", "regions: continue"])
 
 
 def match_() -> Fixture:

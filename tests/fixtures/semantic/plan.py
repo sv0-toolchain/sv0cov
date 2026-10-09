@@ -38,6 +38,7 @@ class Point:
     discriminator: str
     ordinal: int | None = None
     label: str = ""
+    evidence: str | None = None  # set: statically_unreachable (uncounted), with this proof identity
 
 
 @dataclass(eq=False)
@@ -115,11 +116,15 @@ class Plan:
         self.functions.append(fn)
         return fn
 
-    def branch(self, fn: Function, kind: str, span: tuple[int, int], arms: int = 0) -> Branch:
+    def branch(self, fn: Function, kind: str, span: tuple[int, int], arms: int = 0,
+               unreachable: dict[str, str] | None = None) -> Branch:
+        """``unreachable`` maps an outcome name to the static proof identity
+        that makes it statically_unreachable (uncounted)."""
         names = OUTCOMES.get(kind) or tuple(f"arm:{i}" for i in range(arms))
         b = Branch(fn, kind, span)
         for i, n in enumerate(names):
-            b.outcomes.append(Point(fn.path, fn, "branch_outcome", span, kind, i, label=f"{fn.name}.{kind}@{span[0]}.{n}"))
+            b.outcomes.append(Point(fn.path, fn, "branch_outcome", span, kind, i, label=f"{fn.name}.{kind}@{span[0]}.{n}",
+                                    evidence=(unreachable or {}).get(n)))
         self.branches.append(b)
         return b
 
@@ -155,7 +160,7 @@ class Plan:
         ]
 
         ordered = sorted(self.points(), key=lambda p: (src_index[p.path], p.span[0], KIND_ORDER[p.kind], p.ordinal or 0))
-        counter = {id(p): n for n, p in enumerate(ordered)}
+        counter = {id(p): n for n, p in enumerate(q for q in ordered if q.evidence is None)}
         ids: dict[int, str] = {}
         records = []
         for p in ordered:
@@ -169,8 +174,8 @@ class Plan:
             ids[id(p)] = pid
             records.append(
                 {
-                    "classification": "user",
-                    "counter_index": counter[id(p)],
+                    "classification": "user" if p.evidence is None else "statically_unreachable",
+                    "counter_index": counter.get(id(p)),
                     "entity_index": ent_index[id(p.entity)],
                     "fragment_index": None,  # set below
                     "kind": p.kind,
@@ -187,7 +192,7 @@ class Plan:
         fragments = []
         base = 0
         for path in paths:
-            members = [r for r in records if r["_source"] == path]
+            members = [r for r in records if r["_source"] == path and r["counter_index"] is not None]
             fragments.append({"fragment_index": len(fragments), "slice_base": base, "slice_length": len(members), "source_indices": [src_index[path]]})
             for r in members:
                 r["fragment_index"] = fragments[-1]["fragment_index"]
@@ -225,7 +230,8 @@ class Plan:
                     "entity_index": ent_index[id(b.fn)],
                     "kind": b.kind,
                     "outcomes": [
-                        {"classification": "eligible", "evidence_identity": None, "name": o.label.rsplit(".", 1)[1], "ordinal": o.ordinal, "point_id": ids[id(o)]}
+                        {"classification": "eligible" if o.evidence is None else "statically_unreachable", "evidence_identity": o.evidence,
+                         "name": o.label.rsplit(".", 1)[1], "ordinal": o.ordinal, "point_id": ids[id(o)]}
                         for o in b.outcomes
                     ],
                     "source_index": src_index[b.fn.path],
@@ -246,7 +252,7 @@ class Plan:
             "fragments": fragments,
             "point_identity_version": "1.0",
             "points": sorted(records, key=lambda r: r["point_id"]),
-            "program_counter_count": len(records),
+            "program_counter_count": len(counter),
             "regions": regions,
             "schema": "sv0cov.map",
             "sources": sources,
@@ -259,9 +265,12 @@ class Plan:
         return obj
 
     def counts(self, observed: dict[Point, int]) -> list[dict]:
-        """Expected per-point counts for the fixture's fixed input (unlisted = 0)."""
+        """Expected per-point counts for the fixture's fixed input (unlisted = 0);
+        counted points only."""
         out = []
         for p in self.points():
+            if p.evidence is not None:
+                continue
             out.append({"count": observed.get(p, 0), "label": p.label, "point_id": self._ids[id(p)]})
         return sorted(out, key=lambda r: r["point_id"])
 

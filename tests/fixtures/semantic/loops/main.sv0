@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT OR Apache-2.0 */
-/* sv0cov R0 fixture (CV-028): zero, one, many iterations; break; continue. */
+/* sv0cov R0 fixture (CV-028, CV-203): zero, one, many iterations; break; continue; for; loop. */
 
 fn count_up(n: i32) -> i32 {
   let mut i = 0;
@@ -33,11 +33,37 @@ fn odd_sum(n: i32) -> i32 {
   return s;
 }
 
+fn for_sum(n: i32) -> i32 {
+  let mut s = 0;
+  for k in 0..n {
+    if k == 3 {
+      break;
+    };
+    s = s + k;
+  };
+  return s;
+}
+
+fn until(n: i32) -> i32 {
+  let mut i = 0;
+  loop {
+    i = i + 1;
+    if i >= n {
+      break;
+    };
+  };
+  return i;
+}
+
 fn main() -> i32 {
   let a = count_up(0);
   let b = count_up(1);
   let c = count_up(3);
   let d = first_over(2);
   let e = odd_sum(3);
-  return a + b + c + d + e - 11;
+  let f = for_sum(0);
+  let g = for_sum(2);
+  let h = for_sum(5);
+  let u = until(2);
+  return a + b + c + d + e + f + g + h + u - 17;
 }

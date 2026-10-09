@@ -13,7 +13,7 @@ byte for byte.
 | `f0/` | the F0 parity fixture (CV-027): function entries, initializers, assignments, returns, `if` without `else`, `while`, enum `match`, a multibyte string |
 | `functions/` | uncalled, once, repeatedly, expression-statement call |
 | `branches/` | `if` true-only, false-only, both, `else`, nested, returns after early returns (subtraction expressions) |
-| `loops/` | zero, one, many iterations; `break`; `continue` |
+| `loops/` | zero, one, many iterations; `break`; `continue`; `for` (an exhausted iterator vs `break`); `loop`; the statically unreachable exits of `loop` and `while true` (CV-203) |
 | `match/` | enum arms, integer match with `_`, arms never taken (partial lines) |
 | `source-text/` | CRLF endings, tabs, no final newline, CJK text, several regions on one line, a partial line |
 | `project/` | a two-module project whose files share a basename |

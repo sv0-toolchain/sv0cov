@@ -102,7 +102,7 @@ Constructs beyond the F0 fixtures (planned by sv0c since CV-108):
 - `for p in e { … }` is a `loop` branch; `e` is an `expression` region
   counted at the enclosing position (it is evaluated once per loop entry).
 - `loop { … }` is a `loop` branch with a `loop_body` and no condition
-  region.
+  region (its `exit` is statically unreachable since CV-203).
 - A match arm whose result is a block has a `match_arm` region over the
   block, and the block's statements are planned at the arm's outcome.
 - A `while` condition ends before any `loop_invariant(…)` clause.
@@ -155,4 +155,24 @@ Added in CV-202 (R0): line coverage.
   `if c { a(); } else { b(); }` or `while c { … }` with an untaken part is
   `partial`; so is a line of a multi-line statement that holds an untaken
   arm or branch value.
+
+Added in CV-203 (R0): loop branches.
+
+- A loop's `exit` outcome is planned only when a false condition evaluation
+  is possible (SPEC 11.5). `loop { … }` has no condition, and `while true`
+  (the condition is exactly the literal `true`) can never evaluate false,
+  so their `exit` is `statically_unreachable` (owner's choice): uncounted
+  (`counter_index` and `fragment_index` null), no hit placed, and the
+  outcome carries the evidence identity `sv0c:loop:no-condition` or
+  `sv0c:loop:condition-literal-true`. The branch keeps both outcomes and
+  is covered once its body runs. A `while true` condition region counts
+  `body` only.
+- `exit` has one meaning for every loop: a false condition evaluation (an
+  exhausted iterator for `for`). Leaving by `break` or `return` never
+  counts it. (Before CV-203, `loop` counted `exit` after a `break`.)
+- `body` counts iterations entered, including one left by `break`,
+  `continue`, or `return`.
+- Code after a loop counts at the enclosing position minus the `return`s
+  inside the loop, so code after a `loop` left only by `return` counts zero
+  at run time.
 
