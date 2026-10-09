@@ -1,0 +1,758 @@
+{
+ "counted": [
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+ ],
+ "evaluate": [
+  {
+   "contexts": {
+    "0": {}
+   },
+   "expect": {
+    "by_context": [],
+    "inexact": false,
+    "value": 0
+   },
+   "name": "empty expression is constant zero",
+   "terms": []
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      5,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      5,
+      false
+     ]
+    ],
+    "inexact": false,
+    "value": 5
+   },
+   "name": "direct counter",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      2,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      3,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      5,
+      false
+     ]
+    ],
+    "inexact": false,
+    "value": 5
+   },
+   "name": "addition",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": 1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      7,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      3,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      4,
+      false
+     ]
+    ],
+    "inexact": false,
+    "value": 4
+   },
+   "name": "subtraction, positive",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      3,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      3,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [],
+    "inexact": false,
+    "value": 0
+   },
+   "name": "subtraction, exact zero is omitted from by_context",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      2,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      3,
+      false
+     ]
+    }
+   },
+   "expect": "COV3002",
+   "name": "negative exact result is corrupt evidence",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      4,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      5,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      2,
+      false
+     ]
+    ],
+    "inexact": false,
+    "value": 2
+   },
+   "name": "coefficients other than one",
+   "terms": [
+    {
+     "coefficient": 3,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -2,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551614,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      18446744073709551613,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      2147483647,
+      false
+     ]
+    ],
+    "inexact": false,
+    "value": 2147483647
+   },
+   "name": "unbounded intermediates: large products cancel exactly",
+   "terms": [
+    {
+     "coefficient": 2147483647,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -2147483647,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      2147483648,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      1,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [],
+    "inexact": false,
+    "value": 0
+   },
+   "name": "minimum signed 32-bit coefficient",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -2147483648,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      9223372036854775808,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      18446744073709551615,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 18446744073709551615
+   },
+   "name": "exact result above UINT64_MAX becomes a lower bound",
+   "terms": [
+    {
+     "coefficient": 2,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551615,
+      true
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      3,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      18446744073709551612,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 18446744073709551612
+   },
+   "name": "saturated positive term: lower endpoint",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551615,
+      true
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      18446744073709551615,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 18446744073709551615
+   },
+   "name": "saturated positive term only",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      9,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      18446744073709551615,
+      true
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      0,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 0
+   },
+   "name": "saturated negative term: inexact zero, kept",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551615,
+      true
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      18446744073709551615,
+      true
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      0,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 0
+   },
+   "name": "saturated positive and negative terms: inexact zero",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551615,
+      true
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      18446744073709551610,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      0,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 0
+   },
+   "name": "lower bound clamps at zero",
+   "terms": [
+    {
+     "coefficient": 2,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -3,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      5,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      3,
+      false
+     ]
+    },
+    "1": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      4,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      4,
+      false
+     ]
+    },
+    "2": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      1,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      18446744073709551615,
+      true
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      2,
+      false
+     ],
+     [
+      2,
+      0,
+      true
+     ]
+    ],
+    "inexact": true,
+    "value": 2
+   },
+   "name": "per-context evaluation, then saturating aggregate",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      5,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      0,
+      false
+     ]
+    },
+    "1": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      0,
+      false
+     ],
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": [
+      5,
+      false
+     ]
+    }
+   },
+   "expect": "COV3002",
+   "name": "context results are not re-derived from aggregated points",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+     "coefficient": -1,
+     "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ]
+  },
+  {
+   "contexts": {
+    "0": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551614,
+      false
+     ]
+    },
+    "1": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": [
+      18446744073709551614,
+      false
+     ]
+    }
+   },
+   "expect": {
+    "by_context": [
+     [
+      0,
+      18446744073709551614,
+      false
+     ],
+     [
+      1,
+      18446744073709551614,
+      false
+     ]
+    ],
+    "inexact": true,
+    "value": 18446744073709551615
+   },
+   "name": "aggregate above UINT64_MAX is a lower bound",
+   "terms": [
+    {
+     "coefficient": 1,
+     "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   ]
+  }
+ ],
+ "invalid": [
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 1,
+      "point_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+     },
+     {
+      "coefficient": 1,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "terms out of point-ID order"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 1,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     {
+      "coefficient": 1,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "duplicate point"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 0,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "zero coefficient"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 2147483648,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "coefficient above signed 32 bits"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": -2147483649,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "coefficient below signed 32 bits"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": true,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "boolean coefficient"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 1.0,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "name": "float coefficient"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 1,
+      "point_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+     }
+    ]
+   },
+   "name": "uncounted point"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "constant": 0,
+    "terms": []
+   },
+   "name": "extra property"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 1,
+      "point_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "x": 1
+     }
+    ]
+   },
+   "name": "term with an extra property"
+  },
+  {
+   "code": "COV1010",
+   "expression": {
+    "terms": [
+     {
+      "coefficient": 1,
+      "point_id": {
+       "terms": []
+      }
+     }
+    ]
+   },
+   "name": "nested arithmetic"
+  }
+ ],
+ "note": "SPEC 11.1 / AC-109 expression evaluation fixtures (CV-204). A point count is [value, saturated]; a saturated count is the interval [UINT64_MAX, +inf). Results: value, inexact (saturated == lower_bound), by_context [[context_index, value, inexact]] omitting exact zeros. Counted points: a, b.",
+ "schema": "sv0cov.expression-fixtures",
+ "version": "1.0"
+}

@@ -176,3 +176,33 @@ Added in CV-203 (R0): loop branches.
   inside the loop, so code after a `loop` left only by `return` counts zero
   at run time.
 
+Added in CV-204 (R0): counter expressions.
+
+- Normal form (SPEC 11.1): sv0c merges equal points, drops zero
+  coefficients, and orders terms by bytewise point ID; a region whose
+  expression normalizes to nothing is `statically_unreachable` with the
+  empty array. Only counted points are referenced. Coefficients are small
+  integers (each is a count of how often a point was added or subtracted
+  while planning one function), far inside signed 32 bits.
+- Nonnegativity from structured flow. Every region's expression is the
+  count of one control position: a function entry or a branch outcome
+  (each a real execution count), minus the outcomes of the early exits
+  (`return`, `break`, `continue`) nested inside the constructs that precede
+  the region at that position. Each such exit is reached only by passing
+  through that position first, and at most once per pass, so its count
+  never exceeds the position's count; the difference is the number of
+  passes that reached the region. Loop conditions are `body + exit`,
+  a sum of counts. Hence every expression is nonnegative on every valid
+  execution, and a negative exact result means corrupt or mismatched
+  evidence (COV3002).
+- Counter reduction is declined (owner's choice). Deriving an outcome as,
+  say, `false = condition - true` would leave that outcome uncounted, but
+  SPEC 11.1 has branch coverage use direct point counts and a branch
+  outcome references its own point. Regions already have no counters of
+  their own (AC-108), so every counter is a branch outcome or a function
+  entry, and each is needed.
+- Evaluation is `sv0cov.expr`: unbounded integers, per-context evaluation
+  then a saturating aggregate, saturated terms as lower bounds (a saturated
+  subtracted point gives the inexact zero), and a lower-bound zero counts as
+  not executed for regions and lines.
+

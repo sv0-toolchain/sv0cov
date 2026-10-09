@@ -36,8 +36,13 @@ def region(i: int, lines: list[int], point: str | None, lc: bool = True, cls: st
             "line_numbers": lines, "region_index": i, "source_index": 0}
 
 
+def points(regions: list[dict]) -> list[dict]:
+    ids = sorted({t["point_id"] for r in regions for t in r["counter_expression"]["terms"]})
+    return [{"counter_index": i, "point_id": p} for i, p in enumerate(ids)]
+
+
 def one_source(regions: list[dict]) -> dict:
-    return {"regions": regions, "sources": [{"path": "main.sv0", "source_index": 0}]}
+    return {"points": points(regions), "regions": regions, "sources": [{"path": "main.sv0", "source_index": 0}]}
 
 
 class LinesTest(unittest.TestCase):
@@ -77,7 +82,8 @@ class LinesTest(unittest.TestCase):
         self.assertEqual(physical_lines(b"a\n\nb"), 3)
 
     def test_sources_in_index_order(self) -> None:
-        m = {"regions": [region(0, [1], "p") | {"source_index": 1}],
+        regions = [region(0, [1], "p") | {"source_index": 1}]
+        m = {"points": points(regions), "regions": regions,
              "sources": [{"path": "b.sv0", "source_index": 1}, {"path": "a.sv0", "source_index": 0}]}
         recs = line_records(m, {"p": 1}, {"a.sv0": b"x\n", "b.sv0": b"y\n"})
         self.assertEqual([(r["source_index"], r["status"]) for r in recs], [(0, "non_executable"), (1, "covered")])

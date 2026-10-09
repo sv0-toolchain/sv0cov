@@ -17,8 +17,10 @@ on; R0 merge, contexts, policy, and reports come later (SPEC 16.5, 17).
   ``saturated`` (and so only a lower bound) when any contributing count was
   saturated or the sum exceeded ``2**64 - 1``.
 
-Contexts are not separated yet: every accepted profile adds into one
-aggregate, and the contexts seen are reported.
+Point counts add into one aggregate across every accepted profile; they are
+also kept per context (profiles with the same context add together), so
+derived region counts can be evaluated per context and then aggregated
+(:meth:`Resolution.context_counts`, SPEC 11.1; CV-204).
 
     python -m sv0cov.resolve MAP PROFILE [PROFILE ...]
 
@@ -33,6 +35,7 @@ import sys
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
+from sv0cov.expr import Count
 from sv0cov.formats.canonical_json import encode
 from sv0cov.formats.map import MapError, validate_map
 from sv0cov.formats.rawprofile import U64_MAX, RawProfile, RawProfileError, Tier, decode
@@ -65,10 +68,18 @@ class Resolution:
     backends: tuple[str, ...]  # sorted, distinct
     contexts: tuple[str | None, ...]  # sorted (None first), distinct
     points: tuple[PointCount, ...]  # every counted point, in counter order
+    # Per context (in ``contexts`` order): (value, saturated) per point, in
+    # ``points`` order.
+    per_context: tuple[tuple[tuple[int, bool], ...], ...] = ()
 
     def counts(self) -> dict[str, int]:
         """point ID -> count."""
         return {p.point_id: p.value for p in self.points}
+
+    def context_counts(self) -> dict[int, dict[str, Count]]:
+        """context index (into ``contexts``) -> point ID -> that context's count."""
+        return {i: {p.point_id: Count(v, sat) for p, (v, sat) in zip(self.points, row)}
+                for i, row in enumerate(self.per_context)}
 
     def to_json(self) -> dict:
         return {
@@ -125,12 +136,17 @@ def resolve(
 
     total = [0] * n
     saturated = [False] * n
+    ctx_key = lambda c: (c is not None, c or "")  # noqa: E731
+    contexts = sorted({p.context for _, p in accepted.values()}, key=ctx_key)
+    ctx_total = {c: [0] * n for c in contexts}
+    ctx_sat = {c: [False] * n for c in contexts}
     for _, prof in accepted.values():
         for index, count in prof.counts:
-            s = total[index] + count
-            if count == U64_MAX or s > U64_MAX:
-                saturated[index] = True
-            total[index] = min(s, U64_MAX)
+            for tot, sat in ((total, saturated), (ctx_total[prof.context], ctx_sat[prof.context])):
+                s = tot[index] + count
+                if count == U64_MAX or s > U64_MAX:
+                    sat[index] = True
+                tot[index] = min(s, U64_MAX)
 
     entities = m["entities"]
     points = sorted(
@@ -154,8 +170,10 @@ def resolve(
         run_ids=tuple(sorted({p.run_id.hex() for p in profs})),
         profile_ids=tuple(sorted(pid.hex() for pid in accepted)),
         backends=tuple(sorted({p.backend for p in profs})),
-        contexts=tuple(sorted({p.context for p in profs}, key=lambda c: (c is not None, c or ""))),
+        contexts=tuple(contexts),
         points=tuple(points),
+        per_context=tuple(tuple((ctx_total[c][p.counter_index], ctx_sat[c][p.counter_index]) for p in points)
+                          for c in contexts),
     )
 
 

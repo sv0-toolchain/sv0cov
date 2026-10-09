@@ -20,6 +20,11 @@ classification is ignored here. ``excluded`` lines arrive with exclusions
 (R1). Partial lines are not covered: line coverage is
 ``covered_lines / executable_lines``.
 
+Region counts come from :mod:`sv0cov.expr` (SPEC 11.1): evaluated per
+context and aggregated; a region is executed when its count proves at least
+one execution, so a saturation lower-bound zero counts as not executed
+(conservatively uncovered, COV-MET-017).
+
     python -m sv0cov.lines MAP SOURCE_ROOT PROFILE [PROFILE ...]
 
 resolves the profiles through the map and prints one ``path:line status``
@@ -33,6 +38,8 @@ import sys
 from pathlib import Path
 from typing import Mapping
 
+from sv0cov.expr import Count, CountRecord, check_expression, evaluate, evaluate_contexts
+
 STATUSES = ("covered", "partial", "uncovered", "non_executable")
 
 
@@ -42,24 +49,39 @@ def physical_lines(data: bytes) -> int:
 
 
 def region_count(region: dict, counts: Mapping[str, int]) -> int:
-    """A region's count from its counter expression (SPEC 11.1)."""
-    return sum(t["coefficient"] * counts[t["point_id"]] for t in region["counter_expression"]["terms"])
+    """A region's count over one context of point counts (SPEC 11.1; a
+    count of exactly ``UINT64_MAX`` is saturated)."""
+    terms = check_expression(region["counter_expression"])
+    return evaluate(terms, {p: Count.physical(counts[p]) for _, p in terms}).value
 
 
-def line_records(m: dict, counts: Mapping[str, int], sources: Mapping[str, bytes]) -> list[dict]:
+def region_counts(m: dict, contexts: Mapping[int, Mapping[str, Count]]) -> dict[int, CountRecord]:
+    """region index -> count record, for every ``user`` region of a validated
+    map, from per-context point counts (``Resolution.context_counts()``)."""
+    counted = {p["point_id"] for p in m["points"] if p["counter_index"] is not None}
+    return {r["region_index"]: evaluate_contexts(check_expression(r["counter_expression"], counted), contexts)
+            for r in m["regions"] if r["classification"] == "user"}
+
+
+def line_records(m: dict, counts: Mapping[str, int] | None, sources: Mapping[str, bytes], *,
+                 contexts: Mapping[int, Mapping[str, Count]] | None = None) -> list[dict]:
     """One record per physical line of every mapped source, ordered by source
     then line: ``line``, ``line_index``, ``region_indices`` (the contributing
     user regions on the line), ``source_index``, ``status``.
 
-    ``m`` is a validated map, ``counts`` maps each counted point ID to its
-    resolved count, and ``sources`` maps each logical path to its exact bytes.
+    ``m`` is a validated map and ``sources`` maps each logical path to its
+    exact bytes. Point counts are either ``contexts`` (per-context counts,
+    as from ``Resolution.context_counts()``) or ``counts`` (one context:
+    point ID -> count).
     """
+    if contexts is None:
+        contexts = {0: {p: Count.physical(v) for p, v in (counts or {}).items()}}
     by_line: dict[tuple[int, int], list[int]] = {}
     for r in m["regions"]:
         if r["line_contributing"] and r["classification"] == "user":
             for line in r["line_numbers"]:
                 by_line.setdefault((r["source_index"], line), []).append(r["region_index"])
-    executed = {r["region_index"]: region_count(r, counts) > 0 for r in m["regions"] if r["classification"] == "user"}
+    executed = {i: rec.value > 0 for i, rec in region_counts(m, contexts).items()}
     out: list[dict] = []
     for s in sorted(m["sources"], key=lambda s: s["source_index"]):
         for line in range(1, physical_lines(sources[s["path"]]) + 1):
@@ -98,6 +120,7 @@ def line_metric(records: list[dict]) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     import json
 
+    from sv0cov.expr import ExprError
     from sv0cov.resolve import ResolveError, resolve
 
     ap = argparse.ArgumentParser(prog="python -m sv0cov.lines")
@@ -114,7 +137,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error[{exc.code}]: {exc.detail}", file=sys.stderr)
         return 1
     paths = {s["source_index"]: s["path"] for s in m["sources"]}
-    for rec in line_records(m, res.counts(), sources):
+    try:
+        recs = line_records(m, None, sources, contexts=res.context_counts())
+    except ExprError as exc:
+        print(f"error[{exc.code}]: {exc.detail}", file=sys.stderr)
+        return 1
+    for rec in recs:
         print(f"{paths[rec['source_index']]}:{rec['line']} {rec['status']}")
     return 0
 
