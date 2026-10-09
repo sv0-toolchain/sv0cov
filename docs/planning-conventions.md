@@ -206,3 +206,19 @@ Added in CV-204 (R0): counter expressions.
   subtracted point gives the inexact zero), and a lower-bound zero counts as
   not executed for regions and lines.
 
+Added in CV-205 (R0): fragments and program-map assembly.
+
+- One fragment per source file. Sources, and so fragments, are ordered by
+  bytewise logical path; one file has one digest and one fragment, so the
+  path alone fixes the order (SPEC 16.3.3). Counters run by source, then
+  position, so each fragment owns one contiguous slice.
+- A file that plans no counter (only types, enums, `use`, or only
+  statically unreachable points) has a zero-length fragment based at the
+  next positive slice, or at `program_counter_count` when none follows.
+- sv0c compiles a project as one unit, so assembly happens inside one
+  compile, but the map is a function of the files alone: it does not
+  depend on the order the files are linked in. The test hook
+  `SV0_COVERAGE_LINK_ORDER` links a project in any order to prove this
+  (all 120 orders of a five-module project, native and VM). Separate
+  per-module generated C with one registration per module is DV-5 (R1).
+
