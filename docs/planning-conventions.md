@@ -64,6 +64,7 @@ loop left by `break` records `body` but not `exit`).
 | `return …;` | `return` | `return` through `;` | true |
 | `break;` / `continue;` | `break` / `continue` | keyword through `;` | true |
 | `if` / loop condition | `expression` | the condition expression | true |
+| `match` scrutinee | `expression` | the scrutinee expression | true |
 | `if` / `else` block | `branch_body` | `{` through `}` | false |
 | loop body block | `loop_body` | `{` through `}` | false |
 | match arm result | `match_arm` | the arm's result expression | true |
@@ -109,3 +110,26 @@ Constructs beyond the F0 fixtures (planned by sv0c since CV-108):
   block at the enclosing position: its statements get their regions and
   its tail an `expression` region; the block itself has no region of its
   own.
+
+Added in CV-201 (R0):
+
+- Every `match` scrutinee is an `expression` region at the enclosing
+  position, in statement, tail, and nested position alike, like an `if`
+  or loop condition. A call in a scrutinee is therefore always owned by a
+  region (SPEC §11.3).
+- `unsafe { … }` is planned as its block: its statements get their
+  regions, and the wrapper has no region of its own (same execution
+  meaning, §11.3).
+- A region whose counter expression is identically zero (it follows an
+  unconditional `return`, `break`, or `continue`) is `statically_unreachable`
+  with the canonical empty expression. It never enters an ordinary
+  denominator (§11.7). Map 1.0 records this provenance as the region's
+  `classification`; it has no per-region reason field.
+- No `call` region is planned: every call in sv0 sits inside a statement,
+  condition, scrutinee, iterable, or tail-expression region.
+- Desugared syntax plans only source regions. `for p in e { … }` has its
+  iterable and loop body, and `x += …` is one `mutation` region, so
+  compiler-generated support code never gets a region (COV-MET-008).
+  sv0c therefore emits no `synthetic_support` region yet.
+- `?` is refused (exit 9) until CV-213 models it. Its hidden early return
+  would otherwise make the code after it count runs that returned early.

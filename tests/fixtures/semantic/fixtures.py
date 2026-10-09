@@ -67,6 +67,7 @@ def f0() -> Fixture:
     match_span = p.through_block(m, "match s {")
     match = p.branch(measure, "match", match_span, arms=2)
     p.region(measure, "return", (p.find(m, "return match s {")[0], match_span[1] + 1), measure.entry)
+    p.region(measure, "expression", p.find(m, "s", after=p.find(m, "match s {")[0] + len("match ")), measure.entry)
     p.region(measure, "match_arm", p.find(m, "0", after=p.find(m, "Shape::Dot() =>")[1]), match["arm:0"])
     p.region(measure, "match_arm", p.find(m, "len", after=p.find(m, "Shape::Line(len) =>")[1]), match["arm:1"])
 
@@ -241,12 +242,14 @@ def match_() -> Fixture:
     cm = p.through_block(m, "match c {")
     cb = p.branch(code, "match", cm, arms=3)
     p.region(code, "return", (p.find(m, "return match c {")[0], cm[1] + 1), code.entry)
+    p.region(code, "expression", p.find(m, "c", after=p.find(m, "match c {")[0] + len("match ")), code.entry)
     for i, (pat, result) in enumerate((("Color::Red() =>", "1"), ("Color::Green() =>", "2"), ("Color::Blue() =>", "3"))):
         p.region(code, "match_arm", p.find(m, result, after=p.find(m, pat)[1]), cb[f"arm:{i}"])
     bucket = p.function(m, "bucket")
     bm = p.through_block(m, "match n {")
     bb = p.branch(bucket, "match", bm, arms=3)
     p.region(bucket, "return", (p.find(m, "return match n {")[0], bm[1] + 1), bucket.entry)
+    p.region(bucket, "expression", p.find(m, "n", after=p.find(m, "match n {")[0] + len("match ")), bucket.entry)
     for i, (pat, result) in enumerate((("0 =>", "10"), ("1 =>", "20"), ("_ =>", "30"))):
         p.region(bucket, "match_arm", p.find(m, result, after=p.find(m, pat, after=bm[0])[1]), bb[f"arm:{i}"])
     main = p.function(m, "main")
