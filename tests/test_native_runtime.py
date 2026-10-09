@@ -29,6 +29,7 @@ profiles (sizes, sparse and saturated counts, absent/empty/UTF-8 context).
 from __future__ import annotations
 
 import json
+import itertools
 import os
 import random
 import re
@@ -166,6 +167,31 @@ class NativeRuntimeTest(unittest.TestCase):
         want = [0] * 70
         want[0], want[39], want[40], want[69] = 1, 1, 1, 2
         self.assertEqual((r["state"], r["counts"]), (1, want))
+
+    def test_per_fragment_modules_in_every_order(self) -> None:
+        """CV-206: one module per fragment (as sv0c emits), registered in all
+        24 orders, initializes and counts module-local hits identically."""
+        want = [0] * 70
+        want[0] = want[39] = want[40] = want[69] = 1
+        for perm in itertools.permutations("0123"):
+            order = "".join(perm)
+            with self.subTest(order):
+                r = self.report(self.run_driver("per-fragment", order))
+                self.assertEqual((r["state"], r["counts"]), (1, want))
+
+    def test_per_fragment_registration_rejections(self) -> None:
+        """CV-206 / COV-C-005: a later module with a wrong map, count, target,
+        identity, or protocol; a cross-module overlap, gap, missing module, or
+        out-of-range slice; a duplicated (also empty) fragment; a misplaced
+        empty fragment; a module registered twice or missing: all fail before
+        user code (required) or leave collection off (not required)."""
+        kinds = ("map-id", "total", "target", "identity", "protocol", "overlap", "gap", "missing", "out-of-range",
+                 "dup-fragment", "dup-empty-fragment", "empty-misplaced", "dup-module", "null-module")
+        for kind in kinds:
+            with self.subTest(kind):
+                self.assert_refused(self.run_driver("bad-modules", kind), "COV1015")
+                r = self.report(self.run_driver("bad-modules", kind, SV0COV_REQUIRED="0"))
+                self.assertEqual(r["state"], 2)
 
     def test_hit_before_start_is_ignored(self) -> None:
         r = self.report(self.run_driver("hit-before-start"))

@@ -58,7 +58,9 @@ Two kinds of call use them:
 - within a module, the fragments are contiguous from its `slice_base` and
   cover exactly `slice_length` counters;
 - the modules' slices are in bounds, do not overlap, and cover
-  `0..program_counter_count` with no gaps.
+  `0..program_counter_count` with no gaps;
+- an empty fragment sits at the base of a positive slice or at
+  `program_counter_count` (SPEC 16.3.3).
 
 A zero-counter program still registers its zero-length fragments. Its arena
 then has zero elements, and no hit is ever called.
@@ -183,11 +185,34 @@ Two builds exist:
 ## The current `sv0c` shape
 
 `sv0c` compiles a whole program, including every source of a project, into
-one translation unit. That unit is therefore one module, holding every map
-fragment. Its slice is the whole program (`slice_base` 0, `slice_length` =
-`program_counter_count`), so a hit's local index equals its program counter.
-Several separately compiled modules (COV-C-004, R1) would reuse the same
-records, with one entry per module in `__sv0cov_modules`.
+one translation unit. Since CV-206 that unit carries one module descriptor
+per map fragment (one per source file), in map order:
+
+```c
+static const struct __sv0cov_fragment __sv0cov_fragment_<j>[1] = {{"<fragment_id>", <base>u, <length>u}};
+static const struct __sv0cov_module __sv0cov_module_<j> = {
+  1u, "<map_id>", <count>u, "<target>", "<identity>", <base>u, <length>u, 1u, __sv0cov_fragment_<j>
+};
+static const struct __sv0cov_module *const __sv0cov_modules[<fragments>] = {&__sv0cov_module_0, ...};
+```
+
+A hit names the module of the fragment that owns its counter and a
+module-local index, `__sv0cov_hit(&__sv0cov_module_<j>, <counter - base>u);`,
+and main calls `__sv0cov_start(__sv0cov_modules, <fragments>u);`. A file
+that plans no counter still registers its empty fragment, at the next
+positive slice's base or at the total count. Separately compiled C files,
+each carrying its own descriptors (COV-C-004), are R1; they would use the
+same records.
+
+The runtime checks every registered module wherever it sits in the
+aggregator: same map, count, target, and identity; protocol 1; fragments
+contiguous within each module and unique program-wide; slices in bounds,
+non-overlapping, and tiling the program; an empty fragment at a positive
+slice's base or at the total. Protocol 1 cannot see an empty fragment
+that is missing from the aggregator, because it owns no counter and the
+descriptors carry no fragment total. Counts and the profile are
+unaffected; `run_emit_c.py` checks that the aggregator lists exactly the
+map's fragments, so sv0c never emits that shape.
 
 `sv0c/test/coverage/plan/run_emit_c.py` checks the emitted C against each
 fixture's map. It links every program twice:

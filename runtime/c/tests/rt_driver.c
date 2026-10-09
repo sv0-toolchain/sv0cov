@@ -15,6 +15,9 @@
  * (exit(1), as the sv0 runtime's panic and contract-failure paths do),
  * collide (the final profile name already exists), rmdir (the profile
  * directory is gone), fork (a child exits normally after forking).
+ * "per-fragment <order>" (CV-206) registers one module per fragment, as
+ * sv0c emits, in the given order; "bad-modules <kind>" breaks one rule in
+ * a later module of that set.
  * "write" (CV-116) registers a map of a given size and counts, for byte
  * parity with the Python writer.
  *
@@ -52,6 +55,95 @@ static struct __sv0cov_fragment frags_hi[2] = {{FRAG_B, 40, 30}, {FRAG_C, 70, 0}
 static struct __sv0cov_module mod_lo = {1u, MAP_ID, N, "fixture", "sv0c+test", 0u, 40u, 1u, frags_lo};
 static struct __sv0cov_module mod_hi = {1u, MAP_ID, N, "fixture", "sv0c+test", 40u, 30u, 2u, frags_hi};
 static const struct __sv0cov_module *mods2[2] = {&mod_hi, &mod_lo};
+
+/* One module per fragment, as sv0c emits since CV-206: two positive slices
+   and two empty fragments (one at an inner boundary, one at the total). */
+#define FRAG_D "0000000000000000000000000000000000000000000000000000000000000003"
+static struct __sv0cov_fragment f4a[1] = {{FRAG_A, 0, 40}};
+static struct __sv0cov_fragment f4d[1] = {{FRAG_D, 40, 0}};
+static struct __sv0cov_fragment f4b[1] = {{FRAG_B, 40, 30}};
+static struct __sv0cov_fragment f4c[1] = {{FRAG_C, 70, 0}};
+static struct __sv0cov_module m4[4] = {
+    {1u, MAP_ID, N, "fixture", "sv0c+test", 0u, 40u, 1u, f4a},
+    {1u, MAP_ID, N, "fixture", "sv0c+test", 40u, 0u, 1u, f4d},
+    {1u, MAP_ID, N, "fixture", "sv0c+test", 40u, 30u, 1u, f4b},
+    {1u, MAP_ID, N, "fixture", "sv0c+test", 70u, 0u, 1u, f4c},
+};
+
+/* Register the four per-fragment modules in the order given as digits
+   ("0123", "3120", ...), then hit each positive module's first and last
+   counter once. */
+static int per_fragment(const char *order) {
+  static const struct __sv0cov_module *ms[4];
+  if (strlen(order) != 4)
+    return 2;
+  for (int i = 0; i < 4; i++) {
+    if (order[i] < '0' || order[i] > '3')
+      return 2;
+    ms[i] = &m4[order[i] - '0'];
+  }
+  __sv0cov_start(ms, 4u);
+  __sv0cov_hit(&m4[0], 0);
+  __sv0cov_hit(&m4[0], 39);
+  __sv0cov_hit(&m4[2], 0);
+  __sv0cov_hit(&m4[2], 29);
+  return 0;
+}
+
+/* Malformed per-fragment registrations: each breaks one rule in a module
+   other than the first registered one. */
+static int bad_modules(const char *kind) {
+  static struct __sv0cov_fragment f[4][1];
+  static struct __sv0cov_module m[4];
+  static const struct __sv0cov_module *ms[5];
+  for (int i = 0; i < 4; i++) {
+    m[i] = m4[i];
+    f[i][0] = m4[i].fragments[0];
+    m[i].fragments = f[i];
+    ms[i] = &m[i];
+  }
+  uint32_t count = 4;
+  if (strcmp(kind, "map-id") == 0)
+    m[2].map_id = "1111111111111111111111111111111111111111111111111111111111111111";
+  else if (strcmp(kind, "total") == 0)
+    m[2].program_counter_count = 71;
+  else if (strcmp(kind, "target") == 0)
+    m[2].target = "other";
+  else if (strcmp(kind, "identity") == 0)
+    m[2].compiler_identity = "sv0c+other";
+  else if (strcmp(kind, "protocol") == 0)
+    m[3].protocol_major = 2;
+  else if (strcmp(kind, "overlap") == 0) {
+    m[2].slice_base = 39;
+    f[2][0].slice_base = 39;
+  } else if (strcmp(kind, "gap") == 0) {
+    m[2].slice_base = 41;
+    m[2].slice_length = 29;
+    f[2][0].slice_base = 41;
+    f[2][0].slice_length = 29;
+  } else if (strcmp(kind, "missing") == 0) {
+    ms[2] = &m[3]; /* m[2] (counters 40..69) is never registered */
+    count = 3;
+  } else if (strcmp(kind, "out-of-range") == 0) {
+    m[3].slice_base = 71;
+    f[3][0].slice_base = 71;
+  } else if (strcmp(kind, "dup-fragment") == 0)
+    f[2][0].fragment_id = FRAG_A;
+  else if (strcmp(kind, "dup-empty-fragment") == 0)
+    f[3][0].fragment_id = FRAG_D;
+  else if (strcmp(kind, "empty-misplaced") == 0) {
+    m[1].slice_base = 10;
+    f[1][0].slice_base = 10;
+  } else if (strcmp(kind, "dup-module") == 0) {
+    ms[4] = &m[2];
+    count = 5;
+  } else if (strcmp(kind, "null-module") == 0)
+    ms[2] = NULL;
+  else
+    return 2;
+  __sv0cov_start(ms, count);
+  return 0;
+}
 
 static void hex(const uint8_t *b, size_t n) {
   for (size_t i = 0; i < n; i++)
@@ -146,6 +238,20 @@ static int bad_registration(const char *kind) {
 
 int main(int argc, char **argv) {
   const char *scenario = argc > 1 ? argv[1] : "ok";
+  if (strcmp(scenario, "per-fragment") == 0) {
+    if (argc < 3 || per_fragment(argv[2]) != 0)
+      return 2;
+    puts("user-code");
+    report();
+    return 0;
+  }
+  if (strcmp(scenario, "bad-modules") == 0) {
+    if (argc < 3 || bad_modules(argv[2]) != 0)
+      return 2;
+    puts("user-code");
+    report();
+    return 0;
+  }
   if (strcmp(scenario, "bad-registration") == 0) {
     if (argc < 3 || bad_registration(argv[2]) != 0)
       return 2;

@@ -17,7 +17,10 @@
  *   2. registration (SPEC 14.1): every module speaks protocol 1 and names
  *      the same 64-hex map ID, counter count, and compiler identity; its
  *      fragments are distinct, 64-hex, and contiguous across its slice;
- *      the module slices tile 0..count with no gap or overlap. Else COV1015.
+ *      the module slices tile 0..count with no gap or overlap, and an
+ *      empty fragment sits at a positive slice's base or at count. Every
+ *      module is checked whatever its position in the aggregator. Else
+ *      COV1015.
  *   3. the arena: one _Atomic uint64_t per program counter plus an atomic
  *      overflow bitmap of ceil(count / 64) words.
  *   4. the profile ID (SPEC 16.4): 16 bytes from getentropy, never all zero
@@ -374,6 +377,25 @@ static int rt_check_registration(const struct __sv0cov_module *const *modules, u
     snprintf(why, why_len, "the module slices do not cover the program's counters exactly once");
     return -1;
   }
+  /* A zero-length fragment owns no counter and sits at the base of a
+     positive slice or at the total count (SPEC 16.3.3; CV-206). */
+  for (uint32_t a = 0; a < module_count; a++)
+    for (uint32_t f = 0; f < modules[a]->fragment_count; f++) {
+      const struct __sv0cov_fragment *z = &modules[a]->fragments[f];
+      if (z->slice_length != 0 || z->slice_base == total)
+        continue;
+      int placed = 0;
+      for (uint32_t b = 0; b < module_count && !placed; b++)
+        for (uint32_t g = 0; g < modules[b]->fragment_count; g++)
+          if (modules[b]->fragments[g].slice_length > 0 && modules[b]->fragments[g].slice_base == z->slice_base) {
+            placed = 1;
+            break;
+          }
+      if (!placed) {
+        snprintf(why, why_len, "module %u fragment %u is empty but not at a slice boundary", a, f);
+        return -1;
+      }
+    }
   return 0;
 }
 
