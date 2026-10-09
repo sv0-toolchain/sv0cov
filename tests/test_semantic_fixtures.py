@@ -5,8 +5,9 @@
 - The checked-in expected maps, counts, and index are current.
 - Every expected map passes the full map validator with its source bytes
   (this is also CV-018's acceptance of the F0 map).
-- Line statuses recomputed from each map and its expected counts (SPEC
-  11.4) equal the statuses derived by hand in the fixture definition.
+- Line statuses recomputed from each map and its expected counts by
+  sv0cov.lines (SPEC 11.4) equal the statuses derived by hand in the
+  fixture definition.
 """
 
 from __future__ import annotations
@@ -25,30 +26,9 @@ sys.path.insert(0, str(HERE))
 from fixtures import FIXTURES  # noqa: E402
 
 from sv0cov.formats.map import validate_map  # noqa: E402
+from sv0cov.lines import line_statuses  # noqa: E402
 
 MATRIX_ROWS = {"functions", "regions", "if", "loops", "match", "source text", "projects"}
-
-
-def line_statuses(m: dict, counts: dict[str, int], sources: dict[str, bytes]) -> dict[str, list[str]]:
-    """SPEC 11.4 line status from region expressions and point counts."""
-    out = {}
-    for s in m["sources"]:
-        data = sources[s["path"]]
-        n_lines = data.count(b"\n") + (0 if data.endswith(b"\n") or not data else 1)
-        statuses = []
-        for line in range(1, n_lines + 1):
-            regions = [
-                r for r in m["regions"]
-                if r["source_index"] == s["source_index"] and r["line_contributing"]
-                and r["classification"] == "user" and line in r["line_numbers"]
-            ]
-            if not regions:
-                statuses.append("non_executable")
-                continue
-            executed = [sum(t["coefficient"] * counts[t["point_id"]] for t in r["counter_expression"]["terms"]) > 0 for r in regions]
-            statuses.append("covered" if all(executed) else "partial" if any(executed) else "uncovered")
-        out[s["path"]] = statuses
-    return out
 
 
 class SemanticFixtureTest(unittest.TestCase):

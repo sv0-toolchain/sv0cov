@@ -67,7 +67,7 @@ loop left by `break` records `body` but not `exit`).
 | `match` scrutinee | `expression` | the scrutinee expression | true |
 | `if` / `else` block | `branch_body` | `{` through `}` | false |
 | loop body block | `loop_body` | `{` through `}` | false |
-| match arm result | `match_arm` | the arm's result expression | true |
+| match arm result | `match_arm` | the arm's result expression | true (false when the result is a block) |
 
 Container regions (`branch_body`, `loop_body`) do not contribute to lines, so
 a line holding only `}` stays `non_executable`, as SPEC §27.1 requires. A
@@ -133,3 +133,26 @@ Added in CV-201 (R0):
   sv0c therefore emits no `synthetic_support` region yet.
 - `?` is refused (exit 9) until CV-213 models it. Its hidden early return
   would otherwise make the code after it count runs that returned early.
+
+Added in CV-202 (R0): line coverage.
+
+- A region contributes to lines (`line_contributing`) exactly when it is a
+  `user` region and not a container. Containers are branch bodies, loop
+  bodies, and a match arm whose result is a `{ … }` block (owner's choice):
+  the statements inside carry the lines, so a brace-only `}` or `},` line,
+  and a `Pat => {` line, stay `non_executable`, as with `if` / `else`
+  blocks. A non-block arm (`Pat => expr`) still contributes.
+- A `statically_unreachable` region does not contribute (owner's choice), so
+  a line holding only dead code is `non_executable`, and every contributing
+  region enters line status (SPEC 11.4, 11.7).
+- `line_numbers` lists every line on which the span has a byte other than
+  space, tab, LF, or CR, exactly as SPEC 16.3.5 says. A comment line inside
+  a multi-line statement therefore counts with that statement; a blank line
+  does not.
+- Line status is derived by `sv0cov.lines` (SPEC 11.4): `covered` when every
+  contributing region on the line ran, `partial` when some did, `uncovered`
+  when none did, `non_executable` when none contributes. A one-line
+  `if c { a(); } else { b(); }` or `while c { … }` with an untaken part is
+  `partial`; so is a line of a multi-line statement that holds an untaken
+  arm or branch value.
+
