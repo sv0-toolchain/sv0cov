@@ -641,13 +641,15 @@ class SanitizerTest(unittest.TestCase):
         self.run_clean(name, "bad-modules", "overlap", want_rc=1)
         self.run_clean(name, "ok", want_rc=1, SV0COV_RUN_ID="not-hex")
 
-    def caught(self, name: str, kind: str, marker: str) -> None:
-        """The sanitizer build really is instrumented: it stops a deliberate fault."""
+    def caught(self, name: str, kind: str, *markers: str) -> None:
+        """The sanitizer build really is instrumented: it stops a deliberate
+        fault, reporting it with one of `markers` (which sanitizer catches a
+        fault first differs between GCC and Clang)."""
         d = tempfile.mkdtemp(dir=self.tmp.name)
         p = subprocess.run([str(self.driver(name)), "selfcheck", kind], capture_output=True, text=True,
                            env=self.env_for(name, d), timeout=600)
         self.assertNotEqual(p.returncode, 0, f"{name} did not stop a deliberate {kind} fault")
-        self.assertIn(marker, p.stderr)
+        self.assertTrue(any(m in p.stderr for m in markers), p.stderr[-800:])
 
     def test_thread_sanitizer(self) -> None:
         self.caught("thread", "race", "ThreadSanitizer: data race")
@@ -657,7 +659,8 @@ class SanitizerTest(unittest.TestCase):
         self.run_clean("thread", "unjoined", SV0COV_REQUIRED="0")
 
     def test_address_and_undefined_sanitizers(self) -> None:
-        self.caught("address+undefined", "heap", "AddressSanitizer: heap-buffer-overflow")
+        self.caught("address+undefined", "heap", "AddressSanitizer: heap-buffer-overflow",
+                    "insufficient space for an object")  # GCC's UBSan bounds check fires first
         self.caught("address+undefined", "overflow", "signed integer overflow")
         self.scenarios("address+undefined")
 
