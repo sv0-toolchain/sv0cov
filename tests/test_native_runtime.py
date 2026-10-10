@@ -421,6 +421,7 @@ class NativeRuntimeTest(unittest.TestCase):
         p = self.run_driver("collide", SV0COV_PROFILE_DIR=d)
         self.assertEqual(p.returncode, 1)
         self.assertIn("error[COV2112]", p.stderr.decode())
+        self.assertIn(b"unflushed-tail", p.stdout)
         names = self.profiles(d)
         self.assertEqual(len(names), 1)
         with open(os.path.join(d, names[0]), "rb") as f:
@@ -437,6 +438,9 @@ class NativeRuntimeTest(unittest.TestCase):
                 self.assertEqual(p.returncode, rc)
                 self.assertIn("error[COV2010]", p.stderr.decode())
                 self.assertFalse(os.path.exists(d))
+                # What the program printed is not lost when required mode fails
+                # the process from the exit handler (CV-212).
+                self.assertIn(b"unflushed-tail", p.stdout)
 
     def test_forked_child_does_not_publish(self) -> None:
         for required, child in (("1", 1), ("0", 0)):

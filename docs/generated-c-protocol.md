@@ -180,9 +180,15 @@ threads before exiting.
 | A profile with the final name already exists (the existing file is left alone) | COV2112 |
 | A forked child exits; it never publishes its parent's counters | COV2120 |
 
-In required mode, each of these ends the process with `_exit(1)`. Outside
-required mode, the diagnostic is printed and the exit status is left
-unchanged.
+In required mode, each of these ends the process with `_exit(1)`, after
+flushing the program's buffered output streams (`_exit` would otherwise
+drop what the program had already printed). Outside required mode, the
+diagnostic is printed and the exit status is left unchanged.
+
+sv0vm ends a run the same way on every one of these paths (CV-212): the same
+exit status, the same publication, the same registry code. sv0doc
+`bytecode/coverage.md` §3.2 lists the VM's side, and sv0c's
+`test/coverage/lifecycle/run_lifecycle.py` runs each case on both.
 
 ### Raw-profile tier
 

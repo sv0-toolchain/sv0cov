@@ -506,6 +506,10 @@ int main(int argc, char **argv) {
     }
     if (strcmp(scenario, "rmdir") == 0 && rmdir(sv0cov_rt_test_profile_dir()) != 0)
       return 3;
+    /* Left in the stdio buffer: a failed required publication must not lose
+       it (the runtime fails the process from an exit handler). */
+    if (strcmp(scenario, "rmdir") == 0 || strcmp(scenario, "collide") == 0)
+      puts("unflushed-tail");
     if (strcmp(scenario, "fork") == 0) {
       pid_t child = fork();
       if (child == 0)

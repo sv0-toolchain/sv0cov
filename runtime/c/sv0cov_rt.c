@@ -541,7 +541,9 @@ static void rt_unpublished(const char *code, const char *title, const char *deta
   rt_diag(code, title, detail);
   if (rt.required) {
     fprintf(stderr, "sv0cov: coverage is required (SV0COV_REQUIRED=1); failing the process\n");
-    fflush(stderr);
+    /* _exit skips the stdio flush that follows the exit handlers: write out
+       what the program already printed, then fail. */
+    fflush(NULL);
     _exit(1);
   }
 }
