@@ -199,6 +199,10 @@ def _check_sources(ctx: _Ctx, supplied: Mapping[str, bytes] | None) -> None:
                 check_logical_string(s["package"], "package", min_bytes=1, max_bytes=1024)
         except LogicalValueError as exc:
             _fail("COV1010", f"source {s['path']!r}: {exc}")
+        # SPEC 16.3.2: only an unowned root source may have no package.
+        # Ownership comes from the build graph; a path is never consulted.
+        if s["ownership"] == "dependency" and s["package"] is None:
+            _fail("COV1010", f"source {s['path']!r}: a dependency source names its package")
         if supplied is not None and s["path"] in supplied:
             data = supplied[s["path"]]
             if hashlib.sha256(data).hexdigest() != s["digest"]:

@@ -241,3 +241,20 @@ Added in CV-207 (R0): zero-counter programs.
 - sv0vm rejects any disagreement between the binding's count and the
   presence of `COVER_HIT` before user code (COV2201).
 
+Added in CV-209 (R0): ownership and default scope.
+
+- `ownership` and `package` come from the build graph, never from how a
+  path is spelled. An sv0 build has one package, the root project: every
+  file the project compiles is `user`-owned with a null `package`
+  (`cov_src_ownership` / `cov_src_package` in sv0c decide this, and never
+  look at the logical path). Dependency packages (COV-SCP-004, R1) will
+  set both from build metadata.
+- Directory names mean nothing: code under `tests/`, `examples/`,
+  `vendor/`, `third_party/`, `generated/`, `build/` or `node_modules/` is
+  ordinary root-project code and stays in scope. Scope is the compiled set:
+  a file the project does not compile (for example under a dot-directory,
+  which the project listing skips) is not a source.
+- A `dependency` source names its package (a map with a dependency source
+  and a null package is invalid). Root metrics count `user` sources only
+  (`sv0cov.lines.user_source_indices`).
+

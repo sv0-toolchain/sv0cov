@@ -24,7 +24,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from sv0cov.lines import line_metric, line_records, line_statuses, main, physical_lines  # noqa: E402
+from sv0cov.lines import (  # noqa: E402
+    line_metric,
+    line_records,
+    line_statuses,
+    main,
+    physical_lines,
+    user_source_indices,
+)
 from test_resolve import by_counter, fixture, profile  # noqa: E402
 
 SEMANTIC = ROOT / "tests" / "fixtures" / "semantic"
@@ -88,6 +95,19 @@ class LinesTest(unittest.TestCase):
         recs = line_records(m, {"p": 1}, {"a.sv0": b"x\n", "b.sv0": b"y\n"})
         self.assertEqual([(r["source_index"], r["status"]) for r in recs], [(0, "non_executable"), (1, "covered")])
         self.assertEqual([r["line_index"] for r in recs], [0, 1])
+
+    def test_root_metric_counts_user_sources_only(self) -> None:
+        """CV-209: the root metric counts every user source, wherever it sits,
+        and no dependency source, even one that sits beside user code."""
+        regions = [region(0, [1], "p"), region(1, [1], "q") | {"source_index": 1}, region(2, [1], "p") | {"source_index": 2}]
+        m = {"points": points(regions), "regions": regions, "sources": [
+            {"path": "main.sv0", "source_index": 0, "ownership": "user", "package": None},
+            {"path": "src/dep.sv0", "source_index": 1, "ownership": "dependency", "package": "acme"},
+            {"path": "vendor/tests/x.sv0", "source_index": 2, "ownership": "user", "package": None}]}
+        recs = line_records(m, {"p": 1, "q": 0}, {s["path"]: b"x\n" for s in m["sources"]})
+        self.assertEqual(user_source_indices(m), {0, 2})
+        self.assertEqual(line_metric(recs), {"covered": 2, "partial": 0, "total": 3})
+        self.assertEqual(line_metric(recs, user_source_indices(m)), {"covered": 2, "partial": 0, "total": 2})
 
     def test_cli_on_f0(self) -> None:
         data, m, expected = fixture("f0")

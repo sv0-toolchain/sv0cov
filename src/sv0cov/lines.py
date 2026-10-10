@@ -109,9 +109,23 @@ def line_statuses(m: dict, counts: Mapping[str, int], sources: Mapping[str, byte
     return out
 
 
-def line_metric(records: list[dict]) -> dict[str, int]:
-    """``covered``, ``partial``, ``total`` (executable lines) of some records."""
-    executable = [r for r in records if r["status"] != "non_executable"]
+def user_source_indices(m: dict) -> set[int]:
+    """The root project's sources: the default coverage scope (SPEC 18.1).
+
+    Every compiled ``user`` source is in scope whatever directory it sits
+    in (tests/, examples/, vendor/, ... mean nothing); ``dependency``
+    sources are reported separately and stay out of root metrics. Ownership
+    is the map's build-graph fact, never inferred from a path (CV-209).
+    """
+    return {s["source_index"] for s in m["sources"] if s["ownership"] == "user"}
+
+
+def line_metric(records: list[dict], sources: set[int] | None = None) -> dict[str, int]:
+    """``covered``, ``partial``, ``total`` (executable lines) of some records,
+    limited to the source indexes in ``sources`` when given (the root
+    project's metric: ``line_metric(records, user_source_indices(m))``)."""
+    executable = [r for r in records if r["status"] != "non_executable"
+                  and (sources is None or r["source_index"] in sources)]
     return {"covered": sum(r["status"] == "covered" for r in executable),
             "partial": sum(r["status"] == "partial" for r in executable),
             "total": len(executable)}

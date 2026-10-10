@@ -160,6 +160,17 @@ class FragmentsTest(Case):
         ms.finalize(o, fragments=False)
         self.assertEqual(code_of(o), "COV1015")
 
+    def test_ownership_and_package(self) -> None:
+        """CV-209 (SPEC 16.3.2): a dependency source names its package; a
+        root source may or may not; a path never decides ownership."""
+        def own(o, ownership, package):
+            o["sources"][0]["ownership"], o["sources"][0]["package"] = ownership, package
+        self.assertEqual(code_of(ms.mutated(lambda o: own(o, "dependency", None))), "COV1010")
+        self.assertIsNone(code_of(ms.mutated(lambda o: own(o, "dependency", "acme"))))
+        self.assertIsNone(code_of(ms.mutated(lambda o: own(o, "user", "root-pkg"))))
+        self.assertEqual(code_of(ms.mutated(lambda o: own(o, "user", ""))), "COV1010")
+        self.assertEqual(code_of(ms.mutated(lambda o: own(o, "vendor", None))), "COV1010")
+
     def test_zero_length_fragment_at_end_is_valid(self) -> None:
         o = copy.deepcopy(ms.build())
         o["sources"].append({"digest": "0" * 64, "ownership": "user", "package": None, "path": "src/z.sv0", "source_index": 2})
