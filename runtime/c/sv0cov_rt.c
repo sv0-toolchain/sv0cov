@@ -26,9 +26,15 @@
  *   4. the profile ID (SPEC 16.4): 16 bytes from getentropy, never all zero
  *      and never a predictable fallback. Else COV2002.
  *
- * The map must fit the standard raw-profile tier (4,194,304 counters), else
- * COV6001: a runtime has no configuration, and the transport may not set a
- * tier.
+ * Raw-profile tier (SPEC 16.4; CV-211). A runtime has no configuration and
+ * the transport may not set a tier, so the tier is fixed when this file is
+ * compiled: SV0COV_TIER_MAX_COUNTERS and SV0COV_TIER_MAX_BYTES default to the
+ * standard tier (4,194,304 counters, 64 MiB) and the build that links this
+ * runtime may define them for the large tier (16,777,216 counters, 256 MiB)
+ * or for explicit custom ceilings (at most 4,294,967,295 counters and
+ * 68,719,476,736 bytes). A map with more counters is refused before user
+ * code, and a profile that would encode to more bytes is refused before any
+ * file is created, both with COV6001.
  *
  * A failure prints one diagnostic that names the variable or field, never
  * a transport value. In required mode the process then exits with status 1
@@ -76,7 +82,27 @@
 extern char **environ;
 
 #define SV0COV_CONTEXT_MAX 256u
-#define SV0COV_TIER_MAX_COUNTERS 4194304u /* standard tier (SPEC 16.4) */
+#ifndef SV0COV_TIER_MAX_COUNTERS
+#define SV0COV_TIER_MAX_COUNTERS 4194304 /* standard tier (SPEC 16.4) */
+#endif
+#ifndef SV0COV_TIER_MAX_BYTES
+#define SV0COV_TIER_MAX_BYTES 67108864 /* standard tier: 64 MiB */
+#endif
+/* Both ceilings are explicit positive integers inside the protocol maxima. */
+_Static_assert((SV0COV_TIER_MAX_COUNTERS) >= 1 && (SV0COV_TIER_MAX_COUNTERS) <= 4294967295LL,
+               "SV0COV_TIER_MAX_COUNTERS must be 1..4294967295");
+_Static_assert((SV0COV_TIER_MAX_BYTES) >= 1 && (SV0COV_TIER_MAX_BYTES) <= 68719476736LL,
+               "SV0COV_TIER_MAX_BYTES must be 1..68719476736");
+static const uint64_t rt_tier_max_counters = (uint64_t)(SV0COV_TIER_MAX_COUNTERS);
+static const uint64_t rt_tier_max_bytes = (uint64_t)(SV0COV_TIER_MAX_BYTES);
+
+static const char *rt_tier_name(void) {
+  if (rt_tier_max_counters == 4194304u && rt_tier_max_bytes == 67108864u)
+    return "standard";
+  if (rt_tier_max_counters == 16777216u && rt_tier_max_bytes == 268435456u)
+    return "large";
+  return "custom";
+}
 
 static struct {
   atomic_int state;
@@ -542,6 +568,18 @@ static void rt_flush(void) {
     saturated |= c == UINT64_MAX;
   }
   uint32_t words = saturated ? (uint32_t)(((uint64_t)n + 63) / 64) : 0;
+  /* The encoded length (SPEC 16.4), in 64-bit arithmetic that cannot
+     overflow for 32-bit counts: refuse an over-tier profile before any file
+     exists (COV-FMT-023). */
+  uint64_t encoded = 84u + (uint64_t)(rt.context_len > 0 ? rt.context_len : 0) + 4u + 12u * (uint64_t)pairs + 4u +
+                     8u * (uint64_t)words + 8u + 4u;
+  if (encoded > rt_tier_max_bytes) {
+    char detail[160];
+    snprintf(detail, sizeof detail, "the profile would be %llu bytes; the %s raw-profile tier allows %llu",
+             (unsigned long long)encoded, rt_tier_name(), (unsigned long long)rt_tier_max_bytes);
+    rt_unpublished("COV6001", "resource limit exceeded", detail);
+    return;
+  }
   uint64_t *bitmap = NULL;
   if (words > 0 && (bitmap = calloc(words, sizeof(uint64_t))) == NULL) {
     rt_unpublished("COV2011", "raw profile incomplete", "out of memory for the overflow bitmap");
@@ -677,9 +715,10 @@ void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t modul
     return;
   }
   uint32_t n = modules[0]->program_counter_count;
-  if (n > SV0COV_TIER_MAX_COUNTERS) {
-    rt_fail("COV6001", "resource limit exceeded",
-            "the map has more counters than the standard raw-profile tier allows (4194304)");
+  if ((uint64_t)n > rt_tier_max_counters) {
+    snprintf(why, sizeof why, "the map has %u counters; the %s raw-profile tier this program was built for allows %llu",
+             n, rt_tier_name(), (unsigned long long)rt_tier_max_counters);
+    rt_fail("COV6001", "resource limit exceeded", why);
     return;
   }
   size_t words = ((size_t)n + 63) / 64;

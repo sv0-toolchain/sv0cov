@@ -548,6 +548,138 @@ class NativeRuntimeTest(unittest.TestCase):
 
 
 
+STANDARD = (4194304, 67108864)
+LARGE = (16777216, 268435456)
+PROTOCOL_MAX = (4294967295, 68719476736)
+
+
+class TierTest(unittest.TestCase):
+    """CV-211 (SPEC 16.4; COV-FMT-019, COV-FMT-020, COV-FMT-023): the runtime
+    is compiled for one raw-profile tier (standard unless the build defines
+    the ceilings) and refuses a map over its counter ceiling before user
+    code and a profile over its byte ceiling before any file exists, both
+    with COV6001, at the exact limits."""
+
+    tmp: tempfile.TemporaryDirectory
+    built: dict[tuple, Path]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        if cc() is None:
+            raise unittest.SkipTest("no C compiler on this host")
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.built = {}
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tmp.cleanup()
+
+    def compile(self, tier: tuple[int, int] | None) -> subprocess.CompletedProcess:
+        out = Path(self.tmp.name) / f"drv-{len(self.built)}-{tier}"
+        defs = [] if tier is None else [f"-DSV0COV_TIER_MAX_COUNTERS={tier[0]}", f"-DSV0COV_TIER_MAX_BYTES={tier[1]}"]
+        p = subprocess.run([cc(), "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", *defs, "-DSV0COV_RT_TESTING",
+                            "-pthread", "-o", str(out), str(RT / "sv0cov_rt.c"), str(RT / "tests" / "rt_driver.c")],
+                           capture_output=True, text=True)
+        if p.returncode == 0:
+            self.built[tier] = out
+        return p
+
+    def driver(self, tier: tuple[int, int] | None) -> Path:
+        if tier not in self.built:
+            p = self.compile(tier)
+            self.assertEqual(p.returncode, 0, p.stderr[-600:])
+        return self.built[tier]
+
+    def run_tier(self, tier, *args: str, **over: str | None) -> tuple[subprocess.CompletedProcess, str]:
+        d = tempfile.mkdtemp(dir=self.tmp.name)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("SV0COV")}
+        values = {"SV0COV_PROFILE_DIR": d, "SV0COV_RUN_ID": RUN_ID, "SV0COV_REQUIRED": "1",
+                  "SV0COVRT_TEST_PROFILE_ID": "00112233445566778899aabbccddeeff"}
+        values.update(over)
+        env.update({k: v for k, v in values.items() if v is not None})
+        return subprocess.run([str(self.driver(tier)), *args], capture_output=True, env=env, timeout=600), d
+
+    def accepted(self, tier, counters: int, *counts: str, **over) -> bytes:
+        p, d = self.run_tier(tier, "write", MAP_ID.hex(), str(counters), *counts, **over)
+        self.assertEqual(p.returncode, 0, p.stderr.decode())
+        (name,) = os.listdir(d)
+        self.assertTrue(name.endswith(".sv0profraw"))
+        return Path(d, name).read_bytes()
+
+    def refused(self, tier, counters: int, *counts: str, needle: str, **over) -> None:
+        p, d = self.run_tier(tier, "write", MAP_ID.hex(), str(counters), *counts, **over)
+        err = p.stderr.decode()
+        self.assertEqual(p.returncode, 1, err)
+        self.assertIn("error[COV6001]", err)
+        self.assertIn(needle, err)
+        self.assertEqual(os.listdir(d), [])  # no profile and no temporary file
+
+    def test_standard_counter_boundary(self) -> None:
+        data = self.accepted(None, STANDARD[0])
+        self.assertEqual(decode(data, map_counter_count=STANDARD[0]).counts, ())
+        self.refused(None, STANDARD[0] + 1, needle="the standard raw-profile tier this program was built for allows 4194304")
+        # Defining the standard values explicitly is the same tier.
+        self.refused(STANDARD, STANDARD[0] + 1, needle="the standard raw-profile tier")
+
+    def test_large_counter_boundary_and_explicitness(self) -> None:
+        """COV-FMT-019 / AC-055: only a build made for `large` takes more than
+        the standard counters, up to exactly 16,777,216."""
+        self.accepted(LARGE, STANDARD[0] + 1)
+        self.accepted(LARGE, LARGE[0])
+        self.refused(LARGE, LARGE[0] + 1, needle="the large raw-profile tier this program was built for allows 16777216")
+
+    def test_tier_does_not_change_the_profile(self) -> None:
+        """The same counts give the same bytes under every tier that admits them."""
+        counts = ("0=3", "5=1", "69=18446744073709551615")
+        want = self.accepted(None, 70, *counts, SV0COV_CONTEXT="shard é")
+        for tier in (LARGE, (70, 4096), PROTOCOL_MAX):
+            with self.subTest(tier=tier):
+                self.assertEqual(self.accepted(tier, 70, *counts, SV0COV_CONTEXT="shard é"), want)
+
+    def test_custom_counter_boundary(self) -> None:
+        self.accepted((70, 4096), 70)
+        self.refused((69, 4096), 70, needle="the custom raw-profile tier this program was built for allows 69")
+        self.accepted((1, 4096), 1, "0=1")
+        self.refused((1, 4096), 2, needle="allows 1")
+
+    def test_custom_byte_boundary(self) -> None:
+        """An encoded profile of exactly max_bytes is published; one byte more
+        is refused before any file is created. 104 bytes of fixed fields, 12
+        per nonzero counter, the context, and 8 per overflow word all count."""
+        three = ("0=1", "1=1", "2=1")
+        data = self.accepted((70, 140), 70, *three)          # 104 + 3 * 12
+        self.assertEqual(len(data), 140)
+        self.refused((70, 139), 70, *three, needle="the profile would be 140 bytes; the custom raw-profile tier allows 139")
+        self.refused((70, 140), 70, *three, "3=1", needle="would be 152 bytes")
+        self.refused((70, 140), 70, *three, needle="would be 142 bytes", SV0COV_CONTEXT="ab")
+        self.assertEqual(len(self.accepted((70, 142), 70, *three, SV0COV_CONTEXT="ab")), 142)
+        # A saturated counter adds the two-word overflow bitmap (70 counters).
+        sat = ("0=18446744073709551615",)
+        self.assertEqual(len(self.accepted((70, 132), 70, *sat)), 132)   # 104 + 12 + 16
+        self.refused((70, 131), 70, *sat, needle="would be 132 bytes")
+        # An empty profile is 104 bytes.
+        self.assertEqual(len(self.accepted((70, 104), 70)), 104)
+        self.refused((70, 103), 70, needle="would be 104 bytes")
+
+    def test_not_required_refusal_publishes_nothing(self) -> None:
+        p, d = self.run_tier((70, 139), "write", MAP_ID.hex(), "70", "0=1", "1=1", "2=1", SV0COV_REQUIRED="0")
+        self.assertEqual(p.returncode, 0, p.stderr.decode())
+        self.assertIn("error[COV6001]", p.stderr.decode())
+        self.assertEqual(os.listdir(d), [])
+
+    def test_ceilings_must_be_explicit_positive_and_inside_the_protocol(self) -> None:
+        """COV-FMT-020: a runtime cannot be built with a zero, negative, or
+        over-protocol ceiling; the protocol maxima themselves are accepted."""
+        for tier, needle in (((0, 4096), "SV0COV_TIER_MAX_COUNTERS must be"), ((PROTOCOL_MAX[0] + 1, 4096), "SV0COV_TIER_MAX_COUNTERS must be"),
+                             ((70, 0), "SV0COV_TIER_MAX_BYTES must be"), ((70, PROTOCOL_MAX[1] + 1), "SV0COV_TIER_MAX_BYTES must be"),
+                             ((-1, 4096), "SV0COV_TIER_MAX_COUNTERS must be")):
+            with self.subTest(tier=tier):
+                p = self.compile(tier)
+                self.assertNotEqual(p.returncode, 0)
+                self.assertIn(needle, p.stderr)
+        self.accepted(PROTOCOL_MAX, 70, "0=1")
+
+
 SANITIZERS = {
     "thread": (["-fsanitize=thread"], {"TSAN_OPTIONS": "halt_on_error=1:exitcode=66"}, "ThreadSanitizer"),
     "address+undefined": (["-fsanitize=address,undefined", "-fno-sanitize-recover=undefined"],

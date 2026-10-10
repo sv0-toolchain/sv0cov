@@ -184,9 +184,33 @@ In required mode, each of these ends the process with `_exit(1)`. Outside
 required mode, the diagnostic is printed and the exit status is left
 unchanged.
 
-A map with more than 4,194,304 counters (the standard raw-profile tier) is
-refused at start with COV6001. The runtime has no configuration, and the
-transport may not raise the tier.
+### Raw-profile tier
+
+The runtime has no configuration and the transport may not set a tier, so
+the tier is fixed when this file is compiled (CV-211). `SV0COV_TIER_MAX_COUNTERS`
+and `SV0COV_TIER_MAX_BYTES` default to the `standard` tier (4,194,304
+counters, 64 MiB). The build defines them for `large` (16,777,216 counters,
+256 MiB) or for explicit `custom` ceilings; values outside `1..4294967295`
+counters or `1..68719476736` bytes do not compile.
+
+- A map with more counters than the ceiling is refused at start with
+  COV6001, before user code.
+- At exit the runtime computes the encoded profile length (104 bytes of
+  fixed fields, the context, 12 per nonzero counter, 8 per overflow word)
+  and refuses a profile over the byte ceiling with COV6001 before it
+  creates any file. A profile of exactly the ceiling is published.
+
+A larger tier changes only what is accepted: the same counts give the same
+profile bytes under every tier that admits them.
+
+`sv0 native-compile --coverage-tier=standard|large|custom` selects the tier
+(`custom` needs `--coverage-max-counters` and `--coverage-max-bytes`; the
+built-in tiers take neither). The compiler refuses to write a map with more
+counters than the tier allows, or larger than the tier's map ceiling (512
+MiB standard, 2 GiB otherwise), and the build record states the tier and
+its ceilings. sv0vm gets its tier from
+`sv0 vm-run --raw-profile-tier ... [--raw-profile-max-counters N --raw-profile-max-bytes N]`
+and applies the same two checks.
 
 `sv0 native-compile --coverage=instrument` compiles this file with
 `-std=c11 -O2` and links it into the executable. The program C itself stays
