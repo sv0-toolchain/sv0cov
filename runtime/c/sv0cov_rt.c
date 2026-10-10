@@ -554,16 +554,18 @@ static void rt_flush(void) {
   rt_hex(profile_hex, rt.profile_id, 16);
   snprintf(name, sizeof name, "%s-%s.sv0profraw", run_hex, profile_hex);
   size_t dlen = strlen(rt.profile_dir);
-  char *dst = malloc(dlen + 1 + strlen(name) + 1);
-  char *tmp = malloc(dlen + 2 + strlen(name) + 16);
+  size_t dst_size = dlen + 1 + strlen(name) + 1;
+  size_t tmp_size = dlen + 2 + strlen(name) + 16;
+  char *dst = malloc(dst_size);
+  char *tmp = malloc(tmp_size);
   struct rt_out *o = malloc(sizeof *o);
   if (dst == NULL || tmp == NULL || o == NULL) {
     free(bitmap), free(dst), free(tmp), free(o);
     rt_unpublished("COV2011", "raw profile incomplete", "out of memory preparing the profile");
     return;
   }
-  sprintf(dst, "%s/%s", rt.profile_dir, name);
-  sprintf(tmp, "%s/.%s.tmp-XXXXXX", rt.profile_dir, name);
+  snprintf(dst, dst_size, "%s/%s", rt.profile_dir, name);
+  snprintf(tmp, tmp_size, "%s/.%s.tmp-XXXXXX", rt.profile_dir, name);
   int fd = mkstemp(tmp); /* mode 0600, unpredictable name */
   if (fd < 0) {
     free(bitmap), free(dst), free(tmp), free(o);
@@ -753,4 +755,19 @@ int sv0cov_rt_test_context(const char **bytes) {
   *bytes = rt.context;
   return rt.context_len;
 }
+int sv0cov_rt_test_storage_aligned(void) {
+  return (uintptr_t)rt.counters % _Alignof(_Atomic uint64_t) == 0 &&
+         (uintptr_t)rt.overflow % _Alignof(_Atomic uint64_t) == 0;
+}
+unsigned sv0cov_rt_test_counter_size(void) { return (unsigned)sizeof(_Atomic uint64_t); }
+void sv0cov_rt_test_clear_overflow(uint32_t index) {
+  atomic_fetch_and(&rt.overflow[index / 64], ~((uint64_t)1 << (index % 64)));
+}
 #endif
+
+int __sv0cov_atomic_u64_lock_free(int *build_time) {
+  _Atomic uint64_t probe = 0;
+  if (build_time != NULL)
+    *build_time = ATOMIC_LLONG_LOCK_FREE;
+  return atomic_is_lock_free(&probe) ? 1 : 0;
+}

@@ -98,6 +98,46 @@ or an index outside its slice, which generated code never produces.
 relaxed ordering. A counter that is already at `UINT64_MAX` stays there, and
 its overflow bit is set.
 
+### Concurrency, saturation, and the lock-free probe
+
+The counters and the overflow bitmap are C11 atomics, allocated with
+`calloc` (aligned for any object type). A hit is data-race-free and
+individually linearizable; it is not a snapshot across counters. A complete
+profile needs the program to join its worker threads before it exits: the
+exit-time flush reads each counter once, in index order, and refuses to
+publish (COV2011) if it sees a counter change while it writes.
+
+The runtime never assumes 64-bit atomics are lock-free (COV-INS-010).
+`__sv0cov_atomic_u64_lock_free(&build_time)` records what the host
+provides: the compile-time `ATOMIC_LLONG_LOCK_FREE` (0 never, 1 sometimes,
+2 always) and the run-time `atomic_is_lock_free` answer for the counter
+type. Coverage means the same either way; a host without lock-free 64-bit
+atomics would link its C library's lock-based fallback (`-latomic` with
+GCC). Recorded probes (`tests/test_native_runtime.py` prints one line per
+run, on every CI host):
+
+| Host | Compiler | Build-time | Run-time | Counter size |
+|---|---|---|---|---|
+| macOS arm64 | Apple clang | 2 (always) | 1 | 8 |
+| macOS x86-64 | Apple clang | 2 (always) | 1 | 8 |
+| Linux x86-64 | GCC | 2 (always) | 1 | 8 |
+| Linux arm64 | GCC | 2 (always) | 1 | 8 |
+
+The test suite (CV-210) checks, on each host:
+
+- eight joined threads hitting one counter give the exact total, one
+  counter per thread gives exact totals, and repeated runs agree (AC-035);
+- two threads hitting a counter at `UINT64_MAX - 1`, 2,000 times over,
+  always leave it at `UINT64_MAX` with its overflow bit set, as do eight
+  threads crossing the limit together, and the published profile reports
+  the saturation (AC-036);
+- the storage is aligned for its atomic type;
+- a worker that is never joined cannot tear the profile: it is published
+  whole or refused;
+- the whole driver under ThreadSanitizer and under AddressSanitizer +
+  UndefinedBehaviorSanitizer reports nothing, and each sanitizer does stop a
+  deliberate fault (so the builds really are instrumented).
+
 ### Flush and publication
 
 `__sv0cov_start` registers an `atexit` handler once it succeeds. The

@@ -158,6 +158,78 @@ class NativeRuntimeTest(unittest.TestCase):
         self.assertEqual(r["counts"][1], MAX)
         self.assertEqual([i for i, o in enumerate(r["overflow"]) if o], [1])
 
+    # ── CV-210: contention, saturation races, probes ───────────────────────
+
+    def test_stress_counts_are_exact_and_repeatable(self) -> None:
+        """AC-035: joined threads hitting one counter give the exact total;
+        one counter per thread gives exact per-counter totals; every run
+        gives the same counts."""
+        runs = []
+        for _ in range(3):
+            r = self.report(self.run_driver("stress", "8", "100000"))
+            self.assertEqual(r["state"], 1)
+            runs.append(r["counts"])
+        want = [0] * 70
+        want[0] = 8 * 100000
+        want[10:18] = [100000] * 8
+        self.assertEqual(runs, [want] * 3)
+
+    def test_saturation_race(self) -> None:
+        """AC-036: two threads hitting a counter at UINT64_MAX - 1 always
+        leave it at UINT64_MAX (never wrapped) with its overflow bit set, in
+        every one of 2000 rounds; eight threads crossing the limit together
+        do too; and the published profile reports both as saturated."""
+        d = self.fresh_dir()
+        p = self.run_driver("race-saturate", "2000", SV0COV_PROFILE_DIR=d)
+        r = self.report(p)
+        self.assertIn("race two_thread_failures=0 eight_thread_failures=0 trials=2000", p.stdout.decode())
+        self.assertEqual((r["counts"][5], r["counts"][64]), (MAX, MAX))
+        self.assertEqual([i for i, o in enumerate(r["overflow"]) if o], [5, 64])
+        (name,) = self.profiles(d)
+        prof = decode(Path(d, name).read_bytes(), map_counter_count=70, expected_map_id=MAP_ID)
+        self.assertEqual(prof.counts, ((5, MAX), (64, MAX)))
+        self.assertEqual(prof.saturated(), [5, 64])
+
+    def test_lock_free_probe_and_alignment(self) -> None:
+        """COV-INS-010: lock-freedom is probed and recorded, never assumed.
+        The compile-time and run-time answers agree, and the counter and
+        overflow storage is aligned for its atomic type. Coverage works the
+        same whatever the answer (every other test runs on this host)."""
+        out = self.run_driver("probe").stdout.decode()
+        m = re.search(r"^probe lock_free_build=(\d) lock_free_runtime=(\d) counter_size=(\d+) storage_aligned=(\d)$",
+                      out, re.M)
+        self.assertIsNotNone(m, out)
+        build, run, size, aligned = map(int, m.groups())
+        self.assertIn(build, (0, 1, 2))  # ATOMIC_LLONG_LOCK_FREE: never, sometimes, always
+        self.assertIn(run, (0, 1))
+        if build == 2:
+            self.assertEqual(run, 1)
+        if build == 0:
+            self.assertEqual(run, 0)
+        self.assertEqual(aligned, 1)
+        self.assertGreaterEqual(size, 8)
+        import platform
+        print(f"\nsv0cov atomics probe: {platform.system()} {platform.machine()} cc={cc()} "
+              f"lock_free_build={build} lock_free_runtime={run} counter_size={size}", file=sys.stderr)
+
+    def test_unjoined_worker_never_tears_the_profile(self) -> None:
+        """COV-INS-012: with a worker still hitting at exit, the run either
+        publishes one valid profile or refuses with COV2011; never a torn or
+        partial file."""
+        for _ in range(5):
+            d = self.fresh_dir()
+            p = self.run_driver("unjoined", SV0COV_PROFILE_DIR=d)
+            names = self.profiles(d)
+            self.assertEqual([n for n in os.listdir(d) if n not in names], [])  # no temporary file left
+            if names:
+                (name,) = names
+                decode(Path(d, name).read_bytes(), map_counter_count=70, expected_map_id=MAP_ID)
+                self.assertEqual(p.returncode, 0, p.stderr.decode())
+            else:
+                # Required mode: a refused profile fails the process.
+                self.assertIn("COV2011", p.stderr.decode())
+                self.assertEqual(p.returncode, 1)
+
     def test_zero_counter_program(self) -> None:
         r = self.report(self.run_driver("zero"))
         self.assertEqual((r["state"], r["counts"], r["overflow"]), (1, [], []))
@@ -473,6 +545,121 @@ class NativeRuntimeTest(unittest.TestCase):
             data = obj.read_bytes()
         self.assertNotIn(b"SV0COVRT_TEST_ENTROPY", data)
         self.assertNotIn(b"sv0cov_rt_test_", data)
+
+
+
+SANITIZERS = {
+    "thread": (["-fsanitize=thread"], {"TSAN_OPTIONS": "halt_on_error=1:exitcode=66"}, "ThreadSanitizer"),
+    "address+undefined": (["-fsanitize=address,undefined", "-fno-sanitize-recover=undefined"],
+                          {"ASAN_OPTIONS": "exitcode=67", "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"},
+                          "AddressSanitizer"),
+}
+
+
+class SanitizerTest(unittest.TestCase):
+    """CV-210 (COV-INS-006, AC-035): the runtime under ThreadSanitizer and
+    under AddressSanitizer + UndefinedBehaviorSanitizer. Every scenario must
+    behave as in the plain build and the sanitizer must report nothing.
+
+    A host whose compiler cannot build or run a sanitizer skips it, unless
+    SV0COV_REQUIRE_SANITIZERS=1 (set in CI), which makes that a failure."""
+
+    tmp: tempfile.TemporaryDirectory
+    drivers: dict[str, Path]
+    missing: dict[str, str]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        compiler = cc()
+        if compiler is None:
+            raise unittest.SkipTest("no C compiler on this host")
+        cls.tmp = tempfile.TemporaryDirectory()
+        t = Path(cls.tmp.name)
+        cls.drivers, cls.missing = {}, {}
+        for name, (flags, env, _) in SANITIZERS.items():
+            out = t / ("drv-" + name.replace("+", "-"))
+            argv = [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-g", "-O1", *flags,
+                    "-DSV0COV_RT_TESTING", "-pthread", "-o", str(out),
+                    str(RT / "sv0cov_rt.c"), str(RT / "tests" / "rt_driver.c")]
+            b = subprocess.run(argv, capture_output=True, text=True)
+            if b.returncode != 0:
+                cls.missing[name] = f"build failed: {b.stderr.strip()[-300:]}"
+                continue
+            d = tempfile.mkdtemp(dir=t)
+            probe = subprocess.run([str(out), "ok"], capture_output=True, text=True, env=cls.env_for(name, d))
+            if probe.returncode != 0 or "state=1" not in probe.stdout:
+                cls.missing[name] = f"does not run: exit {probe.returncode} {probe.stderr.strip()[-300:]}"
+                continue
+            cls.drivers[name] = out
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tmp.cleanup()
+
+    @classmethod
+    def env_for(cls, name: str, profile_dir: str, **over: str) -> dict[str, str]:
+        env = {k: v for k, v in os.environ.items() if not k.startswith("SV0COV")}
+        env.update({"SV0COV_PROFILE_DIR": profile_dir, "SV0COV_RUN_ID": RUN_ID, "SV0COV_REQUIRED": "1"})
+        env.update(SANITIZERS[name][1])
+        env.update(over)
+        return env
+
+    def driver(self, name: str) -> Path:
+        if name in self.missing:
+            if os.environ.get("SV0COV_REQUIRE_SANITIZERS") == "1":
+                self.fail(f"{name} sanitizer is required here but unavailable: {self.missing[name]}")
+            self.skipTest(f"{name} sanitizer unavailable: {self.missing[name]}")
+        return self.drivers[name]
+
+    def run_clean(self, name: str, *args: str, want_rc: int = 0, **over: str) -> subprocess.CompletedProcess:
+        d = tempfile.mkdtemp(dir=self.tmp.name)
+        p = subprocess.run([str(self.driver(name)), *args], capture_output=True, text=True,
+                           env=self.env_for(name, d, **over), timeout=600)
+        err = p.stderr
+        for marker in ("ThreadSanitizer", "AddressSanitizer", "LeakSanitizer", "runtime error:", "UndefinedBehaviorSanitizer"):
+            self.assertNotIn(marker, err, f"{name} {args}: {err[-1500:]}")
+        self.assertEqual(p.returncode, want_rc, f"{name} {args}: {err[-800:]}")
+        return p
+
+    def scenarios(self, name: str) -> None:
+        p = self.run_clean(name, "stress", "8", "20000")
+        counts = REPORT.match(p.stdout.splitlines()[-1]).group(6).split(",")
+        self.assertEqual((counts[0], counts[10], counts[17]), (str(8 * 20000), "20000", "20000"))
+        p = self.run_clean(name, "race-saturate", "200")
+        self.assertIn("race two_thread_failures=0 eight_thread_failures=0", p.stdout)
+        self.run_clean(name, "threads")
+        self.run_clean(name, "saturate")
+        self.run_clean(name, "two-modules")
+        self.run_clean(name, "per-fragment", "3120")
+        self.run_clean(name, "zero")
+        self.run_clean(name, "probe")
+        self.run_clean(name, "exit1", want_rc=1)
+        self.run_clean(name, "bad-hit", want_rc=1)  # required: the refused profile fails the process
+        self.run_clean(name, "ok", SV0COV_CONTEXT="shard é")
+        # Refusals before user code: registration and transport.
+        self.run_clean(name, "bad-registration", "gap", want_rc=1)
+        self.run_clean(name, "bad-modules", "overlap", want_rc=1)
+        self.run_clean(name, "ok", want_rc=1, SV0COV_RUN_ID="not-hex")
+
+    def caught(self, name: str, kind: str, marker: str) -> None:
+        """The sanitizer build really is instrumented: it stops a deliberate fault."""
+        d = tempfile.mkdtemp(dir=self.tmp.name)
+        p = subprocess.run([str(self.driver(name)), "selfcheck", kind], capture_output=True, text=True,
+                           env=self.env_for(name, d), timeout=600)
+        self.assertNotEqual(p.returncode, 0, f"{name} did not stop a deliberate {kind} fault")
+        self.assertIn(marker, p.stderr)
+
+    def test_thread_sanitizer(self) -> None:
+        self.caught("thread", "race", "ThreadSanitizer: data race")
+        self.scenarios("thread")
+        # A worker still hitting during the exit-time flush is not a data
+        # race: the profile is published whole or refused (not required here).
+        self.run_clean("thread", "unjoined", SV0COV_REQUIRED="0")
+
+    def test_address_and_undefined_sanitizers(self) -> None:
+        self.caught("address+undefined", "heap", "AddressSanitizer: heap-buffer-overflow")
+        self.caught("address+undefined", "overflow", "signed integer overflow")
+        self.scenarios("address+undefined")
 
 
 if __name__ == "__main__":

@@ -39,6 +39,9 @@ jobs:
       UV_NO_CONFIG: "1"
       UV_PYTHON_DOWNLOADS: never
       PYTHONDONTWRITEBYTECODE: "1"
+      # CV-210: the native runtime's ThreadSanitizer and AddressSanitizer +
+      # UBSan runs must happen on every host class, not skip.
+      SV0COV_REQUIRE_SANITIZERS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

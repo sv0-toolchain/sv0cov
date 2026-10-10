@@ -18,6 +18,8 @@
  * "per-fragment <order>" (CV-206) registers one module per fragment, as
  * sv0c emits, in the given order; "bad-modules <kind>" breaks one rule in
  * a later module of that set.
+ * "stress <threads> <hits>", "race-saturate <trials>" and "probe" (CV-210)
+ * are the contention, saturation-race, and lock-free/alignment checks.
  * "write" (CV-116) registers a map of a given size and counts, for byte
  * parity with the Python writer.
  *
@@ -31,6 +33,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -195,6 +198,107 @@ static void threads(const struct __sv0cov_module *m, uint32_t local, int nthread
     pthread_join(t[i], NULL);
 }
 
+/* CV-210 stress. One thread per counter in [first, first + nthreads), each
+   hitting its own counter `hits` times (no sharing: exact per-counter totals). */
+static void spread(const struct __sv0cov_module *m, uint32_t first, int nthreads, int hits) {
+  pthread_t t[16];
+  struct job j[16];
+  for (int i = 0; i < nthreads; i++) {
+    j[i] = (struct job){first + (uint32_t)i, m, hits};
+    pthread_create(&t[i], NULL, hammer, &j[i]);
+  }
+  for (int i = 0; i < nthreads; i++)
+    pthread_join(t[i], NULL);
+}
+
+/* CV-210 / AC-036: threads that wait at a gate, then hit one counter `hits`
+   times each, so the hits collide as closely as the host allows. */
+struct racer {
+  atomic_int *gate;
+  const struct __sv0cov_module *m;
+  uint32_t local;
+  int hits;
+};
+
+static void *race(void *arg) {
+  struct racer *r = arg;
+  while (atomic_load_explicit(r->gate, memory_order_acquire) == 0)
+    ;
+  for (int k = 0; k < r->hits; k++)
+    __sv0cov_hit(r->m, r->local);
+  return NULL;
+}
+
+/* `trials` rounds: the counter starts `below` under UINT64_MAX, `nthreads`
+   racers hit it `hits` times each (nthreads * hits > below, so it must
+   saturate). Returns the number of rounds in which it did not end at exactly
+   UINT64_MAX with its overflow bit set (it wrapped, lost the bit, or stopped
+   short). */
+static int race_saturate(const struct __sv0cov_module *m, uint32_t local, int trials, uint64_t below,
+                         int nthreads, int hits) {
+  int failures = 0;
+  for (int n = 0; n < trials; n++) {
+    atomic_int gate = 0;
+    pthread_t t[16];
+    struct racer r = {&gate, m, local, hits};
+    sv0cov_rt_test_set_counter(local, UINT64_MAX - below);
+    sv0cov_rt_test_clear_overflow(local);
+    for (int i = 0; i < nthreads; i++)
+      pthread_create(&t[i], NULL, race, &r);
+    atomic_store_explicit(&gate, 1, memory_order_release);
+    for (int i = 0; i < nthreads; i++)
+      pthread_join(t[i], NULL);
+    if (sv0cov_rt_test_counter(local) != UINT64_MAX || !sv0cov_rt_test_overflow(local))
+      failures++;
+  }
+  return failures;
+}
+
+/* CV-210 / COV-INS-012: a worker that is never joined keeps hitting every
+   counter while main returns and the exit-time flush runs. */
+static void *restless(void *arg) {
+  const struct __sv0cov_module *m = arg;
+  for (;;)
+    for (uint32_t i = 0; i < N; i++)
+      __sv0cov_hit(m, i);
+  return NULL;
+}
+
+/* CV-210: deliberate faults that prove a sanitizer build is really
+   instrumented (the sanitizer must stop each one). Never run otherwise. */
+static int plain_shared;
+
+static void *unsynchronized(void *arg) {
+  (void)arg;
+  for (int k = 0; k < 100000; k++)
+    plain_shared++;
+  return NULL;
+}
+
+static int selfcheck(const char *kind) {
+  if (strcmp(kind, "race") == 0) {
+    pthread_t a, b;
+    pthread_create(&a, NULL, unsynchronized, NULL);
+    pthread_create(&b, NULL, unsynchronized, NULL);
+    pthread_join(a, NULL);
+    pthread_join(b, NULL);
+    return 0;
+  }
+  if (strcmp(kind, "heap") == 0) {
+    volatile size_t n = 8;
+    char *p = malloc(n);
+    p[n] = 1; /* one past the end */
+    free(p);
+    return 0;
+  }
+  if (strcmp(kind, "overflow") == 0) {
+    volatile int big = 2147483647;
+    volatile int more = big + 1; /* signed overflow */
+    return more == 0;
+  }
+  return 2;
+}
+
 /* Malformed registrations: each breaks one rule. */
 static int bad_registration(const char *kind) {
   static struct __sv0cov_fragment f[2];
@@ -252,6 +356,8 @@ int main(int argc, char **argv) {
     report();
     return 0;
   }
+  if (strcmp(scenario, "selfcheck") == 0)
+    return argc < 3 ? 2 : selfcheck(argv[2]);
   if (strcmp(scenario, "bad-registration") == 0) {
     if (argc < 3 || bad_registration(argv[2]) != 0)
       return 2;
@@ -337,6 +443,32 @@ int main(int argc, char **argv) {
     threads(&mod, 0, 8, 100000);
     sv0cov_rt_test_set_counter(1, UINT64_MAX - 1000);
     threads(&mod, 1, 8, 10000);
+  } else if (strcmp(scenario, "stress") == 0) {
+    /* stress <threads> <hits>: one shared counter, then one counter each. */
+    int nt = argc > 2 ? atoi(argv[2]) : 8, hits = argc > 3 ? atoi(argv[3]) : 100000;
+    if (nt < 1 || nt > 16 || hits < 1)
+      return 2;
+    threads(&mod, 0, nt, hits);
+    spread(&mod, 10, nt, hits);
+  } else if (strcmp(scenario, "race-saturate") == 0) {
+    /* race-saturate <trials>: AC-036 (two threads, one hit each, from
+       UINT64_MAX - 1), then eight threads crossing the limit together. */
+    int trials = argc > 2 ? atoi(argv[2]) : 1000;
+    int two = race_saturate(&mod, 5, trials, 1, 2, 1);
+    int eight = race_saturate(&mod, 64, trials / 10 + 1, 1000, 8, 500);
+    printf("race two_thread_failures=%d eight_thread_failures=%d trials=%d\n", two, eight, trials);
+  } else if (strcmp(scenario, "unjoined") == 0) {
+    pthread_t t;
+    pthread_create(&t, NULL, restless, &mod);
+    pthread_detach(t);
+    /* Return while the worker runs: the profile is either complete as
+       written or refused (COV2011), never torn. */
+    return 0;
+  } else if (strcmp(scenario, "probe") == 0) {
+    int build = -1;
+    int run = __sv0cov_atomic_u64_lock_free(&build);
+    printf("probe lock_free_build=%d lock_free_runtime=%d counter_size=%u storage_aligned=%d\n", build, run,
+           sv0cov_rt_test_counter_size(), sv0cov_rt_test_storage_aligned());
   } else if (strcmp(scenario, "twice") == 0) {
     __sv0cov_start(mods, 1u);
     puts("after-second-start");

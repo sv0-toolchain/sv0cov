@@ -52,6 +52,15 @@ void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);
 #define SV0COV_RT_STATE_ACTIVE 1     /* counting; a complete profile is possible */
 #define SV0COV_RT_STATE_INCOMPLETE 2 /* failed; no complete profile */
 
+/* Lock-free probe (SPEC 14.2, COV-INS-010; CV-210). The runtime uses C11
+   atomics for the counters and the overflow bitmap and never assumes they
+   are lock-free; this records what the host provides, without changing
+   what coverage means. `build_time` receives the compile-time answer for
+   64-bit atomics (ATOMIC_LLONG_LOCK_FREE: 0 never, 1 sometimes, 2 always);
+   the result is the run-time answer for the counter type (1 lock-free,
+   0 not). */
+int __sv0cov_atomic_u64_lock_free(int *build_time);
+
 #ifdef SV0COV_RT_TESTING
 /* Test-only inspection, compiled only with -DSV0COV_RT_TESTING. The testing
    build also reads SV0COVRT_TEST_ENTROPY=fail|zero to force an entropy
@@ -69,6 +78,11 @@ const uint8_t *sv0cov_rt_test_profile_id(void); /* 16 bytes */
 const char *sv0cov_rt_test_profile_dir(void);
 /* -1 when absent, else the context length (its bytes via the pointer). */
 int sv0cov_rt_test_context(const char **bytes);
+/* CV-210: 1 when the counter and overflow arrays are aligned for their
+   atomic element type, and the element size in bytes. */
+int sv0cov_rt_test_storage_aligned(void);
+unsigned sv0cov_rt_test_counter_size(void);
+void sv0cov_rt_test_clear_overflow(uint32_t index);
 #endif
 
 #endif /* SV0COV_RT_H */
