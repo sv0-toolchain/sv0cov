@@ -222,3 +222,22 @@ Added in CV-205 (R0): fragments and program-map assembly.
   (all 120 orders of a five-module project, native and VM). Separate
   per-module generated C with one registration per module is DV-5 (R1).
 
+Added in CV-207 (R0): zero-counter programs.
+
+- A source with no function plans no point: its map has
+  `program_counter_count` 0, empty semantic arrays, and one empty fragment
+  per file (base 0). A VM instrument build of it writes bytecode identical
+  to an off build and a binding counting 0.
+- Such a source is not an executable: both backends need `main`, and
+  `main`'s entry is always counted. So no runnable sv0 program has zero
+  counters until exclusions (CV-305) can exclude a whole program. An empty
+  file is not an sv0 program.
+- Until then the lifecycle is tested with a stand-in for a fully excluded
+  build (owner's choice): an ordinary program's uninstrumented C or
+  bytecode with the zero-counter registration or binding. It runs like the
+  off build and publishes one complete empty profile (no pairs, no
+  overflow words, no overflow flag) bound to the zero-counter map. CV-305
+  repeats the test with a real fully excluded program.
+- sv0vm rejects any disagreement between the binding's count and the
+  presence of `COVER_HIT` before user code (COV2201).
+

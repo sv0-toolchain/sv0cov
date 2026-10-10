@@ -122,6 +122,26 @@ class GoldenTest(unittest.TestCase):
         p = decode(data, map_counter_count=0)
         self.assertEqual(p.counts, ())
 
+    def test_zero_counter_map_admits_only_the_empty_profile(self) -> None:
+        """COV-FMT-034 (CV-207): for a zero-counter map a complete profile has
+        zero pairs, zero overflow words, and no overflow flag."""
+        g, data = golden("native-zero-counter")
+        self.assertEqual(len(data), 104)  # header, two zero counts, marker, CRC
+        head, tail = data[:84], data[92:-4]  # tail = the completion marker
+        zero = struct.pack("<I", 0)
+        cases = {
+            "a pair": head + struct.pack("<IIQ", 1, 0, 1) + zero + tail,
+            "an overflow word": head + zero + struct.pack("<IQ", 1, 0) + tail,
+            "the overflow flag": head[:12] + struct.pack("<I", struct.unpack_from("<I", head, 12)[0] | 0x02) + head[16:]
+                                 + zero + zero + tail,
+        }
+        for name, body in cases.items():
+            with self.subTest(name):
+                self.assertEqual(code(recrc(body + bytes(4)), map_counter_count=0), "COV2110")
+        self.assertIsNone(code(data, map_counter_count=0))
+        # A profile with no pairs is also complete for a map that has counters (nothing ran).
+        self.assertIsNone(code(data, map_counter_count=5))
+
 
 class NegativeTest(unittest.TestCase):
     def setUp(self) -> None:
