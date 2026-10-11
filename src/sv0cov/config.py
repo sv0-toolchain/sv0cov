@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
 """Coverage configuration schema 1.0 and its CLI mapping (SPEC 18.2).
 
-The closed ``[coverage]`` inventory, its defaults, the threshold grammar, and
+The closed ``[tool.sv0cov]`` inventory, its defaults, the threshold grammar, and
 the CLI option table are data in this module. Everything else is derived
 from them: the file validator, the default snapshot, the machine-readable
 inventory document, the JSON Schema in ``schemas/``, and the frozen key-path
@@ -119,7 +119,7 @@ class Key:
 
 @dataclass(frozen=True)
 class Table:
-    """One TOML table or array-table under ``coverage``."""
+    """One TOML table or array-table under ``tool.sv0cov``."""
 
     path: str
     keys: tuple[Key, ...]
@@ -136,7 +136,7 @@ def _thresholds(keys: tuple[str, ...] = METRICS) -> tuple[Key, ...]:
 
 TABLES = (
     Table(
-        "coverage",
+        "tool.sv0cov",
         (
             Key("schema", SCHEMA, required=True, commands=COMMANDS),
             Key("output_dir", ARTIFACT_PATH, ".sv0cov", commands=("run", "merge", "report", "check", "clean")),
@@ -147,24 +147,24 @@ TABLES = (
         ),
         tables=("integrity", "limits", "thresholds", "scopes", "entities", "diff", "ratchet", "exclusions"),
     ),
-    Table("coverage.integrity", (Key("saturation", SATURATION, "fail", commands=("run", "merge", "report", "check")),)),
-    Table("coverage.limits", (), tables=("raw_profile",)),
+    Table("tool.sv0cov.integrity", (Key("saturation", SATURATION, "fail", commands=("run", "merge", "report", "check")),)),
+    Table("tool.sv0cov.limits", (), tables=("raw_profile",)),
     Table(
-        "coverage.limits.raw_profile",
+        "tool.sv0cov.limits.raw_profile",
         (
             Key("tier", TIER, "standard", commands=("run", "merge")),
             Key("max_counters", MAX_COUNTERS, commands=("run", "merge")),
             Key("max_bytes", MAX_BYTES, commands=("run", "merge")),
         ),
     ),
-    Table("coverage.thresholds", _thresholds()),
+    Table("tool.sv0cov.thresholds", _thresholds()),
     Table(
-        "coverage.scopes",
+        "tool.sv0cov.scopes",
         (Key("name", NAME, required=True), Key("include", PATTERNS), Key("packages", PACKAGES), Key("sources", SOURCES), *_thresholds()),
         array=True,
     ),
     Table(
-        "coverage.entities",
+        "tool.sv0cov.entities",
         (
             Key("name", NAME, required=True),
             Key("source", SOURCE, required=True),
@@ -174,9 +174,9 @@ TABLES = (
         ),
         array=True,
     ),
-    Table("coverage.diff", (Key("base", DIFF_BASE, required=True), *_thresholds(("line", "region", "branch")))),
+    Table("tool.sv0cov.diff", (Key("base", DIFF_BASE, required=True), *_thresholds(("line", "region", "branch")))),
     Table(
-        "coverage.ratchet",
+        "tool.sv0cov.ratchet",
         (
             Key("baseline", ARTIFACT_PATH, required=True),
             Key("metrics", METRIC_SET, required=True),
@@ -184,7 +184,7 @@ TABLES = (
         ),
     ),
     Table(
-        "coverage.exclusions",
+        "tool.sv0cov.exclusions",
         (
             Key("max_records", MAX_RECORDS),
             *(Key(f"{m}_basis_points", BASIS_POINTS) for m in METRICS),
@@ -225,22 +225,22 @@ COLOR = Kind("color", "string", values=("auto", "always", "never"))
 DIAGNOSTIC_FORMAT = Kind("diagnostic_format", "string", values=("human", "json-lines"))
 
 OPTIONS = (
-    _mapped("--output-dir", "coverage.output_dir"),
-    _mapped("--report", "coverage.reports", "repeatable"),
-    _mapped("--empty", "coverage.empty"),
-    _mapped("--context", "coverage.context", conflicts=("--no-context",)),
-    Option("--no-context", ("run",), "flag", "coverage.context", conflicts=("--context",)),
-    _mapped("--reproducible-epoch", "coverage.reproducible_epoch"),
-    _mapped("--saturation-policy", "coverage.integrity.saturation"),
-    *(_mapped(f"--threshold-{m}", f"coverage.thresholds.{m}") for m in METRICS),
-    _mapped("--diff-base", "coverage.diff.base"),
-    *(_mapped(f"--diff-{m}", f"coverage.diff.{m}") for m in ("line", "region", "branch")),
-    _mapped("--ratchet-baseline", "coverage.ratchet.baseline"),
-    _mapped("--ratchet-metric", "coverage.ratchet.metrics", "repeatable"),
-    _mapped("--ratchet-tolerance-basis-points", "coverage.ratchet.tolerance_basis_points"),
-    _mapped("--raw-profile-tier", "coverage.limits.raw_profile.tier"),
-    _mapped("--raw-profile-max-counters", "coverage.limits.raw_profile.max_counters"),
-    _mapped("--raw-profile-max-bytes", "coverage.limits.raw_profile.max_bytes"),
+    _mapped("--output-dir", "tool.sv0cov.output_dir"),
+    _mapped("--report", "tool.sv0cov.reports", "repeatable"),
+    _mapped("--empty", "tool.sv0cov.empty"),
+    _mapped("--context", "tool.sv0cov.context", conflicts=("--no-context",)),
+    Option("--no-context", ("run",), "flag", "tool.sv0cov.context", conflicts=("--context",)),
+    _mapped("--reproducible-epoch", "tool.sv0cov.reproducible_epoch"),
+    _mapped("--saturation-policy", "tool.sv0cov.integrity.saturation"),
+    *(_mapped(f"--threshold-{m}", f"tool.sv0cov.thresholds.{m}") for m in METRICS),
+    _mapped("--diff-base", "tool.sv0cov.diff.base"),
+    *(_mapped(f"--diff-{m}", f"tool.sv0cov.diff.{m}") for m in ("line", "region", "branch")),
+    _mapped("--ratchet-baseline", "tool.sv0cov.ratchet.baseline"),
+    _mapped("--ratchet-metric", "tool.sv0cov.ratchet.metrics", "repeatable"),
+    _mapped("--ratchet-tolerance-basis-points", "tool.sv0cov.ratchet.tolerance_basis_points"),
+    _mapped("--raw-profile-tier", "tool.sv0cov.limits.raw_profile.tier"),
+    _mapped("--raw-profile-max-counters", "tool.sv0cov.limits.raw_profile.max_counters"),
+    _mapped("--raw-profile-max-bytes", "tool.sv0cov.limits.raw_profile.max_bytes"),
     Option("--run-id", ("run",), "scalar", kind=RUN_ID),
     Option("--expect-run", ("merge",), "repeatable", kind=RUN_ID, conflicts=("--run-manifest",)),
     Option("--run-manifest", ("merge",), "scalar", kind=PATH_ARG, conflicts=("--expect-run",)),
@@ -418,22 +418,30 @@ def parse_toml(data: bytes) -> dict:
         raise ConfigError(TOML_ERROR, "sv0.toml", str(exc)) from None
 
 
+def subtree(doc: dict) -> object:
+    """The ``tool.sv0cov`` value of a parsed ``sv0.toml``, or ``None`` when
+    there is none. ``tool`` belongs to the toolchain manifest: when it is not
+    a table there is no sv0cov configuration to read."""
+    tool = doc.get("tool")
+    return tool.get("sv0cov") if isinstance(tool, dict) else None
+
+
 def validate_document(doc: dict) -> dict | None:
-    """Validate the ``coverage`` subtree of a parsed ``sv0.toml``.
+    """Validate the ``[tool.sv0cov]`` subtree of a parsed ``sv0.toml``.
 
     Returns the validated subtree with thresholds resolved to numerators, or
-    ``None`` when there is no ``coverage`` key. Keys outside ``coverage`` are
-    not examined.
+    ``None`` when there is no such table. Keys outside it are not examined;
+    a root ``[coverage]`` table is not sv0cov configuration (DEC-091).
     """
-    if "coverage" not in doc:
+    tree = subtree(doc)
+    if tree is None:
         return None
-    tree = doc["coverage"]
     if not isinstance(tree, dict):
-        raise ConfigError(BAD_VALUE, "coverage", "must be a table")
+        raise ConfigError(BAD_VALUE, "tool.sv0cov", "must be a table")
     if "schema" not in tree:
-        raise ConfigError(BAD_SCHEMA, "coverage.schema", "is required when [coverage] is present")
-    check_value(SCHEMA, tree["schema"], "coverage.schema")
-    return _table(TABLE["coverage"], tree, "coverage")
+        raise ConfigError(BAD_SCHEMA, "tool.sv0cov.schema", "is required when [tool.sv0cov] is present")
+    check_value(SCHEMA, tree["schema"], "tool.sv0cov.schema")
+    return _table(TABLE["tool.sv0cov"], tree, "tool.sv0cov")
 
 
 def validate_bytes(data: bytes) -> dict | None:
@@ -474,20 +482,20 @@ def _fields(table: Table, tree: dict, path: str) -> dict:
 
 def _relations(table: str, t: dict, path: str) -> None:
     """Cross-field rules decidable from the file alone (SPEC 18.2.2)."""
-    if table == "coverage.limits.raw_profile":
+    if table == "tool.sv0cov.limits.raw_profile":
         custom = t.get("tier", "standard") == "custom"
         for k in ("max_counters", "max_bytes"):
             if custom and k not in t:
                 raise ConfigError(CONFLICT, f"{path}.{k}", "is required with tier = \"custom\"")
             if not custom and k in t:
                 raise ConfigError(CONFLICT, f"{path}.{k}", "is allowed only with tier = \"custom\"")
-    elif table == "coverage.scopes" and not {"include", "packages", "sources"} & t.keys():
+    elif table == "tool.sv0cov.scopes" and not {"include", "packages", "sources"} & t.keys():
         raise ConfigError(CONFLICT, path, "needs at least one of include, packages, or sources")
-    elif table == "coverage.entities" and t["kind"] == "contract":
+    elif table == "tool.sv0cov.entities" and t["kind"] == "contract":
         extra = [m for m in METRICS if m != "contract" and m in t]
         if extra:
             raise ConfigError(CONFLICT, f"{path}.{extra[0]}", "is inapplicable to a contract entity")
-    elif table == "coverage.diff" and not {"line", "region", "branch"} & t.keys():
+    elif table == "tool.sv0cov.diff" and not {"line", "region", "branch"} & t.keys():
         raise ConfigError(CONFLICT, path, "needs at least one of line, region, or branch")
 
 

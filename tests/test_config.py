@@ -32,15 +32,15 @@ except ImportError:
     ORACLE = None
 
 SPEC_DEFAULTS = {
-    "coverage.output_dir": ".sv0cov",
-    "coverage.reports": ["term"],
-    "coverage.empty": "fail",
-    "coverage.reproducible_epoch": 0,
-    "coverage.integrity.saturation": "fail",
-    "coverage.limits.raw_profile.tier": "standard",
-    "coverage.ratchet.tolerance_basis_points": 0,
-    "coverage.exclusions.forbidden_reasons": [],
-    "coverage.exclusions.forbidden_sources": [],
+    "tool.sv0cov.output_dir": ".sv0cov",
+    "tool.sv0cov.reports": ["term"],
+    "tool.sv0cov.empty": "fail",
+    "tool.sv0cov.reproducible_epoch": 0,
+    "tool.sv0cov.integrity.saturation": "fail",
+    "tool.sv0cov.limits.raw_profile.tier": "standard",
+    "tool.sv0cov.ratchet.tolerance_basis_points": 0,
+    "tool.sv0cov.exclusions.forbidden_reasons": [],
+    "tool.sv0cov.exclusions.forbidden_sources": [],
 }
 
 SPEC_CLI_ONLY = {
@@ -105,7 +105,7 @@ class ConfigTest(unittest.TestCase):
                 self.assertTrue(all(("resolved" in c["expect"]) == ("/valid-" in c["id"]) for c in all_prefix), prefix)
 
     def test_threshold_forms_resolve_identically(self) -> None:
-        got = C.validate_bytes(b'[coverage]\nschema = "1.0"\n[coverage.thresholds]\nline = 85\nbranch = "8500bp"\n')
+        got = C.validate_bytes(b'[tool.sv0cov]\nschema = "1.0"\n[tool.sv0cov.thresholds]\nline = 85\nbranch = "8500bp"\n')
         self.assertEqual(got["thresholds"], {"line": 8500, "branch": 8500})
         self.assertEqual(C.check_cli_value("--threshold-line", "85", "check"), C.check_cli_value("--threshold-line", "8500bp", "check"))
         for bad in ("08500bp", "+85", "85%", "85.0", "1e2", " 85", "85 ", "101", "10001bp"):
@@ -162,17 +162,21 @@ class ConfigTest(unittest.TestCase):
             except tomllib.TOMLDecodeError:
                 continue
             code = case["expect"].get("code")
-            if "coverage" not in doc or code not in (None, "COV0010", "COV0011") or _has_datetime(doc["coverage"]):
+            tree = C.subtree(doc)
+            if tree is None or code not in (None, "COV0010", "COV0011") or _has_datetime(tree):
                 continue
             with self.subTest(case=case["id"]):
-                self.assertEqual(ORACLE.is_valid(doc["coverage"]), code is None)
+                self.assertEqual(ORACLE.is_valid(tree), code is None)
                 checked += 1
         self.assertGreater(checked, 200)
 
     def test_outside_keys_are_not_examined(self) -> None:
         self.assertIsNone(C.validate_bytes(b"[package]\nname = 1\nwhatever = 1979-05-27\n"))
-        got = C.validate_bytes(b'[tool.other]\ncoverage = "x"\n[coverage]\nschema = "1.0"\n')
+        got = C.validate_bytes(b'[tool.other]\ncoverage = "x"\n[tool.sv0cov]\nschema = "1.0"\n')
         self.assertEqual(got, {"schema": "1.0"})
+        # A root [coverage] table belongs to the manifest, not to sv0cov (DEC-091).
+        self.assertIsNone(C.validate_bytes(b'[coverage]\nschema = "nope"\n'))
+        self.assertIsNone(C.validate_bytes(b"tool = 1\n"))
 
 
 def _has_datetime(v: object) -> bool:

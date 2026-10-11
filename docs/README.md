@@ -7,6 +7,7 @@ Documentation is licensed under `CC-BY-4.0`. Pages are added as the
 implementation slices land. The normative contract remains the sv0cov
 specification (`project-specs/sv0cov/SPEC.md`).
 
+- [Configuration](configuration.md): the `[tool.sv0cov]` table, precedence, what fails, and the resolved record.
 - [Generated-C coverage protocol 1](generated-c-protocol.md): what instrumented C contains and what the native runtime must validate.
 - [Indexed evidence 1.0](indexed-evidence.md): the merge result's two closed schemas, what is validated so far, and the structure fixtures.
 - [Merge](merge.md): how inputs are classified, copies and collisions, run selection, and what the engine returns.

@@ -6,7 +6,7 @@
 Outputs (all canonical JSON):
 
 - ``tests/fixtures/config/config.schema.json``: structural JSON Schema
-  (Draft 2020-12) for the parsed ``coverage`` subtree, checked against the
+  (Draft 2020-12) for the parsed ``tool.sv0cov`` subtree, checked against the
   corpus with the jsonschema oracle. It is not in ``schemas/``: the R1
   artifact-schema profile requires every property of a closed object, and
   configuration keys are optional. Grammar and cross-field rules JSON Schema
@@ -100,9 +100,9 @@ def schema() -> dict:
     return {
         "$defs": dict(sorted(defs.items())),
         "$id": "https://github.com/sv0-toolchain/sv0cov/schemas/sv0cov.config-1.0.schema.json",
-        "$ref": f"#/$defs/{_def_name('coverage')}",
+        "$ref": f"#/$defs/{_def_name('tool.sv0cov')}",
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "description": "Structural profile of the [coverage] subtree of sv0.toml (SPEC 18.2). Grammar and cross-field rules are in sv0cov.config.",
+        "description": "Structural profile of the [tool.sv0cov] subtree of sv0.toml (SPEC 18.2). Grammar and cross-field rules are in sv0cov.config.",
         "title": "sv0cov.config 1.0",
     }
 
@@ -140,18 +140,18 @@ BOUNDARY = {  # kind -> (valid TOML literals, invalid TOML literals)
 
 # Minimal bodies that make each table valid on its own, so one key can vary.
 BASE = {
-    "coverage": "",
-    "coverage.integrity": "",
-    "coverage.limits.raw_profile": 'tier = "custom"\nmax_counters = 1\nmax_bytes = 1\n',
-    "coverage.thresholds": "",
-    "coverage.scopes": 'name = "s"\ninclude = ["**"]\n',
-    "coverage.entities": 'name = "e"\nsource = "src/a.sv0"\nqualified_name = "f"\nkind = "function"\n',
-    "coverage.diff": 'base = "HEAD"\nline = 100\n',
-    "coverage.ratchet": 'baseline = "b.json"\nmetrics = ["line"]\n',
-    "coverage.exclusions": "",
+    "tool.sv0cov": "",
+    "tool.sv0cov.integrity": "",
+    "tool.sv0cov.limits.raw_profile": 'tier = "custom"\nmax_counters = 1\nmax_bytes = 1\n',
+    "tool.sv0cov.thresholds": "",
+    "tool.sv0cov.scopes": 'name = "s"\ninclude = ["**"]\n',
+    "tool.sv0cov.entities": 'name = "e"\nsource = "src/a.sv0"\nqualified_name = "f"\nkind = "function"\n',
+    "tool.sv0cov.diff": 'base = "HEAD"\nline = 100\n',
+    "tool.sv0cov.ratchet": 'baseline = "b.json"\nmetrics = ["line"]\n',
+    "tool.sv0cov.exclusions": "",
 }
-KEY_BASE = {"coverage.limits.raw_profile.tier": ""}  # standard/large forbid max_*
-HEAD = '[coverage]\nschema = "1.0"\n'
+KEY_BASE = {"tool.sv0cov.limits.raw_profile.tier": ""}  # standard/large forbid max_*
+HEAD = '[tool.sv0cov]\nschema = "1.0"\n'
 
 
 def _header(table: str) -> str:
@@ -159,7 +159,7 @@ def _header(table: str) -> str:
 
 
 def _doc(table: str, body: str) -> str:
-    if table == "coverage":
+    if table == "tool.sv0cov":
         return HEAD + body
     return HEAD + f"\n{_header(table)}\n{body}"
 
@@ -180,36 +180,36 @@ def _case(cases: list, cid: str, toml: str, note: str = "") -> None:
     cases.append(entry)
 
 
-CANONICAL_EXAMPLE = """[coverage]
+CANONICAL_EXAMPLE = """[tool.sv0cov]
 schema = "1.0"
 output_dir = ".sv0cov"
 reports = ["term", "html", "json", "lcov", "cobertura"]
 empty = "fail"
 
-[coverage.integrity]
+[tool.sv0cov.integrity]
 saturation = "fail" # "fail" or explicit "allow-ordinary"
 
-[coverage.limits.raw_profile]
+[tool.sv0cov.limits.raw_profile]
 tier = "standard"
 
-[coverage.thresholds]
+[tool.sv0cov.thresholds]
 line = 85
 region = 82
 function = 90
 branch = 75
 
-[[coverage.scopes]]
+[[tool.sv0cov.scopes]]
 name = "core"
 include = ["src/core/**"]
 line = 95
 branch = 90
 
-[coverage.diff]
+[tool.sv0cov.diff]
 base = "merge-base:origin/main"
 line = 100
 region = 100
 
-[coverage.ratchet]
+[tool.sv0cov.ratchet]
 baseline = ".sv0cov-baseline.json"
 metrics = ["function", "region", "line", "branch"]
 tolerance_basis_points = 0
@@ -219,7 +219,7 @@ EVERY_KEY = """[package]
 name = "unrelated"
 anything = [1, 2.5, true]
 
-[coverage]
+[tool.sv0cov]
 schema = "1.0"
 output_dir = "build/cov"
 reports = ["json", "term"]
@@ -227,22 +227,22 @@ empty = "pass"
 context = ""
 reproducible_epoch = 9223372036854775807
 
-[coverage.integrity]
+[tool.sv0cov.integrity]
 saturation = "allow-ordinary"
 
-[coverage.limits.raw_profile]
+[tool.sv0cov.limits.raw_profile]
 tier = "custom"
 max_counters = 4294967295
 max_bytes = 68719476736
 
-[coverage.thresholds]
+[tool.sv0cov.thresholds]
 function = "10000bp"
 region = 0
 line = 85
 branch = "8500bp"
 contract = "0bp"
 
-[[coverage.scopes]]
+[[tool.sv0cov.scopes]]
 name = "core"
 include = ["src/core/**", "!src/core/gen/"]
 packages = ["root"]
@@ -253,11 +253,11 @@ line = 3
 branch = 4
 contract = 5
 
-[[coverage.scopes]]
+[[tool.sv0cov.scopes]]
 name = "Core"
 sources = ["src/main.sv0"]
 
-[[coverage.entities]]
+[[tool.sv0cov.entities]]
 name = "main"
 source = "src/main.sv0"
 qualified_name = "main"
@@ -268,25 +268,25 @@ line = 100
 branch = 100
 contract = 100
 
-[[coverage.entities]]
+[[tool.sv0cov.entities]]
 name = "main.requires"
 source = "src/main.sv0"
 qualified_name = "main"
 kind = "contract"
 contract = "5000bp"
 
-[coverage.diff]
+[tool.sv0cov.diff]
 base = "merge-base:origin/main"
 line = 100
 region = "1bp"
 branch = 0
 
-[coverage.ratchet]
+[tool.sv0cov.ratchet]
 baseline = ".sv0cov-baseline.json"
 metrics = ["function", "region", "line", "branch", "contract"]
 tolerance_basis_points = 10000
 
-[coverage.exclusions]
+[tool.sv0cov.exclusions]
 max_records = 4294967295
 function_basis_points = 0
 region_basis_points = 1
@@ -304,18 +304,21 @@ def file_cases() -> list:
     _case(cases, "empty-document", "")
     _case(cases, "minimal", HEAD)
     _case(cases, "canonical-example", CANONICAL_EXAMPLE, "SPEC 18.2.4")
-    _case(cases, "every-key", EVERY_KEY, "every table and key, boundary values; unrelated keys outside coverage are not examined")
-    _case(cases, "threshold-85-vs-8500bp", HEAD + '\n[coverage.thresholds]\nline = 85\nbranch = "8500bp"\n', "AC-102: both resolve to 8500")
-    _case(cases, "empty-exclusions", HEAD + "\n[coverage.exclusions]\n")
-    _case(cases, "empty-limits", HEAD + "\n[coverage.limits]\n")
+    _case(cases, "every-key", EVERY_KEY, "every table and key, boundary values; unrelated keys outside tool.sv0cov are not examined")
+    _case(cases, "threshold-85-vs-8500bp", HEAD + '\n[tool.sv0cov.thresholds]\nline = 85\nbranch = "8500bp"\n', "AC-102: both resolve to 8500")
+    _case(cases, "empty-exclusions", HEAD + "\n[tool.sv0cov.exclusions]\n")
+    _case(cases, "empty-limits", HEAD + "\n[tool.sv0cov.limits]\n")
 
     # schema key
-    _case(cases, "schema/missing", "[coverage]\n")
-    _case(cases, "schema/missing-with-keys", '[coverage]\nempty = "pass"\n')
+    _case(cases, "schema/missing", "[tool.sv0cov]\n")
+    _case(cases, "schema/missing-with-keys", '[tool.sv0cov]\nempty = "pass"\n')
     for i, lit in enumerate(['"1.1"', '"1"', '"1.0 "', "1.0", "1", "true", '["1.0"]']):
-        _case(cases, f"schema/invalid-{i}", f"[coverage]\nschema = {lit}\n")
-    _case(cases, "coverage-not-a-table", "coverage = 1\n")
-    _case(cases, "coverage-array-of-tables", '[[coverage]]\nschema = "1.0"\n')
+        _case(cases, f"schema/invalid-{i}", f"[tool.sv0cov]\nschema = {lit}\n")
+    _case(cases, "root-not-a-table", "[tool]\nsv0cov = 1\n")
+    _case(cases, "root-coverage-table-is-not-ours", '[coverage]\nschema = "9"\nbogus = 1\n', "DEC-091: the manifest owns the root")
+    _case(cases, "tool-not-a-table", "tool = 1\n", "the manifest owns `tool`")
+    _case(cases, "other-tool-only", '[tool.other]\nsv0cov = "x"\n')
+    _case(cases, "root-array-of-tables", '[[tool.sv0cov]]\nschema = "1.0"\n')
     _case(cases, "toml/duplicate-key", HEAD + 'empty = "fail"\nempty = "pass"\n')
     _case(cases, "toml/syntax", HEAD + "empty = \n")
     _case(cases, "toml/not-utf8", "")  # replaced below
@@ -325,15 +328,15 @@ def file_cases() -> list:
 
     for table in C.TABLES:
         base = BASE.get(table.path)
-        if base is None:  # coverage.limits holds only the raw_profile subtable
+        if base is None:  # tool.sv0cov.limits holds only the raw_profile subtable
             _case(cases, f"{table.path}/unknown-key", _doc(table.path, "bogus = 1\n"))
             continue
         _case(cases, f"{table.path}/unknown-key", _doc(table.path, base + "bogus = 1\n"))
         _case(cases, f"{table.path}/unknown-subtable", _doc(table.path, base + "bogus = {}\n"))
-        if table.path != "coverage":
+        if table.path != "tool.sv0cov":
             wrong = f"{table.path.rpartition('.')[2]} = 1\n"
             parent = table.path.rpartition(".")[0]
-            _case(cases, f"{table.path}/wrong-shape", _doc(parent, BASE.get(parent, "") + wrong) if parent != "coverage.limits" else HEAD + "\n[coverage.limits]\nraw_profile = 1\n")
+            _case(cases, f"{table.path}/wrong-shape", _doc(parent, BASE.get(parent, "") + wrong) if parent != "tool.sv0cov.limits" else HEAD + "\n[tool.sv0cov.limits]\nraw_profile = 1\n")
         for key in table.keys:
             if key.kind is C.SCHEMA:
                 continue
@@ -347,7 +350,7 @@ def file_cases() -> list:
                 _case(cases, f"{table.path}.{key.name}/missing", _doc(table.path, rest))
 
     # relations and uniqueness
-    rp = "coverage.limits.raw_profile"
+    rp = "tool.sv0cov.limits.raw_profile"
     _case(cases, "relation/custom-without-limits", _doc(rp, 'tier = "custom"\n'))
     _case(cases, "relation/custom-without-max-bytes", _doc(rp, 'tier = "custom"\nmax_counters = 1\n'))
     _case(cases, "relation/custom-without-max-counters", _doc(rp, 'tier = "custom"\nmax_bytes = 1\n'))
@@ -355,30 +358,30 @@ def file_cases() -> list:
     _case(cases, "relation/standard-with-max-counters", _doc(rp, 'tier = "standard"\nmax_counters = 1\n'))
     _case(cases, "relation/large-with-max-bytes", _doc(rp, 'tier = "large"\nmax_bytes = 1\n'))
     _case(cases, "relation/default-tier-with-max-bytes", _doc(rp, "max_bytes = 1\n"))
-    _case(cases, "relation/scope-without-selector", _doc("coverage.scopes", 'name = "s"\nline = 90\n'))
+    _case(cases, "relation/scope-without-selector", _doc("tool.sv0cov.scopes", 'name = "s"\nline = 90\n'))
     for sel in ("include", "packages", "sources"):
         lit = {"include": '["**"]', "packages": '["p"]', "sources": '["a.sv0"]'}[sel]
-        _case(cases, f"relation/scope-only-{sel}", _doc("coverage.scopes", f'name = "s"\n{sel} = {lit}\n'))
+        _case(cases, f"relation/scope-only-{sel}", _doc("tool.sv0cov.scopes", f'name = "s"\n{sel} = {lit}\n'))
     ent = 'name = "e"\nsource = "src/a.sv0"\nqualified_name = "f"\nkind = "contract"\n'
-    _case(cases, "relation/contract-entity-contract-metric", _doc("coverage.entities", ent + "contract = 90\n"))
+    _case(cases, "relation/contract-entity-contract-metric", _doc("tool.sv0cov.entities", ent + "contract = 90\n"))
     for m in ("function", "region", "line", "branch"):
-        _case(cases, f"relation/contract-entity-{m}", _doc("coverage.entities", ent + f"{m} = 90\n"))
-    _case(cases, "relation/diff-without-threshold", _doc("coverage.diff", 'base = "HEAD"\n'))
+        _case(cases, f"relation/contract-entity-{m}", _doc("tool.sv0cov.entities", ent + f"{m} = 90\n"))
+    _case(cases, "relation/diff-without-threshold", _doc("tool.sv0cov.diff", 'base = "HEAD"\n'))
     for m in ("function", "contract"):
-        _case(cases, f"relation/diff-{m}", _doc("coverage.diff", f'base = "HEAD"\nline = 1\n{m} = 1\n'))
+        _case(cases, f"relation/diff-{m}", _doc("tool.sv0cov.diff", f'base = "HEAD"\nline = 1\n{m} = 1\n'))
     two = 'name = "s"\ninclude = ["**"]\n'
     two_upper = two.replace('"s"', '"S"')
     two_e = two.replace('"s"', '"e"')
-    _case(cases, "unique/scope-names", HEAD + f"\n[[coverage.scopes]]\n{two}\n[[coverage.scopes]]\n{two}")
-    _case(cases, "unique/scope-names-case-distinct", HEAD + f"\n[[coverage.scopes]]\n{two}\n[[coverage.scopes]]\n{two_upper}")
-    e = BASE["coverage.entities"]
-    _case(cases, "unique/entity-names", HEAD + f"\n[[coverage.entities]]\n{e}\n[[coverage.entities]]\n{e}")
-    _case(cases, "unique/scope-and-entity-share-name", HEAD + f"\n[[coverage.scopes]]\n{two_e}\n[[coverage.entities]]\n{e}")
-    _case(cases, "shape/scopes-as-table", HEAD + '\n[coverage.scopes]\nname = "s"\ninclude = ["**"]\n')
-    _case(cases, "shape/thresholds-as-array", HEAD + "\n[[coverage.thresholds]]\nline = 1\n")
+    _case(cases, "unique/scope-names", HEAD + f"\n[[tool.sv0cov.scopes]]\n{two}\n[[tool.sv0cov.scopes]]\n{two}")
+    _case(cases, "unique/scope-names-case-distinct", HEAD + f"\n[[tool.sv0cov.scopes]]\n{two}\n[[tool.sv0cov.scopes]]\n{two_upper}")
+    e = BASE["tool.sv0cov.entities"]
+    _case(cases, "unique/entity-names", HEAD + f"\n[[tool.sv0cov.entities]]\n{e}\n[[tool.sv0cov.entities]]\n{e}")
+    _case(cases, "unique/scope-and-entity-share-name", HEAD + f"\n[[tool.sv0cov.scopes]]\n{two_e}\n[[tool.sv0cov.entities]]\n{e}")
+    _case(cases, "shape/scopes-as-table", HEAD + '\n[tool.sv0cov.scopes]\nname = "s"\ninclude = ["**"]\n')
+    _case(cases, "shape/thresholds-as-array", HEAD + "\n[[tool.sv0cov.thresholds]]\nline = 1\n")
     _case(cases, "shape/cli-only-key", HEAD + 'run_id = "0123456789abcdef0123456789abcdef"\n')
     _case(cases, "shape/cli-spelling", HEAD + 'output-dir = "x"\n')
-    _case(cases, "shape/percent-sign-key", HEAD + "\n[coverage.thresholds]\nlines = 1\n")
+    _case(cases, "shape/percent-sign-key", HEAD + "\n[tool.sv0cov.thresholds]\nlines = 1\n")
     return cases
 
 
