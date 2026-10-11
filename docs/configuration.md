@@ -87,5 +87,5 @@ native reports embed (SPEC §21.3.7):
 CLI-only controls such as `--run-id`, `--expect-run`, `--output`, `--quiet`
 and `--color` are returned in `Resolved.controls` and never serialized.
 
-The JSON Schema and validator for this record come with the native report
-schema (CV-228).
+Its closed JSON Schema is generated from the same inventory and is described
+in [Native report 1.0](native-report.md).

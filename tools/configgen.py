@@ -12,6 +12,10 @@ Outputs (all canonical JSON):
   configuration keys are optional. Grammar and cross-field rules JSON Schema
   cannot express (threshold strings, paths, names, uniqueness, relations)
   stay in ``sv0cov.config``.
+- ``schemas/sv0cov.resolved-configuration-1.0.schema.json``: the closed
+  schema of the resolved record (SPEC 21.3.7), generated from the same
+  inventory, with ``tests/fixtures/config/resolved-defaults.json`` as its
+  default snapshot.
 - ``tests/fixtures/config/inventory.json``: tables, keys, kinds, defaults,
   command applicability, and the CLI option table.
 - ``tests/fixtures/config/defaults.json``: the default snapshot.
@@ -105,6 +109,75 @@ def schema() -> dict:
         "description": "Structural profile of the [tool.sv0cov] subtree of sv0.toml (SPEC 18.2). Grammar and cross-field rules are in sv0cov.config.",
         "title": "sv0cov.config 1.0",
     }
+
+
+# --- resolved-configuration schema (SPEC 21.3.7) ------------------------------
+
+RESOLVED_SCHEMA_FILE = ROOT / "schemas" / "sv0cov.resolved-configuration-1.0.schema.json"
+OPTIONAL_TABLES = ("diff", "ratchet")
+
+
+def _resolved_value(kind: C.Kind) -> dict:
+    """The schema of a resolved value: thresholds are basis points, the rest
+    keep their validated form. Grammar and order rules are semantic."""
+    if kind is C.THRESHOLD:
+        return {"maximum": C.DENOMINATOR, "minimum": 0, "type": "integer"}
+    if kind is C.SCHEMA:
+        return {"const": C.SCHEMA_VERSION}
+    if kind.toml == "integer":
+        return {"maximum": kind.maximum, "minimum": kind.minimum, "type": "integer"}
+    if kind.toml == "string":
+        if kind.values:
+            return {"enum": sorted(kind.values)}
+        return {"maxLength": 128 if kind is C.NAME else 4096, "minLength": 0 if kind is C.CONTEXT else 1, "type": "string"}
+    blank_ok = kind in (C.PATTERNS, C.FORBIDDEN_SOURCES)  # a blank Gitignore line is a valid pattern
+    item: dict = {"enum": sorted(kind.values)} if kind.values else {"maxLength": 4096, "minLength": 0 if blank_ok else 1, "type": "string"}
+    s: dict = {"items": item, "type": "array"}
+    if kind.values:
+        s["maxItems"] = len(kind.values)
+    return s
+
+
+def _leaf(value: dict, nullable: bool) -> dict:
+    return {"additionalProperties": False,
+            "properties": {"source": {"enum": ["cli", "default", "sv0.toml"]},
+                           "value": {"anyOf": [{"type": "null"}, value]} if nullable else value},
+            "required": ["source", "value"], "type": "object"}
+
+
+def _resolved_table(table: C.Table) -> dict:
+    props = {k.name: _leaf(_resolved_value(k.kind), k.default is None and not k.required) for k in table.keys}
+    for name in table.tables:
+        child = _resolved_table(C.TABLE[f"{table.path}.{name}"])
+        props[name] = {"anyOf": [{"type": "null"}, child]} if name in OPTIONAL_TABLES else child
+    obj = {"additionalProperties": False, "properties": dict(sorted(props.items())), "required": sorted(props), "type": "object"}
+    return {"items": obj, "type": "array"} if table.array else obj
+
+
+def resolved_schema() -> dict:
+    flag = _leaf({"type": "boolean"}, False)
+    return {
+        "$comment": "sv0cov.resolved-configuration 1.0 (SPEC 21.3.7). Generated from the configuration inventory by tools/configgen.py; "
+                    "do not edit. Lexical forms, array order, name uniqueness and cross-field relations are semantic checks "
+                    "(sv0cov.formats.report).",
+        "$defs": {"resolved_configuration": {
+            "additionalProperties": False,
+            "properties": {
+                "coverage": _resolved_table(C.TABLE["tool.sv0cov"]),
+                "report": {"additionalProperties": False,
+                           "properties": {"allow_lossy_saturated_export": flag, "allow_source_mismatch": flag},
+                           "required": ["allow_lossy_saturated_export", "allow_source_mismatch"], "type": "object"},
+                "schema": {"const": "sv0cov.resolved-configuration"},
+                "version": {"const": "1.0"}},
+            "required": ["coverage", "report", "schema", "version"], "type": "object"}},
+        "$ref": "#/$defs/resolved_configuration",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+    }
+
+
+def resolved_defaults() -> bytes:
+    from sv0cov.config_resolve import resolve
+    return resolve("run").to_bytes()
 
 
 # --- file corpus -------------------------------------------------------------
@@ -434,6 +507,8 @@ def cli_cases() -> dict:
 def artifacts() -> dict[Path, bytes]:
     return {
         SCHEMA_FILE: encode(schema()),
+        RESOLVED_SCHEMA_FILE: encode(resolved_schema()),
+        FIXTURES / "resolved-defaults.json": resolved_defaults(),
         FIXTURES / "inventory.json": C.inventory_document(),
         FIXTURES / "defaults.json": C.default_snapshot(),
         FIXTURES / "file-cases.json": encode({"cases": file_cases(), "schema": "sv0cov.config-file-corpus", "version": C.SCHEMA_VERSION}),
