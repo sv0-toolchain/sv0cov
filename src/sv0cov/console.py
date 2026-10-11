@@ -13,11 +13,12 @@
 
 Color applies only to human text on a terminal: ``always`` forces it,
 ``never`` forbids it, ``auto`` uses it when the stream is a terminal. No
-environment variable is consulted.
+environment variable is consulted (``os`` is used only for descriptors).
 """
 
 from __future__ import annotations
 
+import os
 from typing import BinaryIO, TextIO
 
 from sv0cov.diagnostics import Diagnostic, Registry, load_registry, order_events, render_human, render_json_line
@@ -111,6 +112,20 @@ class Console:
         self.stdout.flush()
         raw = getattr(self.stdout, "buffer", None)
         return raw if raw is not None else _TextBytes(self.stdout)
+
+    def abandon_stdout(self) -> None:
+        """After a failed stdout write: point the descriptor at the null
+        device, so the bytes still buffered cannot fail again when the
+        interpreter exits and replace the command's exit status."""
+        try:
+            fd = self.stdout.fileno()
+            null = os.open(os.devnull, os.O_WRONLY)
+            try:
+                os.dup2(null, fd)
+            finally:
+                os.close(null)
+        except (OSError, ValueError, AttributeError):
+            pass  # not a real descriptor: nothing will be flushed at exit
 
     @staticmethod
     def _bytes(stream: object, data: bytes) -> None:

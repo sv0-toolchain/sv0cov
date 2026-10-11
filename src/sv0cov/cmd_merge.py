@@ -206,6 +206,8 @@ def cmd_merge(ctx: cli.Context) -> int:
         else:
             publish_file(final, result.data, anchor=anchor, validate=validate)
     except PublishError as exc:
+        if to_stdout:
+            console.abandon_stdout()
         console.report(_publish_failure(exc))
         return cli.EXIT_EVIDENCE
 
