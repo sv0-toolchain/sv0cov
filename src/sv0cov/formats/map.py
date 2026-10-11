@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from sv0cov._generated.validators import sv0cov_map_1_0 as _schema
-from sv0cov.formats.canonical_json import DEFAULT_LIMITS, CanonicalJsonError, Limits, decode_canonical, encode
+from sv0cov.formats.canonical_json import CanonicalJsonError, Limits, decode_canonical, encode
 from sv0cov.formats.structural import StructuralError
 from sv0cov.model.identity import (
     ALLOWED_ENTITY_KINDS,
@@ -567,16 +567,31 @@ def _check_exclusions(ctx: _Ctx, points: dict[str, dict]) -> None:
     )
 
 
+# Map byte ceilings by effective raw-profile tier (SPEC 16.3.9, DEC-090). The
+# same ceiling bounds every artifact that embeds a map-scale inventory.
+MAP_CEILINGS = {"standard": 536870912, "large": 2147483648, "custom": 2147483648}
+
+
+def map_limits(tier: str = "standard") -> Limits:
+    """Decoding bounds for a map-scale canonical JSON artifact of ``tier``.
+    A custom raw-profile ceiling neither raises nor lowers this one."""
+    return Limits(max_bytes=MAP_CEILINGS[tier])
+
+
 def validate_map(
     data: bytes,
     *,
     sources: Mapping[str, bytes] | None = None,
-    limits: Limits = DEFAULT_LIMITS,
+    limits: Limits | None = None,
 ) -> dict:
-    """Validate canonical map bytes; return the decoded map. Raises :class:`MapError`."""
+    """Validate canonical map bytes; return the decoded map. Raises
+    :class:`MapError`. ``limits`` defaults to the standard tier's ceiling;
+    an oversized map is ``COV6001`` and is refused before it is parsed."""
     try:
-        obj = decode_canonical(data, limits)
+        obj = decode_canonical(data, limits or map_limits())
     except CanonicalJsonError as exc:
+        if exc.reason == "size_limit":
+            raise MapError("COV6001", f"the map is {len(data)} bytes; the tier allows {(limits or map_limits()).max_bytes}") from exc
         raise MapError("COV1010", f"not canonical JSON ({exc.reason})") from exc
     if not isinstance(obj, dict) or obj.get("schema") != "sv0cov.map":
         _fail("COV1010", "not an sv0cov.map object")

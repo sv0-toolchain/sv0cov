@@ -150,7 +150,11 @@ def _check_name(name: str, what: str) -> None:
         raise PublishError("unsafe", f"{what} {name!r} is not a single path component")
 
 
-def _open_parent(final: str, anchor: str | None) -> tuple[int, str]:
+class _Missing(Exception):
+    """A managed directory on the way does not exist yet (and was not to be created)."""
+
+
+def _open_parent(final: str, anchor: str | None, *, create: bool = True) -> tuple[int, str]:
     """An open directory to publish into and the final name inside it."""
     final = os.fspath(final)
     if anchor is None:
@@ -173,12 +177,17 @@ def _open_parent(final: str, anchor: str | None) -> tuple[int, str]:
         raise PublishError("failed", f"the project root cannot be opened ({os.strerror(exc.errno)})") from None
     try:
         for part in parts[:-1]:
-            try:
-                os.mkdir(part, DIR_MODE, dir_fd=fd)
-            except FileExistsError:
-                pass
+            if create:
+                try:
+                    os.mkdir(part, DIR_MODE, dir_fd=fd)
+                except FileExistsError:
+                    pass
             try:
                 nxt = os.open(part, _DIR_FLAGS | os.O_NOFOLLOW, dir_fd=fd)
+            except FileNotFoundError:
+                if create:
+                    raise
+                raise _Missing(part) from None
             except OSError as exc:
                 if exc.errno in (errno.ELOOP, errno.ENOTDIR, errno.EMLINK):
                     raise PublishError("unsafe", f"{part!r} is a symlink or not a directory") from None
@@ -205,11 +214,14 @@ def _absent(parent: int, name: str) -> None:
 
 
 def check_destination(final: str, *, anchor: str | None = None) -> None:
-    """Fail early when ``final`` cannot be published to. For a managed
-    destination this creates the missing managed directories. It is a
-    diagnostic aid: :func:`publish_file` and :func:`publish_bundle` repeat
-    it and do not depend on it."""
-    parent, name = _open_parent(final, anchor)
+    """Fail early when ``final`` cannot be published to. It creates nothing:
+    a managed directory that does not exist yet is simply not an obstacle.
+    It is a diagnostic aid: :func:`publish_file` and :func:`publish_bundle`
+    repeat it and do not depend on it."""
+    try:
+        parent, name = _open_parent(final, anchor, create=False)
+    except _Missing:
+        return
     try:
         _absent(parent, name)
     finally:

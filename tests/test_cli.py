@@ -170,7 +170,7 @@ class ExitCodeTest(unittest.TestCase):
 
     def test_a_valid_invocation_of_an_unimplemented_command_is_unsupported(self) -> None:
         pending = [c for c in C.COMMANDS if c not in cli.HANDLERS]
-        self.assertEqual(sorted(cli.HANDLERS), ["version"])
+        self.assertEqual(sorted(cli.HANDLERS), ["merge", "version"])
         for command in pending:
             with self.subTest(command=command):
                 code, out, err = run(*argv(command, "--diagnostic-format=json-lines"))
@@ -228,7 +228,7 @@ class UsageMatrixTest(unittest.TestCase):
     def test_every_base_invocation_is_accepted_by_the_usage_checks(self) -> None:
         for command in C.COMMANDS:
             code, _, err = run(*argv(command))
-            self.assertEqual(code, 0 if command == "version" else 7, (command, err))
+            self.assertEqual(code, {"version": 0, "merge": 5}.get(command, 7), (command, err))
 
     def test_every_option_on_every_command(self) -> None:
         accepted = refused = 0
@@ -242,7 +242,7 @@ class UsageMatrixTest(unittest.TestCase):
                         code, _, err = run(*args)
                         # Accepted by the usage layer: any failure left is a configuration relation, never COV0001.
                         self.assertNotIn("COV0001", err, args)
-                        self.assertIn(code, (0, 2, 7), args)
+                        self.assertIn(code, (0, 2, 5, 7), args)
                         accepted += 1
                     else:
                         self.assert_usage(args, opt.name)

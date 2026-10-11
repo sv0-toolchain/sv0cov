@@ -14,9 +14,9 @@ sv0cov version [--json]
 ```
 
 This page describes the framework every command shares (SPEC §18.2.3,
-§20.1 to §20.3, §20.5.2). Today only `version` is implemented; the other
-commands are checked for correct usage and then report that this build does
-not provide them yet.
+§20.1 to §20.3, §20.5.2). Today `version` and [`merge`](merge.md) are
+implemented; the other commands are checked for correct usage and then
+report that this build does not provide them yet.
 
 ## Arguments
 

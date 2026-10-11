@@ -20,7 +20,7 @@ usage and configuration have been checked, so a wrong invocation is always
 reported as wrong. An unexpected exception is exit 8 (``COV8001``) and names
 only the exception type.
 
-Implemented commands: ``version``. A handler is registered with
+Implemented commands: ``version`` and ``merge``. A handler is registered with
 :func:`command` and receives a :class:`Context`.
 """
 
@@ -174,6 +174,8 @@ def main(argv: list[str] | None = None, *, stdout: TextIO | None = None, stderr:
         return EXIT_INTERNAL
     return status
 
+
+from sv0cov import cmd_merge  # noqa: E402,F401 - registers the merge handler
 
 if __name__ == "__main__":
     sys.exit(main())

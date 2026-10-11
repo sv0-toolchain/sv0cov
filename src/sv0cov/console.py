@@ -34,6 +34,20 @@ def _is_terminal(stream: object) -> bool:
         return False
 
 
+class _TextBytes:
+    """A byte-stream face for a text stream that has no buffer (a test double)."""
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def write(self, data: bytes) -> int:
+        self._stream.write(bytes(data).decode("utf-8"))
+        return len(data)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+
 class Console:
     def __init__(self, stdout: TextIO, stderr: TextIO, *, diagnostic_format: str = "human", quiet: bool = False,
                  color: str = "auto", registry: Registry | None = None) -> None:
@@ -91,6 +105,12 @@ class Console:
         """A format the user explicitly sent to stdout."""
         self._bytes(self.stdout, data)
         self.stdout.flush()
+
+    def binary_stdout(self) -> BinaryIO:
+        """Stdout as a byte stream, for an artifact that is published to it."""
+        self.stdout.flush()
+        raw = getattr(self.stdout, "buffer", None)
+        return raw if raw is not None else _TextBytes(self.stdout)
 
     @staticmethod
     def _bytes(stream: object, data: bytes) -> None:

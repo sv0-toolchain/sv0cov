@@ -50,7 +50,7 @@ from typing import Iterable, Sequence
 from sv0cov.expr import Count, ExprError, check_expression, evaluate
 from sv0cov.formats.canonical_json import encode
 from sv0cov.formats.indexed import IndexedError
-from sv0cov.formats.map import MapError, validate_map
+from sv0cov.formats.map import MapError, map_limits, validate_map
 from sv0cov.formats.rawprofile import Header, RawProfile, RawProfileError, Tier, decode, peek_header
 from sv0cov.formats.runset import RunIdError, decode_run_set, parse_run_id
 from sv0cov.model.indexed import MapInput, ProfileInput, RunSelection, build_indexed, read_indexed
@@ -78,10 +78,14 @@ class MergeError(ValueError):
 @dataclass(frozen=True)
 class Artifact:
     """One supplied input: its basename and its bytes (``None`` when the
-    bytes could not be read)."""
+    bytes could not be read). ``fault`` is a finding the caller made before
+    the engine saw the input, as ``(code, detail)``: a file over the size
+    tier, an uncommitted temporary. Such an input is inventoried and not
+    decoded."""
 
     name: str
     data: bytes | None
+    fault: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -207,11 +211,14 @@ def merge(
     # Maps: validate each, then require the valid ones to agree.
     decoded: dict[Artifact, dict] = {}
     for a in set(map_arts):
+        if a.fault is not None:
+            reject("map", a, *a.fault)
+            continue
         if a.data is None:
             reject("map", a, "COV1010", "the map could not be read")
             continue
         try:
-            decoded[a] = validate_map(a.data)
+            decoded[a] = validate_map(a.data, limits=map_limits(tier.name))
         except MapError as exc:
             reject("map", a, exc.code, exc.detail)
     conflicting = _conflicting({m["map_id"]: m for m in decoded.values()})
@@ -226,6 +233,11 @@ def merge(
     alone: dict[Artifact, RawProfile] = {}
     incomplete: set[Artifact] = set()
     for a in set(profile_arts):
+        if a.fault is not None:
+            reject("profile", a, *a.fault)
+            if a.fault[0] == "COV2011":
+                incomplete.add(a)
+            continue
         if a.data is None:
             reject("profile", a, "COV2010", "the profile could not be read")
             continue
@@ -282,7 +294,7 @@ def merge(
                             allow_rejected_inputs=allow_rejected_inputs, tier=tier, tool_version=tool_version,
                             saturation_policy=saturation_policy)
         data = encode(obj)
-        read_indexed(data)
+        read_indexed(data, tier=tier.name)
     except (ModelError, IndexedError) as exc:
         raise MergeError("COV3002", f"the classified inputs do not form valid evidence: {exc}") from exc
 

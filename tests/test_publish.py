@@ -275,6 +275,15 @@ class ManagedTest(Base):
         self.assertEqual(self.reason(publish_bundle, ".sv0cov/runs/abc/reports", FILES, anchor=str(self.dir)), "collision")
         self.assertEqual(sorted(os.listdir(self.dir / ".sv0cov/runs/abc")), ["coverage.sv0covdata.json", "reports"])
 
+    def test_checking_a_managed_destination_creates_nothing(self) -> None:
+        check_destination(".sv0cov/runs/abc/x.json", anchor=str(self.dir))
+        self.assert_clean()
+        (self.dir / ".sv0cov").mkdir()
+        check_destination(".sv0cov/runs/abc/x.json", anchor=str(self.dir))
+        self.assertEqual(os.listdir(self.dir / ".sv0cov"), [])
+        os.symlink(self.dir, self.dir / ".sv0cov" / "runs")
+        self.assertEqual(self.reason(check_destination, ".sv0cov/runs/abc/x.json", anchor=str(self.dir)), "unsafe")
+
     def test_no_component_below_the_root_may_be_a_symlink_or_a_file(self) -> None:
         outside = self.dir / "outside"
         outside.mkdir()

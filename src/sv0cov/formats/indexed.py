@@ -34,6 +34,7 @@ import re
 from sv0cov._generated.validators import sv0cov_indexed_1_0 as _indexed_schema
 from sv0cov._generated.validators import sv0cov_indexed_semantic_1_0 as _semantic_schema
 from sv0cov.formats.canonical_json import CanonicalJsonError, decode_canonical, encode
+from sv0cov.formats.map import map_limits
 from sv0cov.formats.structural import StructuralError
 from sv0cov.model.logical import LogicalValueError, check_logical_path, check_logical_string
 
@@ -49,7 +50,8 @@ PRINTABLE = frozenset(range(0x21, 0x7F))
 
 
 class IndexedError(ValueError):
-    """``code``: COV3010 invalid indexed evidence, COV3011 projection mismatch."""
+    """``code``: COV3010 invalid indexed evidence, COV3011 projection mismatch,
+    COV6001 over the reader's size tier."""
 
     def __init__(self, code: str, detail: str) -> None:
         super().__init__(f"{code}: {detail}")
@@ -368,19 +370,23 @@ def check_indexed_structure(obj: object) -> dict:
     return obj
 
 
-def _decode(data: bytes) -> object:
+def _decode(data: bytes, tier: str) -> object:
     try:
-        return decode_canonical(data)
+        return decode_canonical(data, map_limits(tier))
     except CanonicalJsonError as exc:
+        if exc.reason == "size_limit":
+            raise IndexedError("COV6001", f"the artifact is {len(data)} bytes; the {tier} tier allows {map_limits(tier).max_bytes}") from exc
         raise IndexedError("COV3010", str(exc)) from exc
 
 
-def decode_semantic_structure(data: bytes) -> dict:
-    """Canonical semantic-projection bytes -> a well-formed semantic object."""
-    return check_semantic_structure(_decode(data))
+def decode_semantic_structure(data: bytes, *, tier: str = "standard") -> dict:
+    """Canonical semantic-projection bytes -> a well-formed semantic object.
+    ``tier`` is the reader's size tier (SPEC 16.3.9): the artifact never
+    selects its own ceiling."""
+    return check_semantic_structure(_decode(data, tier))
 
 
-def decode_indexed_structure(data: bytes) -> dict:
+def decode_indexed_structure(data: bytes, *, tier: str = "standard") -> dict:
     """Canonical indexed bytes -> a well-formed indexed object (not yet
     cross-validated; see the module docstring)."""
-    return check_indexed_structure(_decode(data))
+    return check_indexed_structure(_decode(data, tier))

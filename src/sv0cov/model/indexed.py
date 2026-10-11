@@ -631,12 +631,14 @@ def _check_full(o: dict, registry: diagnostics.Registry | None) -> None:
             _fail("diagnostics", f"{code} is recorded exactly when its condition holds")
 
 
-def read_indexed(data: bytes, *, registry: diagnostics.Registry | None = None) -> dict:
+def read_indexed(data: bytes, *, registry: diagnostics.Registry | None = None, tier: str = "standard") -> dict:
     """Canonical ``sv0cov.indexed`` 1.0 bytes -> the validated object.
 
     Runs the structure layer, then cross-validates every retained fact (see
-    the module docstring). Nothing outside ``data`` is read."""
-    obj = decode_indexed_structure(data)
+    the module docstring). Nothing outside ``data`` is read. ``tier`` is
+    the reader's size tier (SPEC 16.3.9); bytes over its ceiling are
+    ``COV6001``."""
+    obj = decode_indexed_structure(data, tier=tier)
     _check_full(obj, registry)
     return obj
 

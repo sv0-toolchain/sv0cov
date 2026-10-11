@@ -3,10 +3,79 @@
 
 # Merge
 
-`sv0cov.model.merge.merge(maps, profiles, ...)` turns the bytes of the
-supplied maps and raw profiles into [indexed evidence](indexed-evidence.md)
-(SPEC §17). It is the engine behind the future `merge` command; reading
-files and publishing the result are that command's job (CV-226, CV-227).
+```text
+sv0cov merge [options] <raw-or-directory>...
+```
+
+`merge` gathers coverage maps and raw profiles, checks every one, combines
+the accepted profiles, and writes one [indexed profile](indexed-evidence.md)
+(SPEC §17). The first half of this page is the command; the second half is
+the engine behind it, `sv0cov.model.merge.merge(maps, profiles, ...)`.
+
+## The command
+
+### Inputs
+
+Each operand is resolved from the working directory.
+
+- **A directory** contributes the regular files directly inside it whose
+  names end in `.sv0covmap.json` (maps) or `.sv0profraw` (raw profiles). It
+  is not searched recursively; name each directory you want.
+- **A file** is a map when its name ends in `.sv0covmap.json` and a raw
+  profile otherwise. A named file may be a symlink.
+
+Inside a directory:
+
+| Entry | Treatment |
+|---|---|
+| A runtime's uncommitted temporary, `.<name>.sv0profraw.tmp-…` | Inventoried as an incomplete profile (`COV2011`). Its process did not finish publishing, so its counts are never used, even if the bytes look complete. |
+| An artifact name that is a symlink, a directory, or another non-regular file | Rejected input (`COV6002`). |
+| Any other entry, other dot files included | Ignored. |
+
+A path that does not exist or cannot be read is a rejected input. Names are
+only how inputs are found: what an input is, and which map a profile belongs
+to, is decided from its bytes. Naming the same file twice counts it once;
+the summary says how many copies were dropped.
+
+A profile over the raw-profile tier, or a map over that tier's map ceiling
+(512 MiB for `standard`, 2 GiB for `large` and `custom`), is rejected from
+its size alone and is never read into memory (`COV6001`).
+
+### Options
+
+| Option | Effect |
+|---|---|
+| `--output <path>` | Write the indexed profile to this file. Its parent directory must exist. |
+| `--output -` | Write only the canonical indexed JSON to stdout. |
+| `--output-dir <dir>` | The managed output directory. Without `--output`, the file is `<output_dir>/coverage.sv0covdata.json`. |
+| `--expect-run <id>` | Declare a run to combine. Repeat it for each run. |
+| `--run-manifest <path>` | Declare the run set with a manifest file instead. |
+| `--allow-rejected-inputs` | Publish visibly incomplete evidence for diagnosis. |
+| `--raw-profile-tier`, `--raw-profile-max-counters`, `--raw-profile-max-bytes` | Size limits. |
+| `--saturation-policy` | Recorded in the evidence. |
+| `--quiet`, `--color`, `--diagnostic-format` | See [Command line](cli.md). |
+
+Without a run option, every accepted profile must carry the same run ID.
+Nothing in the environment selects a run.
+
+### Outcome
+
+| Situation | Published | Exit |
+|---|---|---|
+| Every input accepted, run selection holds | yes | 0 |
+| A rejected or incomplete input, a failed run selection, or two versions of one source | no | 5 |
+| The same, with `--allow-rejected-inputs` | yes, marked incomplete | 0 |
+| The destination already exists, or publication fails | no | 5 |
+| A malformed option | no | 2 |
+
+Every finding is reported on stderr with the input's basename. Evidence
+published under `--allow-rejected-inputs` can never pass a check.
+
+The destination is checked before any input is read, and the output is
+written through [no-replace publication](publication.md): an existing file is
+never overwritten, and a failed merge leaves nothing behind.
+
+## The engine
 
 ## Order of work
 
@@ -101,7 +170,7 @@ make the evidence incomplete.
 
 ## Limits
 
-- The engine works on bytes in memory. Size-limited reading of files belongs
-  to the `merge` command.
+- The engine works on bytes in memory; the command bounds each file by its
+  tier before reading it.
 - When two maps conflict, both are rejected; the engine does not guess which
   one is right.
