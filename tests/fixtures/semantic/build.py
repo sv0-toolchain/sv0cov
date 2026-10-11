@@ -3,8 +3,10 @@
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
 """Build or check the semantic fixtures' expected artifacts.
 
-For each fixture directory: ``expected-map.json`` (canonical sv0cov.map 1.0)
-and ``expected-counts.json`` (per-point counts for the fixed input). Also
+For each fixture directory: ``expected-map.json`` (canonical sv0cov.map 1.0),
+``expected-counts.json`` (per-point counts for the fixed input), and
+``expected-semantic.json`` (the sv0cov.indexed-semantic 1.0 object of one run
+in the absent context, CV-221). Also
 ``index.json`` (fixtures, exit codes, SPEC 28.2 rows exercised).
 
     python3 tests/fixtures/semantic/build.py            # check (exit 1 if stale)
@@ -33,6 +35,7 @@ def artifacts() -> dict[Path, bytes]:
         out[HERE / name / "expected-counts.json"] = dump(
             {"counts": fx.plan.counts(fx.counts), "exit_code": fx.exit_code, "fixture": name, "map_id": m["map_id"]}
         )
+        out[HERE / name / "expected-semantic.json"] = dump(fx.plan.semantic(m, fx.counts, fx.lines))
         index.append({"exit_code": fx.exit_code, "fixture": name, "map_id": m["map_id"], "matrix": sorted(fx.matrix), "sources": sorted(fx.plan.sources)})
     out[HERE / "index.json"] = dump({"fixtures": index, "schema": "sv0cov.semantic-fixture-index", "version": "1.0"})
     return out

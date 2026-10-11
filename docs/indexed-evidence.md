@@ -9,10 +9,10 @@ that `report` and `check` read without the original maps or raw profiles
 source-level meaning of the run, and wraps it in the transport evidence that
 says how the counts were obtained.
 
-This page covers what exists today (CV-220): the two closed schemas, the
-record-level rules, and the frozen structure fixtures. Building the semantic
-object from maps and profiles (CV-221), the reader's cross-validation
-(CV-222), and the merge engine (CV-223) come next.
+This page covers what exists today: the two closed schemas, the record-level
+rules and the frozen structure fixtures (CV-220), and the builder of the
+semantic object (CV-221). The full object and the reader's cross-validation
+(CV-222) and the merge engine (CV-223) come next.
 
 ## The two schemas
 
@@ -61,6 +61,53 @@ bindings that cover each map's counters, region counts recomputed from
 expressions, line membership and status, branch and contract results against
 points, exclusions against classifications, the saturation inventory against
 count flags, and `complete`.
+
+## Building the semantic object
+
+`sv0cov.model.semantic.build_semantic(maps, profiles)` takes validated maps
+and decoded, accepted raw profiles and returns the semantic object.
+
+- **Union.** Records from every map are merged and reindexed in the
+  canonical orders. Equal definitions deduplicate. Two definitions that
+  disagree for one identity fail with `COV3002`. One path with two digests
+  is a source-version conflict: both sources stay, `COV3004` is recorded, and
+  `complete` is false.
+- **Contexts.** Every distinct profile context, absent first, then bytewise
+  UTF-8. The caller can add the contexts of rejected profiles, which
+  contribute no count.
+- **Point counts.** A profile's counts reach points through its own map's
+  counter bindings and add per context with 64-bit saturation. A count is a
+  lower bound when a contribution was `UINT64_MAX` or a sum passed it.
+- **Region counts.** Each expression is evaluated per context with interval
+  lower bounds, then the context results are added (SPEC §11.1). An inexact
+  zero is kept.
+- **Lines.** Membership comes from the regions' `line_numbers` alone; no
+  source file is opened. A line is listed when any region names it, and
+  `region_indices` are its `line_contributing` regions. The status comes from
+  the contributing `user` regions: all executed is `covered`, some `partial`,
+  none `uncovered`. A lower-bound zero is not executed. A line with no such
+  region is `excluded` when an excluded region names it, else
+  `non_executable`.
+- **Branches and contracts.** An outcome's count is its point's count. A
+  runtime-checked clause reports `mixed`, `evaluated_true`, `evaluated_false`
+  or `not_evaluated` from its two counts.
+- **Saturation.** The inexact points and the inexact regions.
+
+The result does not depend on the order of the maps or the profiles.
+
+Two fields are the caller's to supply, because they depend on facts outside
+the model:
+
+- `complete` starts from the caller's transport verdict (inputs and run
+  selection) and is false whenever the model records a diagnostic.
+- The saturation `policy` defaults to `fail`. `ineligible_uses` is left
+  empty: which exact uses exist is known only when a report is made.
+
+The oracle is `tests/fixtures/semantic/<fixture>/expected-semantic.json`,
+written by the fixture builder from the hand-stated plan, counts, and line
+statuses, with no code shared with the model. The model must equal it for
+all eight reviewed fixtures, from synthetic profiles in sv0cov's tests and
+from real native and sv0vm runs in sv0c's `run_vm_profile.py`.
 
 ## Fixtures
 

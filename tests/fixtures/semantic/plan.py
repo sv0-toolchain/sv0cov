@@ -288,6 +288,62 @@ class Plan:
         return sorted(out, key=lambda r: r["point_id"])
 
 
+    def semantic(self, m: dict, observed: dict[Point, int], line_status: dict[str, list[str]]) -> dict:
+        """The expected ``sv0cov.indexed-semantic`` 1.0 object for one run of
+        the fixture in the absent context: the built map ``m`` with the hand
+        counts on its points, each region's count worked out from its terms,
+        each outcome's status from its count, and each line's status taken
+        from the hand-derived ``line_status`` (path -> status per physical
+        line). A line is listed when some region names it; its
+        ``region_indices`` are the line-contributing regions on it.
+
+        This is the oracle for sv0cov's model builder and shares no code
+        with it.
+        """
+        by_id = {self._ids[id(p)]: observed.get(p, 0) for p in self.points()}
+
+        def count(v: int) -> dict:
+            if v < 0:
+                raise ValueError(f"{self.name}: a hand count works out negative")
+            ctx = [{"context_index": 0, "lower_bound": False, "saturated": False, "value": v}] if v else []
+            return {"by_context": ctx, "lower_bound": False, "saturated": False, "value": v}
+
+        points = [{k: v for k, v in p.items() if k not in ("counter_index", "fragment_index")} | {"count": count(by_id[p["point_id"]])}
+                  for p in m["points"]]
+        regions = [r | {"count": count(sum(t["coefficient"] * by_id[t["point_id"]] for t in r["counter_expression"]["terms"]))}
+                   for r in m["regions"]]
+        paths = {s["source_index"]: s["path"] for s in m["sources"]}
+        listed: dict[tuple[int, int], list[int]] = {}
+        for r in m["regions"]:
+            for line in r["line_numbers"]:
+                listed.setdefault((r["source_index"], line), [])
+                if r["line_contributing"]:
+                    listed[(r["source_index"], line)].append(r["region_index"])
+        lines = [{"line": line, "line_index": n, "region_indices": sorted(members), "source_index": source,
+                  "status": line_status[paths[source]][line - 1]}
+                 for n, ((source, line), members) in enumerate(sorted(listed.items()))]
+        branches = []
+        for b in m["branches"]:
+            outcomes = []
+            for o in b["outcomes"]:
+                v = by_id[o["point_id"]]
+                status = o["classification"] if o["classification"] != "eligible" else ("covered" if v else "uncovered")
+                outcomes.append({"count": count(v), "evidence_identity": o["evidence_identity"], "name": o["name"], "ordinal": o["ordinal"],
+                                 "point_id": o["point_id"], "status": status})
+            branches.append(b | {"outcomes": outcomes})
+        return {
+            "branches": branches,
+            "capabilities": ["branch-outcomes", "contexts", "contract-coverage", "exclusion-audit", "line-membership",
+                             "normalized-linear-expressions", "saturation-lower-bounds", "semantic-function-ownership", "source-digests"],
+            "complete": True, "contexts": [{"context_index": 0, "value": None}], "contracts": [], "diagnostics": [],
+            "entities": m["entities"], "exclusions": [], "lines": lines, "map_ids": [m["map_id"]], "map_version": "1.0",
+            "point_identity_version": "1.0", "points": points, "regions": regions,
+            "saturation": {"affected_point_ids": [], "affected_region_indices": [], "any": False, "eligible_metrics": [],
+                           "ineligible_uses": [], "policy": "fail"},
+            "schema": "sv0cov.indexed-semantic", "sources": m["sources"], "version": "1.0",
+        }
+
+
 def dump(obj: object) -> bytes:
     return encode(obj)
 

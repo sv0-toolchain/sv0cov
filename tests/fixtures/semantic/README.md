@@ -19,8 +19,10 @@ byte for byte.
 | `project/` | a two-module project whose files share a basename |
 | `question/` | the `?` operator (CV-213): never propagating, propagating, twice in one statement, on a variable, in a loop body, in a loop condition; each is one counted `synthetic_support` point outside every ordinary metric |
 
-Each fixture directory holds the program, `expected-map.json`, and
-`expected-counts.json` (the per-point counts of one run with no input). All
+Each fixture directory holds the program, `expected-map.json`,
+`expected-counts.json` (the per-point counts of one run with no input), and
+`expected-semantic.json` (the `sv0cov.indexed-semantic` 1.0 object of that
+run, CV-221). All
 programs exit 0 on the native C backend and on the VM (checked on
 2026-09-25 with the toolchain at sv0c `d1a5100`).
 
@@ -34,6 +36,11 @@ programs exit 0 on the native C backend and on the VM (checked on
 - `plan.py` does only the mechanical part: byte offsets, line and column
   coordinates, point IDs, counter numbering in source order, fragment and
   map IDs. It validates every map against its exact source bytes.
+- `plan.py` also writes the expected semantic object: the map's records
+  with the hand counts on the points, each region's count worked out from
+  its terms, each outcome's status from its count, and each line's status
+  taken from the hand-derived list. It is the oracle for
+  `sv0cov.model.semantic` and shares no code with it.
 - `build.py --write` regenerates the checked-in artifacts after a reviewed
   change; `build.py` (and the test suite) fails when they are stale.
 - `tests/test_semantic_fixtures.py` recomputes every line status from the
