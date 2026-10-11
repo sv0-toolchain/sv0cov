@@ -119,7 +119,7 @@ class ExpressionPropertyTest(unittest.TestCase):
 class SemanticFixtureExpressionTest(unittest.TestCase):
     def test_fixture_regions(self) -> None:
         names = sorted(p.parent.name for p in SEMANTIC.glob("*/expected-map.json"))
-        self.assertEqual(len(names), 7)
+        self.assertEqual(len(names), 8)
         for name in names:
             with self.subTest(fixture=name):
                 m = json.loads((SEMANTIC / name / "expected-map.json").read_bytes())
@@ -127,9 +127,12 @@ class SemanticFixtureExpressionTest(unittest.TestCase):
                 counted = {p["point_id"] for p in m["points"] if p["counter_index"] is not None}
                 for r in m["regions"]:
                     terms = check_expression(r["counter_expression"], counted)
-                    if r["classification"] != "user":
+                    if r["classification"] == "statically_unreachable":
                         self.assertEqual(terms, [])
                         continue
+                    # `user`, and the synthetic-support early return of a `?`
+                    # (CV-213), whose count is its own propagate point.
+                    self.assertIn(r["classification"], ("user", "synthetic_support"))
                     got = evaluate(terms, {p: Count(counts[p]) for _, p in terms})
                     self.assertFalse(got.inexact)
                     self.assertEqual(got.value, sum(c * counts[p] for c, p in terms))

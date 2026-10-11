@@ -25,7 +25,8 @@ from sv0cov.formats.canonical_json import encode  # noqa: E402
 from sv0cov.formats.map import CAPABILITIES, _Text, fragment_id, map_id, validate_map  # noqa: E402
 from sv0cov.model.identity import NO_ORDINAL, EntityKind, PointIdentity, PointKind, point_id  # noqa: E402
 
-KIND_ORDER = {"function_entry": 0, "branch_outcome": 1}
+KIND_ORDER = {"function_entry": 0, "branch_outcome": 1, "region": 1}
+POINT_KINDS = {"function_entry": PointKind.FUNCTION_ENTRY, "branch_outcome": PointKind.BRANCH_OUTCOME, "region": PointKind.REGION}
 OUTCOMES = {"if": ("true", "false"), "loop": ("body", "exit")}
 
 
@@ -39,6 +40,7 @@ class Point:
     ordinal: int | None = None
     label: str = ""
     evidence: str | None = None  # set: statically_unreachable (uncounted), with this proof identity
+    synthetic: bool = False  # compiler-generated support (counted, outside ordinary denominators)
 
 
 @dataclass(eq=False)
@@ -67,6 +69,7 @@ class Region:
     span: tuple[int, int]
     terms: list[tuple[Point, int]]
     line_contributing: bool
+    classification: str = "user"
 
 
 class Plan:
@@ -77,6 +80,7 @@ class Plan:
         self.functions: list[Function] = []
         self.branches: list[Branch] = []
         self.regions: list[Region] = []
+        self.questions: list[Point] = []
 
     # ── locating source text ─────────────────────────────────────────────
 
@@ -128,6 +132,15 @@ class Plan:
         self.branches.append(b)
         return b
 
+    def question(self, fn: Function, span: tuple[int, int]) -> Point:
+        """The `?` operator at ``span`` (the `?` byte): its early return is
+        one counted synthetic-support point, hit only when it propagates,
+        and a synthetic-support `return` region counting that point."""
+        q = Point(fn.path, fn, "region", span, "question:propagate", label=f"{fn.name}.question@{span[0]}.propagate", synthetic=True)
+        self.questions.append(q)
+        self.regions.append(Region(fn, "return", span, [(q, 1)], False, "synthetic_support"))
+        return q
+
     def region(self, fn: Function, kind: str, span: tuple[int, int], *terms, lc: bool = True) -> Region:
         norm = [(t, 1) if isinstance(t, Point) else t for t in terms]
         r = Region(fn, kind, span, norm, lc)
@@ -137,7 +150,7 @@ class Plan:
     # ── assembly ─────────────────────────────────────────────────────────
 
     def points(self) -> list[Point]:
-        pts = [f.entry for f in self.functions] + [o for b in self.branches for o in b.outcomes]
+        pts = [f.entry for f in self.functions] + [o for b in self.branches for o in b.outcomes] + self.questions
         return sorted(pts, key=lambda p: (p.path, p.span[0], KIND_ORDER[p.kind], p.ordinal or 0))
 
     def _span(self, path: str, span: tuple[int, int]) -> dict:
@@ -167,14 +180,14 @@ class Plan:
             pid = point_id(
                 PointIdentity(
                     p.path, digests[p.path], EntityKind.FUNCTION, p.entity.name,
-                    PointKind.FUNCTION_ENTRY if p.kind == "function_entry" else PointKind.BRANCH_OUTCOME,
+                    POINT_KINDS[p.kind],
                     p.span[0], p.span[1], NO_ORDINAL if p.ordinal is None else p.ordinal, p.discriminator,
                 )
             )
             ids[id(p)] = pid
             records.append(
                 {
-                    "classification": "user" if p.evidence is None else "statically_unreachable",
+                    "classification": "synthetic_support" if p.synthetic else "user" if p.evidence is None else "statically_unreachable",
                     "counter_index": counter.get(id(p)),
                     "entity_index": ent_index[id(p.entity)],
                     "fragment_index": None,  # set below
@@ -207,7 +220,7 @@ class Plan:
             terms = sorted(({"coefficient": c, "point_id": ids[id(p)]} for p, c in r.terms), key=lambda t: t["point_id"])
             regions.append(
                 {
-                    "classification": "user",
+                    "classification": r.classification,
                     "counter_expression": {"terms": terms},
                     "entity_index": ent_index[id(r.fn)],
                     "kind": r.kind,

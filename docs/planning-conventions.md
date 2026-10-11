@@ -130,9 +130,42 @@ Added in CV-201 (R0):
 - Desugared syntax plans only source regions. `for p in e { … }` has its
   iterable and loop body, and `x += …` is one `mutation` region, so
   compiler-generated support code never gets a region (COV-MET-008).
-  sv0c therefore emits no `synthetic_support` region yet.
-- `?` is refused (exit 9) until CV-213 models it. Its hidden early return
-  would otherwise make the code after it count runs that returned early.
+  The one `synthetic_support` region sv0c emits is the early return of a
+  `?` (CV-213, below).
+
+Added in CV-213 (R0): the `?` operator.
+
+`e?` returns from the function when `e` is the failure variant (the
+enum's second variant: `None`, `Err`). That early return is real control
+flow the source does not spell out, so the code after a `?` must not count
+the runs that left through it.
+
+- Each `?` is one counted point, `propagate`: kind `region`,
+  classification `synthetic_support`, discriminator `question:propagate`,
+  span = the `?` byte. It is hit only when the operator returns early. The
+  "continue" side needs no counter: it is the position minus `propagate`.
+- Each `?` also has a `return` region of the same span and classification
+  whose counter is that point, so the early return is inspectable. It is
+  not `line_contributing`.
+- A `?` is not a branch. A map branch outcome is `eligible`, `excluded`,
+  or `statically_unreachable`, never synthetic (SPEC §16.3.6), and
+  compiler-generated support enters no ordinary denominator (§11.7,
+  COV-MET-008). So `?` adds nothing to branch, region, or line metrics.
+- The statement holding a `?` counts every start, as before. What follows
+  the `?` loses its count: later constructs in the same expression, the
+  statements after it, and the code after an enclosing loop
+  (`entry - propagate`). Two `?` in one statement are two points, and both
+  are subtracted.
+- A `while` condition counts `body + exit + propagate` for each `?` in it:
+  an evaluation that returns early reaches neither outcome.
+- A `?` the planner cannot reach, in a contract clause or a loop
+  invariant, fails the build (exit 9) instead of leaving later code
+  over-counted.
+- Counters stay ordered by source and span start, so a `propagate` point
+  takes its place among the entries and outcomes by where its `?` sits.
+
+The reviewed `question` fixture pins all of this; sv0c reproduces its map
+byte for byte and its counts on the C backend and on sv0vm.
 
 Added in CV-202 (R0): line coverage.
 

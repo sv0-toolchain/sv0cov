@@ -17,6 +17,7 @@ byte for byte.
 | `match/` | enum arms, integer match with `_`, arms never taken (partial lines) |
 | `source-text/` | CRLF endings, tabs, no final newline, CJK text, several regions on one line, a partial line |
 | `project/` | a two-module project whose files share a basename |
+| `question/` | the `?` operator (CV-213): never propagating, propagating, twice in one statement, on a variable, in a loop body, in a loop condition; each is one counted `synthetic_support` point outside every ordinary metric |
 
 Each fixture directory holds the program, `expected-map.json`, and
 `expected-counts.json` (the per-point counts of one run with no input). All

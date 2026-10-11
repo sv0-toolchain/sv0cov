@@ -1,0 +1,87 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0 fixture (CV-213): the `?` operator never propagating, propagating, twice in one statement, on a variable, in a loop body, and in a loop condition. */
+
+enum Opt {
+  Some(i32),
+  None,
+}
+
+enum Res {
+  Ok(i32),
+  Err(i32),
+}
+
+fn pick(n: i32) -> Opt {
+  if n > 0 {
+    return Opt::Some(n);
+  }
+  return Opt::None;
+}
+
+fn check(n: i32) -> Res {
+  if n < 10 {
+    return Res::Ok(n);
+  }
+  return Res::Err(n);
+}
+
+fn sure(n: i32) -> Opt {
+  let v: i32 = pick(n + 1)?;
+  return Opt::Some(v + 1);
+}
+
+fn plain(n: i32) -> Opt {
+  let v: i32 = pick(n)?;
+  return Opt::Some(v + 1);
+}
+
+fn twice(a: i32, b: i32) -> Opt {
+  let s: i32 = pick(a)? + pick(b)?;
+  return Opt::Some(s);
+}
+
+fn pass_on(o: Opt) -> Opt {
+  let v: i32 = o?;
+  return Opt::Some(v * 2);
+}
+
+fn total(limit: i32) -> Res {
+  let mut sum: i32 = 0;
+  let mut i: i32 = 0;
+  while i < limit {
+    sum = sum + check(i * 4)?;
+    i = i + 1;
+  }
+  return Res::Ok(sum);
+}
+
+fn drain(n: i32) -> Opt {
+  let mut k: i32 = n;
+  while pick(k)? > 1 {
+    k = k - 1;
+  }
+  return Opt::Some(k);
+}
+
+fn some_or(o: Opt, d: i32) -> i32 {
+  return match o {
+    Opt::Some(x) => x,
+    Opt::None => d,
+  };
+}
+
+fn ok_or(r: Res, d: i32) -> i32 {
+  return match r {
+    Res::Ok(x) => x,
+    Res::Err(x) => d - x,
+  };
+}
+
+fn main() -> i32 {
+  let a = some_or(sure(1), 0) + some_or(plain(4), 0) + some_or(plain(0), 100);
+  let b = some_or(twice(1, 2), 0) + some_or(twice(0, 2), 1000) + some_or(twice(2, 0), 10000);
+  let c = some_or(pass_on(Opt::Some(3)), 0) + some_or(pass_on(Opt::None), 100000);
+  let d = ok_or(total(2), 0) + ok_or(total(5), 0);
+  let e = some_or(drain(3), 0) + some_or(drain(0), 20);
+  return a + b + c + d + e - 111130;
+}

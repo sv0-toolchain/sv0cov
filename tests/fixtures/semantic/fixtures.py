@@ -339,6 +339,113 @@ def project() -> Fixture:
     return Fixture(p, counts, lines, 0, ["projects: many files", "projects: same basename in two directories", "projects: module-qualified names"])
 
 
+def question() -> Fixture:
+    m = "main.sv0"
+    p = Plan("question", read("question", m))
+
+    def early(fn_name: str, first: str, last: str):
+        """`if <first> { return ...; } return <last>;` as in the branches fixture."""
+        fn = p.function(m, fn_name)
+        span = p.through_block(m, f"if {first} {{")
+        b = p.branch(fn, "if", span)
+        p.region(fn, "expression", p.find(m, first), fn.entry)
+        p.region(fn, "branch_body", p.through_block(m, "{", after=span[0]), b["true"], lc=False)
+        p.region(fn, "return", p.find(m, "return", after=span[0])[0:1] + (p.find(m, ";", after=span[0])[1],), b["true"])
+        p.region(fn, "return", p.find(m, last), fn.entry, (b["true"], -1))
+        return fn, b
+
+    def mark(fn, stmt: str, occurrence: int = 0):
+        """The `?` number ``occurrence`` inside the statement or condition ``stmt``."""
+        at = p.find(m, stmt)[0]
+        return p.question(fn, p.find(m, "?", occurrence, after=at))
+
+    pick, pb = early("pick", "n > 0", "return Opt::None;")
+    check, cb = early("check", "n < 10", "return Res::Err(n);")
+
+    # One `?`: the statement counts every start; what follows it counts the
+    # starts that did not return early.
+    one = {}
+    for name, stmt, ret in (("sure", "let v: i32 = pick(n + 1)?;", "return Opt::Some(v + 1);"),
+                            ("plain", "let v: i32 = pick(n)?;", "return Opt::Some(v + 1);"),
+                            ("pass_on", "let v: i32 = o?;", "return Opt::Some(v * 2);")):
+        fn = p.function(m, name)
+        p.region(fn, "initializer", p.find(m, stmt), fn.entry)
+        q = mark(fn, stmt)
+        p.region(fn, "return", p.find(m, ret, after=fn.span[0]), fn.entry, (q, -1))
+        one[name] = (fn, q)
+
+    # Two in one statement: each is its own point, and both leave the function.
+    twice = p.function(m, "twice")
+    ts = "let s: i32 = pick(a)? + pick(b)?;"
+    p.region(twice, "initializer", p.find(m, ts), twice.entry)
+    tq1, tq2 = mark(twice, ts, 0), mark(twice, ts, 1)
+    p.region(twice, "return", p.find(m, "return Opt::Some(s);"), twice.entry, (tq1, -1), (tq2, -1))
+
+    # In a loop body: the rest of the iteration and the code after the loop
+    # both lose the early returns.
+    total = p.function(m, "total")
+    tw = p.through_block(m, "while i < limit {")
+    tl = p.branch(total, "loop", tw)
+    p.region(total, "initializer", p.find(m, "let mut sum: i32 = 0;"), total.entry)
+    p.region(total, "initializer", p.find(m, "let mut i: i32 = 0;"), total.entry)
+    p.region(total, "expression", p.find(m, "i < limit"), tl["body"], tl["exit"])
+    p.region(total, "loop_body", p.through_block(m, "{", after=tw[0]), tl["body"], lc=False)
+    p.region(total, "assignment", p.find(m, "sum = sum + check(i * 4)?;"), tl["body"])
+    lq = mark(total, "sum = sum + check(i * 4)?;")
+    p.region(total, "assignment", p.find(m, "i = i + 1;"), tl["body"], (lq, -1))
+    p.region(total, "return", p.find(m, "return Res::Ok(sum);"), total.entry, (lq, -1))
+
+    # In a loop condition: an evaluation ends in body, exit, or the early return.
+    drain = p.function(m, "drain")
+    dw = p.through_block(m, "while pick(k)? > 1 {")
+    dl = p.branch(drain, "loop", dw)
+    dq = mark(drain, "pick(k)? > 1")
+    p.region(drain, "initializer", p.find(m, "let mut k: i32 = n;"), drain.entry)
+    p.region(drain, "expression", p.find(m, "pick(k)? > 1"), dl["body"], dl["exit"], dq)
+    p.region(drain, "loop_body", p.through_block(m, "{", after=dw[0]), dl["body"], lc=False)
+    p.region(drain, "assignment", p.find(m, "k = k - 1;"), dl["body"])
+    p.region(drain, "return", p.find(m, "return Opt::Some(k);"), drain.entry, (dq, -1))
+
+    arms = {}
+    for name, scrut, results in (("some_or", "o", (("Opt::Some(x) =>", "x"), ("Opt::None =>", "d"))),
+                                 ("ok_or", "r", (("Res::Ok(x) =>", "x"), ("Res::Err(x) =>", "d - x")))):
+        fn = p.function(m, name)
+        ms = p.through_block(m, f"match {scrut} {{")
+        mb = p.branch(fn, "match", ms, arms=2)
+        p.region(fn, "return", (p.find(m, f"return match {scrut} {{")[0], ms[1] + 1), fn.entry)
+        p.region(fn, "expression", p.find(m, scrut, after=ms[0] + len("match ")), fn.entry)
+        for i, (pat, result) in enumerate(results):
+            p.region(fn, "match_arm", p.find(m, result, after=p.find(m, pat)[1]), mb[f"arm:{i}"])
+        arms[name] = (fn, mb)
+
+    main = p.function(m, "main")
+    for start in ("let a = ", "let b = ", "let c = ", "let d = ", "let e = "):
+        at = p.find(m, start)[0]
+        p.region(main, "initializer", (at, p.find(m, ";", after=at)[1]), main.entry)
+    p.region(main, "return", p.find(m, "return a + b + c + d + e - 111130;"), main.entry)
+
+    (sure, sq), (plain, pq), (pass_on, oq) = one["sure"], one["plain"], one["pass_on"]
+    (some_or, sm), (ok_or, om) = arms["some_or"], arms["ok_or"]
+    counts = {
+        pick.entry: 12, pb["true"]: 8, pb["false"]: 4,
+        check.entry: 6, cb["true"]: 5, cb["false"]: 1,
+        sure.entry: 1,
+        plain.entry: 2, pq: 1,
+        twice.entry: 3, tq1: 1, tq2: 1,
+        pass_on.entry: 2, oq: 1,
+        total.entry: 2, tl["body"]: 6, tl["exit"]: 1, lq: 1,
+        drain.entry: 2, dl["body"]: 2, dl["exit"]: 1, dq: 1,
+        some_or.entry: 10, sm["arm:0"]: 5, sm["arm:1"]: 5,
+        ok_or.entry: 2, om["arm:0"]: 1, om["arm:1"]: 1,
+        main.entry: 1,
+    }
+    fn2 = [N, C, C, N]  # a function of two statements, then a blank line
+    lines = ([N] * 14 + [C, C, N, C, N, N] + [N, C, C, N, C, N, N] + fn2 + [N] + fn2 + [N] + fn2 + [N] + fn2 + [N]
+             + [N, C, C, C, C, C, N, C, N, N] + [N, C, C, C, N, C, N, N] + [N, C, C, C, C, N, N] + [N, C, C, C, C, N, N]
+             + [N, C, C, C, C, C, C, N])
+    return Fixture(p, counts, {m: lines}, 0, ["question: never propagates", "question: propagates", "question: twice in one statement", "question: on a variable", "question: in a loop body", "question: in a loop condition", "regions: synthetic support"])
+
+
 FIXTURES = {
     "f0": f0,
     "functions": functions,
@@ -347,4 +454,5 @@ FIXTURES = {
     "match": match_,
     "source-text": source_text,
     "project": project,
+    "question": question,
 }

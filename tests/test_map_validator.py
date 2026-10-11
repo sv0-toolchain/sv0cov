@@ -260,6 +260,53 @@ class BranchesContractsExclusionsTest(Case):
             }
         )
 
+    def test_question_propagate_points(self) -> None:
+        """CV-213: a `?` operator is one counted synthetic-support `region`
+        point and a synthetic-support `return` region. It is not a branch:
+        an outcome cannot be synthetic (SPEC 16.3.6)."""
+        d = ROOT / "tests" / "fixtures" / "semantic" / "question"
+        src = {"main.sv0": (d / "main.sv0").read_bytes()}
+        good = json.loads((d / "expected-map.json").read_bytes())
+        self.assertIsNone(code_of(good, sources=src))
+        qs = [p for p in good["points"] if p["semantic_discriminator"] == "question:propagate"]
+        self.assertEqual(len(qs), 7)
+        for q in qs:
+            self.assertEqual((q["kind"], q["classification"], q["outcome_ordinal"]), ("region", "synthetic_support", None))
+            self.assertIsNotNone(q["counter_index"])
+            self.assertEqual(src["main.sv0"][q["span"]["start_byte"]:q["span"]["end_byte"]], b"?")
+        syn = [r for r in good["regions"] if r["classification"] == "synthetic_support"]
+        self.assertEqual([(r["kind"], r["line_contributing"], r["span"]) for r in syn],
+                         [("return", False, q["span"]) for q in sorted(qs, key=lambda q: q["span"]["start_byte"])])
+        self.assertEqual({b["kind"] for b in good["branches"]}, {"if", "loop", "match"})
+        qid = qs[0]["point_id"]
+
+        def mutate(fn) -> str | None:
+            o = copy.deepcopy(good)
+            fn(o)
+            return code_of(ms.finalize(o), sources=src)
+
+        def by_id(o, pid):
+            return next(p for p in o["points"] if p["point_id"] == pid)
+
+        def as_outcome(o):
+            o["branches"][0]["outcomes"][0]["point_id"] = qid
+
+        def uncounted_class(o):
+            by_id(o, qid)["classification"] = "statically_unreachable"
+
+        def with_ordinal(o):
+            by_id(o, qid)["outcome_ordinal"] = 0
+
+        def empty_user(o):
+            r = next(r for r in o["regions"] if r["classification"] == "synthetic_support")
+            r["classification"] = "user"
+            r["counter_expression"] = {"terms": []}
+
+        self.assertEqual(mutate(as_outcome), "COV1010")
+        self.assertEqual(mutate(uncounted_class), "COV1015")
+        self.assertIsNotNone(mutate(with_ordinal))
+        self.assertEqual(mutate(empty_user), "COV1010")
+
     def test_orphan_outcome_point(self) -> None:
         o = ms.build()
         o["branches"] = []
