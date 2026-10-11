@@ -162,6 +162,44 @@ def _u32(data: bytes, at: int) -> int:
     return struct.unpack_from("<I", data, at)[0]
 
 
+@dataclass(frozen=True)
+class Header:
+    """What the fixed header of a raw profile says, read without trusting the
+    rest of the file. ``has_context`` is false when the context bytes are
+    missing or are not UTF-8."""
+
+    backend: str
+    map_id: bytes
+    run_id: bytes
+    profile_id: bytes
+    has_context: bool
+    context: str | None
+
+
+def peek_header(data: bytes) -> Header | None:
+    """The header of a profile that may be truncated or corrupt, for the
+    inventory record of an input that is not accepted (SPEC 16.5.2). ``None``
+    when the fixed header is absent or is not a valid 1.0 header. This is
+    diagnostic identity only: nothing here has been checksummed."""
+    if len(data) < HEADER or data[:8] != MAGIC or struct.unpack_from("<HH", data, 8) != VERSION:
+        return None
+    flags = _u32(data, 12)
+    backends = [name for name, bit in BACKEND_FLAGS.items() if flags & bit]
+    map_id, run_id, profile_id = data[16:48], data[48:64], data[64:80]
+    ctx_len = _u32(data, 80)
+    present = bool(flags & CONTEXT_PRESENT)
+    if flags & ~KNOWN_FLAGS or len(backends) != 1 or bytes(16) in (run_id, profile_id) or ctx_len > MAX_CONTEXT \
+            or (ctx_len and not present):
+        return None
+    has_context, context = len(data) >= HEADER + ctx_len, None
+    if has_context and present:
+        try:
+            context = data[HEADER : HEADER + ctx_len].decode("utf-8")
+        except UnicodeDecodeError:
+            has_context = False
+    return Header(backends[0], map_id, run_id, profile_id, has_context, context)
+
+
 def decode(
     data: bytes,
     *,

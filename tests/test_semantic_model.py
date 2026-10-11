@@ -225,6 +225,11 @@ class SaturationTest(unittest.TestCase):
                          {"by_context": exact(0, (0, big), (1, 2))["by_context"], "lower_bound": True, "saturated": True, "value": U64})
         self.assertEqual(apart["saturation"]["affected_point_ids"], [p.entry])
         check_semantic_structure(apart)
+        # A sum landing exactly on UINT64_MAX is saturated: a physical count of that value is never exact.
+        landed = build_semantic([m], [profile(m, {p.entry: big}, n=1), profile(m, {p.entry: 1}, n=2)])
+        self.assertEqual(by_id(landed)[p.entry]["count"], bound(U64, (0, U64)))
+        under = build_semantic([m], [profile(m, {p.entry: big - 1}, n=1), profile(m, {p.entry: 1}, n=2)])
+        self.assertEqual(by_id(under)[p.entry]["count"], exact(big, (0, big)))
 
     def test_allow_ordinary_lists_the_eligible_metrics_only_when_saturated(self) -> None:
         m, p = tiny(TINY)

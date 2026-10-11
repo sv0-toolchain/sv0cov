@@ -9,5 +9,6 @@ specification (`project-specs/sv0cov/SPEC.md`).
 
 - [Generated-C coverage protocol 1](generated-c-protocol.md): what instrumented C contains and what the native runtime must validate.
 - [Indexed evidence 1.0](indexed-evidence.md): the merge result's two closed schemas, what is validated so far, and the structure fixtures.
+- [Merge](merge.md): how inputs are classified, copies and collisions, run selection, and what the engine returns.
 - [Planning conventions](planning-conventions.md): how the planner assigns entities, regions, and counters.
 - [Release policy](release-policy.md): release identity, versioning, attestations, checksums, SBOM, approval, publication, retention.

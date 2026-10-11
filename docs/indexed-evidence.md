@@ -12,8 +12,8 @@ says how the counts were obtained.
 This page covers what exists today: the two closed schemas, the record-level
 rules and the frozen structure fixtures (CV-220), the builder of the semantic
 object (CV-221), and the full object with its cross-validating reader
-(CV-222). The merge engine, which classifies inputs and selects runs, comes
-next (CV-223).
+(CV-222). The merge engine, which classifies inputs and selects runs, is
+described in [Merge](merge.md) (CV-223).
 
 ## The two schemas
 

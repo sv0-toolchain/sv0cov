@@ -199,7 +199,8 @@ def build_semantic(
             pid = slots[counter]
             old = counts[pid]
             total = old.value + value
-            counts[pid] = Count(min(total, U64_MAX), old.inexact or value == U64_MAX or total > U64_MAX)
+            # A sum that lands exactly on UINT64_MAX is saturated too: a physical count of that value is never exact.
+            counts[pid] = Count(min(total, U64_MAX), old.inexact or total >= U64_MAX)
 
     def point_count(pid: str) -> CountRecord:
         # A raw profile lists only nonzero counts, so every entry here is positive.
