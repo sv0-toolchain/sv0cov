@@ -107,8 +107,10 @@ def indexed(sem: dict, **over) -> dict:
 
 
 def empty() -> dict:
-    """Selection failed before any input was found: nothing accepted, nothing rejected."""
-    return indexed(semantic(diagnostics=["COV3001"]), diagnostics=["COV3003"])
+    """Selection failed before any input was found: nothing accepted, nothing
+    rejected. Unlike the other two documents this one is also valid evidence
+    for the cross-validating reader (CV-222)."""
+    return indexed(semantic(), diagnostics=["COV3001", "COV3003"])
 
 
 # ── all-kinds.json ───────────────────────────────────────────────────────────

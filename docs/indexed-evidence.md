@@ -10,9 +10,10 @@ source-level meaning of the run, and wraps it in the transport evidence that
 says how the counts were obtained.
 
 This page covers what exists today: the two closed schemas, the record-level
-rules and the frozen structure fixtures (CV-220), and the builder of the
-semantic object (CV-221). The full object and the reader's cross-validation
-(CV-222) and the merge engine (CV-223) come next.
+rules and the frozen structure fixtures (CV-220), the builder of the semantic
+object (CV-221), and the full object with its cross-validating reader
+(CV-222). The merge engine, which classifies inputs and selects runs, comes
+next (CV-223).
 
 ## The two schemas
 
@@ -29,7 +30,7 @@ here. The generated validators are
 `sv0cov._generated.validators.sv0cov_indexed_1_0` and
 `sv0cov_indexed_semantic_1_0`.
 
-## What is checked now
+## The structure layer
 
 `sv0cov.formats.indexed` checks a document in three steps:
 
@@ -54,13 +55,8 @@ here. The generated validators are
 Failures raise `IndexedError` with `COV3010` (invalid indexed evidence) or
 `COV3011` (projection mismatch).
 
-A document that passes is well formed. It is not yet accepted evidence. The
-rules that relate records to each other are the reader's cross-validation
-and arrive with CV-222: references and index positions, record-array order,
-bindings that cover each map's counters, region counts recomputed from
-expressions, line membership and status, branch and contract results against
-points, exclusions against classifications, the saturation inventory against
-count flags, and `complete`.
+A document that passes is well formed. It is accepted evidence only after the
+reader below has cross-validated it.
 
 ## Building the semantic object
 
@@ -109,6 +105,70 @@ statuses, with no code shared with the model. The model must equal it for
 all eight reviewed fixtures, from synthetic profiles in sv0cov's tests and
 from real native and sv0vm runs in sv0c's `run_vm_profile.py`.
 
+## The full object
+
+`sv0cov.model.indexed.build_indexed(map_inputs, profile_inputs, ...)`
+assembles the eleven-property object from inputs a merge has already
+classified:
+
+- the **inventory**: one record per map and profile artifact, with its
+  SHA-256, length, basename, status, and diagnostics. Exact copies of an
+  accepted artifact appear once. No directory or absolute path is stored;
+- the **bindings**: for each accepted map, its compiler identity, target,
+  sources, and the point each counter index names;
+- the **run selection**, the **execution** record, and the **merge** record
+  (tool version, diagnostic registry, tier ceilings, the override flag);
+- the semantic object and its projection digest.
+
+`complete` is true exactly when (SPEC §16.5.7) at least one profile is
+accepted, every map and profile input is accepted, the override flag is off,
+the run selection holds (one run when implicit, the declared set exactly
+otherwise), and both diagnostic arrays are empty. The producer records:
+
+| Code | When |
+|---|---|
+| `COV3001` | no profile was accepted |
+| `COV3002` | a map or profile input was rejected or incomplete |
+| `COV3003` | the run selection does not hold |
+| `COV3004` | one source path has two versions (also in the semantic array) |
+
+The override flag alone makes evidence incomplete without a code: the flag
+itself is the stated reason.
+
+The bytes do not depend on the order of the inputs. A native run and an
+sv0vm run of the same program give the same semantic projection; only their
+transport records differ.
+
+## The reader
+
+`sv0cov.model.indexed.read_indexed(bytes)` is what every consumer starts
+from. It reads nothing but the artifact. After the structure layer it
+re-derives each retained fact and rejects any disagreement:
+
+- canonical order and index positions of every record array;
+- every reference between records;
+- each point ID, recomputed from its definition (SPEC §10.3);
+- bindings: each accepted map binds its counters to distinct counted points,
+  and a point no map binds has the exact zero count (`COV3012`);
+- point counts are physical and aggregate by saturating sum; region counts
+  recompute from their expressions per context;
+- line membership is exactly the inversion of the regions' `line_numbers`,
+  and each status recomputes;
+- outcome and contract results equal their points; exclusions equal
+  classifications; the saturation inventory equals the count flags;
+- the inventory names the bindings, the selected runs are the accepted
+  profiles' runs, every context is used, every stored code is in the
+  diagnostic registry the artifact names, and `complete` and the four codes
+  above are exactly what their conditions give.
+
+So a report or check can work from the artifact alone, with the maps and raw
+profiles deleted.
+
+What a reader cannot do is recheck the omitted bytes: that the counts are the
+sum of the raw profiles, or that a binding is really the map's. The artifact
+digests record what the producer validated. Evidence that must prove the
+original bytes has to keep them (§16.5.7).
+
 ## Fixtures
 
 `tests/fixtures/indexed/` holds hand-written structure fixtures, built and
@@ -116,13 +176,14 @@ checked by `build.py`:
 
 | File | Purpose |
 |---|---|
-| `empty.json` | Diagnostic evidence with no input at all. |
+| `empty.json` | Diagnostic evidence with no input at all. Also valid for the reader. |
 | `all-kinds.json` | Every record kind and every enumeration value. |
 | `bounds.json` | Every integer and length at its largest value. |
 | `mutations.json` | Single changes to those documents, each with its outcome: `valid`, `COV3010`, or `COV3011`. |
 
-Their digests are made up and their counts are not derived from a real map,
-so they prove structure only. `tests/test_indexed_structure.py` also removes,
+The digests in `all-kinds.json` and `bounds.json` are made up and their
+counts are not derived from a real map, so they prove structure only and the
+reader rejects both. `tests/test_indexed_structure.py` also removes,
 adds, and mistypes every property of every record in the three documents,
 rejects noncanonical bytes, and requires every record-level rule to be
 reached by some corpus entry.
