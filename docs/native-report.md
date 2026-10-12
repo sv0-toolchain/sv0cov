@@ -8,10 +8,8 @@ to show or judge coverage, in one canonical document (SPEC §21.3). It embeds
 one `sv0cov.resolved-configuration` 1.0 record, the configuration the report
 was made under.
 
-This page covers what exists today: the two closed schemas, the record-level
-rules, and the frozen structure fixtures (CV-228). Producing a report from
-indexed evidence, and the reader that cross-validates one, come next
-(CV-229).
+This page covers the two closed schemas and their record-level rules
+(CV-228), then the producer and the cross-validating reader (CV-229).
 
 ## The two schemas
 
@@ -84,14 +82,8 @@ The record-level rules:
 Failures raise `ReportError`: `COV4001` for an invalid report or resolved
 configuration, `COV6001` for bytes over the reader's tier.
 
-### What it does not check
-
-Left to the cross-validating reader (CV-229): the order and index positions
-of record arrays, references between records, recomputed point IDs, counts
-and statuses, summaries against detail, policy fractions against their
-members, provenance sets against inputs, the saturation inventory against
-count flags, the full eligibility precedence, and the configuration digest
-used by export manifests.
+The structure layer does not look across records. That is the reader's job,
+described below.
 
 ## Fixtures
 
@@ -114,3 +106,99 @@ structure only.
 property of every record in the four documents, rejects noncanonical bytes,
 compares `ratio` with exact rational arithmetic, and requires every rule of
 the module to be reached by some case.
+
+## Producing a report
+
+`sv0cov.model.report.build_report(indexed_bytes, config, sources)` takes
+canonical indexed bytes, a resolved configuration, and the current bytes of
+each source file. It reads the evidence through the indexed reader first, so
+a report is never made from evidence that does not validate.
+
+### What is counted
+
+| Metric | A unit is | Covered when |
+|---|---|---|
+| function | a function whose entry point is `user` | its entry count is above zero |
+| region | a `user` region | its count is above zero (a lower-bound zero is not) |
+| line | a line that is `covered`, `partial` or `uncovered` | every contributing region on it ran; `partial` lines are counted apart and are not covered |
+| branch | an outcome that is `covered` or `uncovered` | its count is above zero |
+| contract | a `runtime_checked` clause that no exclusion removes | either outcome was observed at least once |
+
+Excluded, statically unreachable and synthetic-support records are outside
+every denominator. A zero denominator gives a `null` ratio.
+
+The project and each source get all five metrics. A function entity counts
+only what it owns: its own entry, its regions, the outcomes of its branches,
+its clauses, and each line once where one of its regions contributes, with
+that line's status worked out from its own regions alone. A contract entity
+has only the `contract` metric of its one clause.
+
+### Policy
+
+- **Integrity.** One evaluation carries every finding about the evidence
+  itself: the evidence's own codes, plus `COV1004` for a source that is not
+  current, `COV4020` for saturation that blocks a use, and `COV4021` for a
+  lossy export. It is `fail` for an evidence finding, `ineligible` for a
+  report-time one, and `pass` otherwise.
+- **Project thresholds.** One evaluation per configured threshold, decided
+  by `covered * 10000 >= total * threshold` on integers. The rounded ratio
+  is never used. A zero denominator passes only under `empty = "pass"`;
+  otherwise it fails with `COV4102`.
+- **Saturation.** Under the `fail` policy any saturation makes every
+  threshold `ineligible`. Under `allow-ordinary`, function, region, line and
+  branch are evaluated; a contract threshold is `ineligible` when one of its
+  points saturated.
+
+### Sources
+
+Each source's digest is compared with the bytes supplied. A file that
+differs or is missing is an error (`COV1004`) unless
+`--allow-source-mismatch` is resolved. With it, the source is recorded as
+`mismatch` or `unavailable` and the report can be at most `diagnostic_only`.
+
+### Eligibility
+
+In order: `incomplete` when the evidence is incomplete; `diagnostic_only`
+when a source is not current, a lossy export was used, or an exact-count use
+is ineligible; `policy_failed` when the policy did not pass; `passing`
+otherwise.
+
+### What this build refuses
+
+It reports `COV5001` rather than guess:
+
+- scope, entity, diff, ratchet and exclusion-cap assertions, which come with
+  the policy preview;
+- evidence whose test command failed or was signalled, because the
+  diagnostic registry has no code for that yet;
+- two regions with the same source, span, kind and point set, which the
+  report's ordering rule cannot tell apart.
+
+## Reading a report
+
+`read_report(bytes)` is what every consumer starts from. It reads nothing
+but the report. After the structure layer it recomputes each redundant fact
+and rejects any disagreement with `COV4002`:
+
+- the shared records by the indexed reader's rules: order, index positions,
+  references, point IDs, counts, region expressions, line membership and
+  statuses, branch and contract results, exclusions, the saturation
+  inventory;
+- region order by the report's key, and each exclusion's lines;
+- maps, inputs and contexts against each other, and the provenance sets
+  against them;
+- every summary: project, source and entity;
+- the project evaluations from the configured thresholds, and the integrity
+  evaluation;
+- for evaluations of other kinds, that the result follows from the two
+  fractions and that every member exists;
+- `passed`, `complete` against the integrity findings, and eligibility.
+
+A report must name the diagnostic registry this reader has; every stored
+code must be in it.
+
+What a reader cannot recheck is what a report does not retain: source text
+(so line and column coordinates), the files behind artifact digests, and the
+evidence's own diagnostics beyond their union in the integrity evaluation.
+`tests/test_report.py` lists those primary facts and shows that changing any
+other single field is rejected.

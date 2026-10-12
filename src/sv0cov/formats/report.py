@@ -232,8 +232,6 @@ def _check_policy(p: dict) -> None:
             _fail(f"{w}/threshold_source", "no threshold applies when nothing is compared")
         if e["comparison"] != "none" and e["threshold_source"] is None:
             _fail(f"{w}/threshold_source", "a comparison names the source of its threshold")
-        if e["result"] in ("pass", "fail") and e["comparison"] != "none" and e["actual"] is None:
-            _fail(f"{w}/actual", "a decided comparison has an observation")
         for key, values in e["members"].items():
             _shared(_ix._sorted_unique, values, f"{w}/members/{key}")
         if kind == "integrity":

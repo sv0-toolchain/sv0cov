@@ -512,7 +512,7 @@ def mutations() -> list[dict]:
     add("limit without a comparison", A, [(f"{ev}/15/limit", f(1, 1))])
     add("comparison without a threshold source", P, [(f"{ev}/1/threshold_source", None)])
     add("threshold source without a comparison", A, [(f"{ev}/15/threshold_source", "assertion")])
-    add("decided comparison without an observation", P, [(f"{ev}/1/actual", None)])
+    add("a zero-denominator decision has no observation", P, [(f"{ev}/1/actual", None)], "valid")
     add("comparison unknown", P, [(f"{ev}/1/comparison", "greater")])
     add("result unknown", P, [(f"{ev}/1/result", "ok")])
     add("metric unknown", P, [(f"{ev}/1/metric", "statement")])
