@@ -1,0 +1,69 @@
+sv0cov coverage report
+======================
+evidence:   PASSING
+complete:   yes
+policy:     passed
+tool:       sv0cov 0.0.0-test
+backends:   native
+execution:  not applicable
+runs:       1 (implicit-single)
+inputs:     1 accepted
+sources:    current
+contexts:   (default)
+
+Summary
+-------
+metric     covered/total    percent
+functions            3/3  100.0000%
+regions            13/15   86.6667%
+lines              13/15   86.6667%  2 partial
+branches             4/6   66.6667%
+
+Contracts are reported separately and are not part of the metrics above.
+contracts  0/0  N/A
+
+Files
+-----
+                   functions      regions         lines           branches      contracts
+[user] no package
+  main.sv0         3/3 100.0000%  13/15 86.6667%  13/15 86.6667%  4/6 66.6667%  0/0 N/A
+    fn code        1/1 100.0000%  4/5 80.0000%    4/5 80.0000%    2/3 66.6667%  0/0 N/A
+    fn bucket      1/1 100.0000%  4/5 80.0000%    4/5 80.0000%    2/3 66.6667%  0/0 N/A
+    fn main        1/1 100.0000%  5/5 100.0000%   5/5 100.0000%   0/0 N/A       0/0 N/A
+
+Partial lines
+-------------
+main.sv0: 13, 21
+
+Uncovered lines
+---------------
+(none)
+
+Uncovered branch outcomes
+-------------------------
+main.sv0:11:10  match  not taken: arm:1
+main.sv0:19:10  match  not taken: arm:1
+
+Contracts
+---------
+(none)
+
+Exclusions
+----------
+excluded: 0 functions, 0 regions, 0 lines, 0 branches, 0 contracts
+statically unreachable: 0 branch outcomes
+
+Warnings
+--------
+(none)
+
+Policy
+------
+result  assertion              metric    required  actual  threshold source  members  diagnostics
+PASS    integrity "integrity"  evidence  -         -       -                 -        -
+policy passed
+
+Saturation
+----------
+policy: fail
+no count is saturated

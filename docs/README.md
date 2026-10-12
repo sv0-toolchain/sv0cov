@@ -13,6 +13,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Indexed evidence 1.0](indexed-evidence.md): the merge result's two closed schemas, what is validated so far, and the structure fixtures.
 - [Merge](merge.md): how inputs are classified, copies and collisions, run selection, and what the engine returns.
 - [Native report 1.0](native-report.md): the report and resolved-configuration schemas, how a report is produced and counted, and what the reader re-derives.
+- [Terminal report](terminal-report.md): the plain-text view of a native report, its sections, its escaping and color rules, and its goldens.
 - [Planning conventions](planning-conventions.md): how the planner assigns entities, regions, and counters.
 - [Publication](publication.md): how outputs are written without ever replacing anything, and the primitive used per host.
 - [Release policy](release-policy.md): release identity, versioning, attestations, checksums, SBOM, approval, publication, retention.

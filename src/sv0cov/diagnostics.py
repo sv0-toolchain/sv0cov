@@ -328,11 +328,27 @@ def render_json_line(obj: dict) -> bytes:
     return encode(obj)
 
 
-def _escape(text: str) -> str:
-    """Make untrusted text inert on a terminal: escape C0 controls, DEL, and C1."""
-    return "".join(
-        f"\\x{ord(c):02x}" if (ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F) else c for c in text
-    )
+# Characters that are not controls but still let text rearrange or split a
+# line: the line and paragraph separators and the bidirectional controls.
+_REORDERING = frozenset([0x061C, 0x200E, 0x200F, 0x2028, 0x2029, *range(0x202A, 0x202F), *range(0x2066, 0x206A)])
+
+
+def escape_text(text: str) -> str:
+    """Make untrusted text inert on a terminal: escape C0 controls, DEL, C1,
+    and the characters that reorder or split a line."""
+    out = []
+    for c in text:
+        n = ord(c)
+        if n < 0x20 or 0x7F <= n <= 0x9F:
+            out.append(f"\\x{n:02x}")
+        elif n in _REORDERING:
+            out.append(f"\\u{n:04x}")
+        else:
+            out.append(c)
+    return "".join(out)
+
+
+_escape = escape_text
 
 
 def _render_value(v: object) -> str:

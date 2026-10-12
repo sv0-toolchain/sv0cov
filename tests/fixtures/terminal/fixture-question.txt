@@ -1,0 +1,76 @@
+sv0cov coverage report
+======================
+evidence:   PASSING
+complete:   yes
+policy:     passed
+tool:       sv0cov 0.0.0-test
+backends:   native
+execution:  not applicable
+runs:       1 (implicit-single)
+inputs:     1 accepted
+sources:    current
+contexts:   (default)
+
+Summary
+-------
+metric     covered/total    percent
+functions          11/11  100.0000%
+regions            42/42  100.0000%
+lines              38/38  100.0000%  0 partial
+branches           12/12  100.0000%
+
+Contracts are reported separately and are not part of the metrics above.
+contracts  0/0  N/A
+
+Files
+-----
+                   functions        regions          lines            branches         contracts
+[user] no package
+  main.sv0         11/11 100.0000%  42/42 100.0000%  38/38 100.0000%  12/12 100.0000%  0/0 N/A
+    fn pick        1/1 100.0000%    4/4 100.0000%    3/3 100.0000%    2/2 100.0000%    0/0 N/A
+    fn check       1/1 100.0000%    4/4 100.0000%    3/3 100.0000%    2/2 100.0000%    0/0 N/A
+    fn sure        1/1 100.0000%    2/2 100.0000%    2/2 100.0000%    0/0 N/A          0/0 N/A
+    fn plain       1/1 100.0000%    2/2 100.0000%    2/2 100.0000%    0/0 N/A          0/0 N/A
+    fn twice       1/1 100.0000%    2/2 100.0000%    2/2 100.0000%    0/0 N/A          0/0 N/A
+    fn pass_on     1/1 100.0000%    2/2 100.0000%    2/2 100.0000%    0/0 N/A          0/0 N/A
+    fn total       1/1 100.0000%    7/7 100.0000%    6/6 100.0000%    2/2 100.0000%    0/0 N/A
+    fn drain       1/1 100.0000%    5/5 100.0000%    4/4 100.0000%    2/2 100.0000%    0/0 N/A
+    fn some_or     1/1 100.0000%    4/4 100.0000%    4/4 100.0000%    2/2 100.0000%    0/0 N/A
+    fn ok_or       1/1 100.0000%    4/4 100.0000%    4/4 100.0000%    2/2 100.0000%    0/0 N/A
+    fn main        1/1 100.0000%    6/6 100.0000%    6/6 100.0000%    0/0 N/A          0/0 N/A
+
+Partial lines
+-------------
+(none)
+
+Uncovered lines
+---------------
+(none)
+
+Uncovered branch outcomes
+-------------------------
+(none)
+
+Contracts
+---------
+(none)
+
+Exclusions
+----------
+excluded: 0 functions, 0 regions, 0 lines, 0 branches, 0 contracts
+statically unreachable: 0 branch outcomes
+
+Warnings
+--------
+(none)
+
+Policy
+------
+result  assertion              metric    required  actual  threshold source  members  diagnostics
+PASS    integrity "integrity"  evidence  -         -       -                 -        -
+policy passed
+
+Saturation
+----------
+policy: fail
+no count is saturated

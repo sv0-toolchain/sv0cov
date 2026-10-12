@@ -1,0 +1,105 @@
+sv0cov coverage report
+======================
+evidence:   INCOMPLETE
+complete:   no
+policy:     failed
+tool:       sv0cov 0.1.0
+backends:   native, vm-v1, vm-v2
+execution:  failed (exit 3)
+runs:       2 (explicit-list)
+inputs:     3 accepted, 1 incomplete, 1 rejected
+sources:    mismatch allowed
+contexts:   (default), "", "shard é"
+
+Summary
+-------
+metric     covered/total   percent
+functions            1/2  50.0000%
+regions             9/14  64.2857%
+lines               7/12  58.3333%  2 partial
+branches             5/9  55.5556%
+
+Contracts are reported separately and are not part of the metrics above.
+contracts  3/4  75.0000%
+
+Files
+-----
+                                functions      regions        lines          branches      contracts
+[user] no package
+  src/app.sv0                   1/2 50.0000%   9/14 64.2857%  7/12 58.3333%  5/9 55.5556%  3/4 75.0000%
+    fn app::run                 1/2 50.0000%   9/14 64.2857%  7/12 58.3333%  5/9 55.5556%  3/4 75.0000%
+[dependency] package "dep-lib"
+  vendor/dep/hot.sv0            1/1 100.0000%  1/1 100.0000%  1/1 100.0000%  0/0 N/A       0/0 N/A
+    fn dep::hot                 1/2 50.0000%   9/14 64.2857%  7/12 58.3333%  5/9 55.5556%  3/4 75.0000%
+
+Partial lines
+-------------
+src/app.sv0: 9
+
+Uncovered lines
+---------------
+src/app.sv0: 26
+
+Uncovered branch outcomes
+-------------------------
+src/app.sv0:4:1   if             not taken: false
+src/app.sv0:18:1  short_circuit  not taken: skipped
+
+Contracts
+---------
+location          clause                     enforcement          result           true  false
+src/app.sv0:2:1   app::run#requires:0        runtime_checked      mixed               4      1
+src/app.sv0:20:1  app::run#ensures:0         runtime_checked      evaluated_true      5      0
+src/app.sv0:22:1  app::run#assert:0          runtime_checked      not_evaluated       0      0
+src/app.sv0:24:1  app::run#assert:1          runtime_checked      evaluated_false     0      1
+src/app.sv0:8:1   app::run#loop_invariant:0  statically_verified  not_applicable      -      -
+src/app.sv0:25:1  app::run#assert:2          disabled             not_applicable      -      -
+src/app.sv0:32:1  app#ensures:0              unsupported          not_applicable      -      -
+src/app.sv0:8:1 evidence: "sv0c:smt:proof-1"
+
+Exclusions
+----------
+excluded: 0 functions, 1 region, 3 lines, 1 branch, 1 contract
+statically unreachable: 1 branch outcome
+#0 src/app.sv0:11:1 branch_off (comment): "generated dispatch table"
+#1 src/app.sv0:13:1 off (attribute): "platform-specific arm, tested elsewhere"
+#2 src/app.sv0:25:1 contract_off (comment): "checked by the caller: see app::main"
+
+Warnings
+--------
+WARNING: the evidence is incomplete; this report cannot be passing evidence.
+WARNING: input "truncated.sv0profraw" was incomplete [COV2011]
+WARNING: input "collision.sv0profraw" was rejected [COV2112]
+WARNING: source src/app.sv0 does not match the evidence; its lines may be wrong.
+WARNING: source vendor/dep/hot.sv0 was not available; its lines may be wrong.
+
+Policy
+------
+result      assertion                metric             required        actual  threshold source  members               diagnostics
+N/A         diff "diff"              branch             >= 9000/10000   -       diff              -                     -
+FAIL        diff "diff"              line               >= 10000/10000  3/4     diff              1 source, 4 lines     COV4101
+PASS        diff "diff"              region             >= 10000/10000  2/2     diff              2 regions             -
+PASS        entity "check-contract"  contract           >= 10000/10000  1/1     assertion         1 entity, 1 clause    -
+PASS        entity "main-fn"         branch             >= 5000/10000   5/9     assertion         1 entity, 2 branches  -
+FAIL        entity "main-fn"         line               >= 8500/10000   7/12    project           1 entity, 2 lines     COV4101
+PASS        exclusion "exclusions"   branch             <= 2500/10000   1/10    exclusion         1 branch              -
+PASS        exclusion "exclusions"   exclusion_records  <= 3/1          3/1     exclusion         -                     -
+INELIGIBLE  integrity "integrity"    evidence           -               -       -                 -                     COV1004, COV3002, COV3004, COV4020
+INELIGIBLE  project "project"        contract           >= 10000/10000  -       project           3 clauses             COV4020
+FAIL        project "project"        function           >= 9000/10000   1/2     project           2 entities            COV4101
+FAIL        project "project"        region             >= 8250/10000   9/14    project           3 regions             COV4101
+INELIGIBLE  ratchet "ratchet"        line               >= 7/12         -       ratchet           -                     COV4020
+PASS        ratchet "ratchet"        region             == 9/14         9/14    ratchet           -                     -
+FAIL        scope "core"             line               >= 9500/10000   7/12    assertion         1 source, 2 lines     COV4101, COV4102
+N/A         scope "core"             region             -               -       -                 -                     -
+policy failed
+
+Saturation
+----------
+policy: allow-ordinary
+a count written >=N is a lower bound: the true count is N or more
+point a6a4ddf760c2  vendor/dep/hot.sv0:1:1  all contexts       >=18446744073709551615
+point a6a4ddf760c2  vendor/dep/hot.sv0:1:1  context (default)  >=18446744073709551615
+region 13           vendor/dep/hot.sv0:2:1  all contexts       >=18446744073709551615
+metrics still decidable: branch, function, line, region
+not usable for: context_exact_counts, contract_counts, exact_count_assertions, ratchets, standard_exports
