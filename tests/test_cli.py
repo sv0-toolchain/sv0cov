@@ -170,7 +170,7 @@ class ExitCodeTest(unittest.TestCase):
 
     def test_a_valid_invocation_of_an_unimplemented_command_is_unsupported(self) -> None:
         pending = [c for c in C.COMMANDS if c not in cli.HANDLERS]
-        self.assertEqual(sorted(cli.HANDLERS), ["merge", "version"])
+        self.assertEqual(sorted(cli.HANDLERS), ["check", "merge", "version"])
         for command in pending:
             with self.subTest(command=command):
                 code, out, err = run(*argv(command, "--diagnostic-format=json-lines"))
@@ -228,7 +228,7 @@ class UsageMatrixTest(unittest.TestCase):
     def test_every_base_invocation_is_accepted_by_the_usage_checks(self) -> None:
         for command in C.COMMANDS:
             code, _, err = run(*argv(command))
-            self.assertEqual(code, {"version": 0, "merge": 5}.get(command, 7), (command, err))
+            self.assertEqual(code, {"version": 0, "merge": 5, "check": 5}.get(command, 7), (command, err))
 
     def test_every_option_on_every_command(self) -> None:
         accepted = refused = 0
@@ -384,7 +384,7 @@ class ProcessTest(unittest.TestCase):
         self.assertEqual((p.returncode, p.stdout), (2, b""))
         (rec,) = records(p.stderr.decode())
         self.assertEqual(rec["code"], "COV0001")
-        p = self.process("check", "cov.json")
+        p = self.process("report", "--format", "json", "cov.json")
         self.assertEqual((p.returncode, p.stdout), (7, b""))
         self.assertTrue(p.stderr.startswith(b"COV5001 error: Unsupported installation or platform\n"))
         self.assertNotIn(b"\x1b", p.stderr)  # a pipe is not a terminal

@@ -175,7 +175,7 @@ def main(argv: list[str] | None = None, *, stdout: TextIO | None = None, stderr:
     return status
 
 
-from sv0cov import cmd_merge  # noqa: E402,F401 - registers the merge handler
+from sv0cov import cmd_check, cmd_merge  # noqa: E402,F401 - register the check and merge handlers
 
 if __name__ == "__main__":
     sys.exit(main())

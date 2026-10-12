@@ -328,9 +328,10 @@ class _View:
         self.lines.append(f"metrics still decidable: {', '.join(s['eligible_metrics']) or 'none'}")
         self.lines.append(f"not usable for: {', '.join(s['ineligible_uses']) or 'nothing'}")
 
-    def render(self) -> str:
-        for part in (self.header, self.summary, self.files, self.uncovered, self.contracts, self.exclusions,
-                     self.warnings, self.policy, self.saturation):
+    def render(self, brief: bool = False) -> str:
+        full = (self.header, self.summary, self.files, self.uncovered, self.contracts, self.exclusions,
+                self.warnings, self.policy, self.saturation)
+        for part in ((self.header, self.summary, self.warnings, self.policy, self.saturation) if brief else full):
             part()
         out = []
         for number, line in enumerate(self.lines):
@@ -349,6 +350,12 @@ class _View:
 def render_terminal(report: dict, *, color: bool = False) -> str:
     """The terminal report for one validated native report document."""
     return _View(report, color).render()
+
+
+def render_check(report: dict, *, color: bool = False) -> str:
+    """What ``check`` says: the header, summary, warnings, policy and
+    saturation sections of the terminal report, unchanged."""
+    return _View(report, color).render(brief=True)
 
 
 def terminal_bytes(report: dict) -> bytes:

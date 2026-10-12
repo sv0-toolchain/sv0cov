@@ -280,7 +280,8 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
         observed = None if data is None else hashlib.sha256(data).hexdigest()
         state = "unavailable" if observed is None else "current" if observed == s["digest"] else "mismatch"
         if state != "current" and not allow_stale:
-            raise ReportError(STALE, f"source {s['path']} is {state}: coverage was collected from other bytes")
+            what = "is missing or unreadable" if state == "unavailable" else "has changed since coverage was collected"
+            raise ReportError(STALE, f"source {s['path']} {what}")
         report_sources.append({**s, "observed_digest": observed, "source_state": state})
 
     registry = diagnostics.load_registry()

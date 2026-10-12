@@ -14,6 +14,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Merge](merge.md): how inputs are classified, copies and collisions, run selection, and what the engine returns.
 - [Native report 1.0](native-report.md): the report and resolved-configuration schemas, how a report is produced and counted, and what the reader re-derives.
 - [Terminal report](terminal-report.md): the plain-text view of a native report, its sections, its escaping and color rules, and its goldens.
+- [Check](check.md): what `sv0cov check` evaluates, its exit statuses, and its output.
 - [Planning conventions](planning-conventions.md): how the planner assigns entities, regions, and counters.
 - [Publication](publication.md): how outputs are written without ever replacing anything, and the primitive used per host.
 - [Release policy](release-policy.md): release identity, versioning, attestations, checksums, SBOM, approval, publication, retention.
