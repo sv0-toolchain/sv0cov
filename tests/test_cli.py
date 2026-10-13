@@ -20,7 +20,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from sv0cov import cli  # noqa: E402
+from sv0cov import cli, cmd_run  # noqa: E402
 from sv0cov import config as C  # noqa: E402
 from sv0cov.console import Console  # noqa: E402
 from sv0cov.diagnostics import Diagnostic, load_registry, validate_record  # noqa: E402
@@ -56,7 +56,9 @@ def run(*args: str, cwd: Path | None = None, files: dict[str, bytes] | None = No
         d = cwd or Path(tmp)
         for name, data in (files or {}).items():
             (d / name).write_bytes(data)
-        code = cli.main(list(args), stdout=out, stderr=err, cwd=d)
+        # These tests are about the framework: `run` must not reach a real toolchain from here.
+        with mock.patch.object(cmd_run, "toolchain_driver", lambda: None):
+            code = cli.main(list(args), stdout=out, stderr=err, cwd=d)
     return code, out.getvalue(), err.getvalue()
 
 
@@ -170,7 +172,7 @@ class ExitCodeTest(unittest.TestCase):
 
     def test_a_valid_invocation_of_an_unimplemented_command_is_unsupported(self) -> None:
         pending = [c for c in C.COMMANDS if c not in cli.HANDLERS]
-        self.assertEqual(sorted(cli.HANDLERS), ["check", "clean", "merge", "report", "version"])
+        self.assertEqual(sorted(cli.HANDLERS), ["check", "clean", "merge", "report", "run", "version"])
         for command in pending:
             with self.subTest(command=command):
                 code, out, err = run(*argv(command, "--diagnostic-format=json-lines"))

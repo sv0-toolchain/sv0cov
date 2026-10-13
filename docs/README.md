@@ -14,6 +14,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Merge](merge.md): how inputs are classified, copies and collisions, run selection, and what the engine returns.
 - [Native report 1.0](native-report.md): the report and resolved-configuration schemas, how a report is produced and counted, and what the reader re-derives.
 - [Terminal report](terminal-report.md): the plain-text view of a native report, its sections, its escaping and color rules, and its goldens.
+- [Run](run.md): what `sv0cov run` builds, how the test command is started, its environment and run directory.
 - [Report](report.md): formats, the destination matrix, and the exit statuses of `sv0cov report`.
 - [Check](check.md): what `sv0cov check` evaluates, its exit statuses, and its output.
 - [Clean](clean.md): what `sv0cov clean` recognizes as its own and how it refuses everything else.
