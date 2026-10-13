@@ -79,4 +79,4 @@ is incidental: `--quiet` removes it and never removes a diagnostic.
 SPEC 20.1 names the operand `<indexed-profile-or-native-report>`, while
 SPEC 16.5 says the indexed profile is the only accepted input to `check`.
 Until that is decided (D-10 in the toolchain hub), a native report operand
-is refused with `COV5001` and exit 7.
+is refused with `COV5001` and exit 7. `report` refuses one the same way.

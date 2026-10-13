@@ -31,7 +31,7 @@ from test_indexed_reader import FIXTURES, U64, fixture_inputs, raw, simple  # no
 from test_report import fixture_sources  # noqa: E402
 from test_terminal import sections  # noqa: E402
 
-from sv0cov import cli, cmd_check  # noqa: E402
+from sv0cov import cli, cmd_check, evidence  # noqa: E402
 from sv0cov.config_resolve import resolve  # noqa: E402
 from sv0cov.formats.canonical_json import encode  # noqa: E402
 from sv0cov.formats.terminal import render_check, render_terminal  # noqa: E402
@@ -285,27 +285,27 @@ class OperandTest(Base):
         code, out, err = self.check(operand="coverage.json")
         (r,) = records(err)
         self.assertEqual((code, out, r["code"], r["phase"]), (7, "", "COV5001", "invocation"))
-        self.assertIn("not a native report", r["facts"][0]["value"])
+        self.assertIn("for check, not a native report", r["facts"][0]["value"])
 
     def test_an_oversized_profile_is_refused_before_it_is_read(self) -> None:
         self.project()
         with open(self.cwd / "huge.json", "wb") as f:
             f.truncate((512 << 20) + 1)
-        with mock.patch.object(cmd_check, "read_indexed", side_effect=AssertionError("the file was read")):
+        with mock.patch.object(evidence, "read_indexed", side_effect=AssertionError("the file was read")):
             code, _, err = self.check(operand="huge.json")
         self.assertEqual((code, self.codes(err)), (5, ["COV6001"]))
 
     def test_a_result_the_reader_rejects_is_an_internal_failure(self) -> None:
         """The report is read back before any verdict is given."""
         self.project()
-        real = cmd_check.build_report
+        real = evidence.build_report
 
         def wrong(*args, **kw):
             report = real(*args, **kw)
             report["summary"]["line"]["covered"] -= 1
             return report
 
-        with mock.patch.object(cmd_check, "build_report", wrong):
+        with mock.patch.object(evidence, "build_report", wrong):
             code, out, err = self.check()
         self.assertEqual((code, out, self.codes(err)), (8, "", ["COV8001"]))
 
