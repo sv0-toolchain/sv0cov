@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
-"""The ``run`` command, first half (CV-233; SPEC 14.3, 20.1, 20.2.2, 20.4,
-23.3; COV-CLI-001, COV-CLI-003, COV-SEC-006, AC-018, AC-098)::
+"""The ``run`` command (CV-233, CV-234; SPEC 14.3, 17, 20.1 to 20.4, 23.3;
+COV-CLI-001, COV-CLI-003, COV-CLI-004, COV-INS-008, COV-SEC-006, AC-018,
+AC-022, AC-098)::
 
     sv0cov run [options] -- <test-command> [args...]
 
@@ -9,7 +10,8 @@ What happens, in order:
 
 1. **Checks that cost nothing.** The project name (the working directory's
    name) must be a plain file name; the test command must be findable; the
-   toolchain driver must exist. Nothing is created before these pass.
+   selected report formats must be ones this build produces; the toolchain
+   driver must exist. Nothing is created before these pass.
 2. **Run ID.** ``--run-id`` if given, else 16 bytes from the operating
    system's secure source as 32 lowercase hex. An all-zero value or an
    entropy failure aborts. Nothing in the caller's environment selects it.
@@ -35,16 +37,33 @@ What happens, in order:
    on ``PATH``, which is how the command (or a script it runs) reaches the
    instrumented program by name. The caller's own environment is not
    changed. The build gets the same environment without the transport.
+   SIGINT, SIGTERM, SIGHUP and SIGQUIT sent to sv0cov meanwhile are passed
+   on to the command.
+6. **Collection and merge.** Whatever the command's fate, the maps and every
+   profile in the run directory are merged for exactly this run ID, with the
+   command's result as the execution record. A profile that is cut short,
+   a runtime's uncommitted temporary, a profile of another run, or no
+   profile at all makes the evidence incomplete: each is reported, nothing
+   is published, and no report is made, because a missing profile is never
+   zero coverage.
+7. **Publication.** Complete evidence becomes
+   ``<run>/coverage.sv0covdata.json``. The selected nonterminal reports
+   become the bundle ``<run>/reports``. A selected terminal report goes to
+   stdout unless ``--quiet``.
+8. **Check.** Every assertion that did not pass is a diagnostic, as in
+   ``check``. A failed or signalled command fails the integrity evaluation
+   with ``COV2130`` and the coverage policy is still evaluated and reported
+   beside it.
 
-Collecting, merging, reporting and checking the run are the second half
-(CV-234). Until then a run whose test command succeeded ends with
-``COV5001`` and exit 7, after saying where the evidence is; ``sv0cov merge``
-can take it from there.
-
-**Exit status.** 2 usage (including a test command that cannot be found); 3
-the build failed or left no valid map; 4 the test command failed; 5 the run
-directory exists or cannot be created safely; 7 no toolchain driver, or the
-unimplemented second half; 8 no entropy.
+**Exit status** (SPEC 20.3). With a test command that passed: 0, or 1 when
+the policy did not pass, 5 when the evidence is incomplete or a source
+changed, 6 when the reports could not be published. With a test command
+that failed: 4, or 128 plus the number of the signal that ended it, whatever
+else went wrong; ``--prefer-coverage-exit`` gives 1 instead when the
+coverage policy itself also failed. Before the command runs: 2 usage
+(including a test command that cannot be found), 3 the build failed, 5 the
+run directory exists, 7 no toolchain driver or an unimplemented report
+format, 8 no entropy.
 """
 
 from __future__ import annotations
@@ -52,17 +71,26 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 from pathlib import Path
 from typing import Callable, Mapping
 
-from sv0cov import cli
+from sv0cov import cli, evidence
+from sv0cov.cmd_check import coverage_failed, evaluation_diagnostics, exit_status
+from sv0cov.cmd_merge import INDEXED_NAME, collect
+from sv0cov.cmd_report import FILENAMES, IMPLEMENTED, REPORTS_DIR
 from sv0cov.diagnostics import Diagnostic
-from sv0cov.formats.map import MapError, map_limits, validate_map
+from sv0cov.evidence import report_of
 from sv0cov.formats import runset
+from sv0cov.formats.map import MapError, map_limits, validate_map
 from sv0cov.formats.runset import RunIdError, parse_run_id
-from sv0cov.publish import DIR_MODE, PublishError, _open_parent
+from sv0cov.formats.terminal import render_terminal
+from sv0cov.model.indexed import read_indexed
+from sv0cov.model.merge import MergeError, merge, select_runs
+from sv0cov.model.report import read_report
+from sv0cov.publish import DIR_MODE, PublishError, _open_parent, publish_bundle, publish_file
 
 RESERVED_PREFIX = "SV0COV_"
 TRANSPORT = ("SV0COV_PROFILE_DIR", "SV0COV_RUN_ID", "SV0COV_CONTEXT", "SV0COV_REQUIRED")
@@ -71,7 +99,8 @@ SUBDIRS = ("bin", "maps", "profiles")
 BUILD_LOG = "build.log"
 MAP_SUFFIX = ".sv0covmap.json"
 RE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
-LOG_BYTES = 1 << 20
+#: Signals passed on to the running test command.
+FORWARDED = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT)
 
 
 class _Stop(Exception):
@@ -219,7 +248,11 @@ def _descriptor(stream: object) -> int | None:
 
 def execute(argv: tuple[str, ...], program: str, cwd: Path, env: Mapping[str, str], console) -> int:
     """Run the test command as the exact argv vector, without a shell. The
-    result is its exit status, or the negated signal number."""
+    result is its exit status, or the negated signal number.
+
+    While it runs, the termination signals sent to sv0cov are passed on to
+    it, so that ending sv0cov ends the command and sv0cov still gets to say
+    what the run left (SPEC 23.3)."""
     out, err = _descriptor(console.stdout), _descriptor(console.stderr)
     console.stdout.flush()
     console.stderr.flush()
@@ -230,13 +263,102 @@ def execute(argv: tuple[str, ...], program: str, cwd: Path, env: Mapping[str, st
     except OSError as exc:
         raise _Stop(cli.EXIT_USAGE, "COV0001", "invocation", subject="run",
                     detail=f"the test command could not be started ({type(exc).__name__})") from None
-    if captured:
-        got_out, got_err = child.communicate()
-        console.stdout.write(got_out.decode("utf-8", "replace"))
-        console.stderr.write(got_err.decode("utf-8", "replace"))
-    else:
-        child.wait()
+
+    def forward(number: int, _frame: object) -> None:
+        try:
+            child.send_signal(number)
+        except OSError:
+            pass  # it has already ended
+
+    previous = {}
+    for number in FORWARDED:
+        try:
+            previous[number] = signal.signal(number, forward)
+        except (ValueError, OSError):
+            pass  # not the main thread: nothing can be forwarded from here
+    try:
+        if captured:
+            got_out, got_err = child.communicate()
+            console.stdout.write(got_out.decode("utf-8", "replace"))
+            console.stderr.write(got_err.decode("utf-8", "replace"))
+        else:
+            child.wait()
+    finally:
+        for number, handler in previous.items():
+            signal.signal(number, handler)
     return child.returncode
+
+
+def execution_record(status: int) -> dict:
+    """The indexed ``execution`` record of a wait status (SPEC 16.5)."""
+    if status == 0:
+        return {"exit_code": 0, "signal": None, "status": "passed"}
+    if status < 0:
+        return {"exit_code": None, "signal": -status, "status": "signaled"}
+    return {"exit_code": status, "signal": None, "status": "failed"}
+
+
+def final_status(status: int, stage: int, coverage_failed: bool, prefer_coverage: bool) -> int:
+    """The combined exit status (SPEC 20.3).
+
+    ``stage`` is what sv0cov's own work came to: 0, 1 (policy), 5 (evidence)
+    or 6 (reports). A test command that passed leaves that as the result. A
+    test command that failed is 4, or 128 plus the signal that ended it,
+    whatever else failed; except that ``--prefer-coverage-exit`` gives 1
+    when the coverage policy itself also failed."""
+    if status == 0:
+        return stage
+    if prefer_coverage and coverage_failed:
+        return cli.EXIT_POLICY
+    return 128 - status if status < 0 else cli.EXIT_TEST
+
+
+def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int) -> tuple[int, bool]:
+    """Collect, merge, report and check what the run left. Returns sv0cov's
+    own stage status and whether the coverage policy failed."""
+    console, config = ctx.console, ctx.config
+    tier = config.tier()
+    formats = [f for f in FILENAMES if f in config.value("reports")]
+    maps, profiles = collect((f"{shown}/maps", f"{shown}/profiles"), ctx.cwd, tier)
+    try:
+        result = merge(maps, profiles, run_selection=select_runs([run_id]), tier=tier, execution=execution_record(status),
+                       saturation_policy=config.value("integrity.saturation"))
+    except MergeError as exc:
+        raise _Stop(cli.EXIT_EVIDENCE, exc.code, "merge", detail=exc.detail) from None
+    for f in result.findings:
+        facts = [("detail", cli.fact_text(f.detail)), ("input_kind", f.kind)]
+        if f.name is not None:
+            facts.append(("name", cli.fact_text(f.name)))
+        console.report(Diagnostic(f.code, "merge", facts=tuple(facts)))
+    inputs = result.indexed["profile_inputs"]
+    accepted = sum(1 for r in inputs if r["status"] == "accepted")
+    if not result.publishable:
+        # Incomplete evidence is never turned into a report: a missing or cut profile is not zero coverage.
+        console.say(f"run {run_id}: the evidence is incomplete ({accepted} of {len(inputs)} profiles accepted) and was not reported")
+        return cli.EXIT_EVIDENCE, False
+    try:
+        publish_file(f"{shown}/{INDEXED_NAME}", result.data, anchor=str(ctx.cwd), validate=lambda data: read_indexed(data, tier=tier.name))
+    except PublishError as exc:
+        raise _Stop(cli.EXIT_EVIDENCE, exc.code, "publication", artifact="indexed-profile", detail=exc.detail) from None
+    try:
+        report, encoded = report_of(ctx, result.data)
+    except evidence.Stop as stop:
+        console.report(stop.diagnostic)
+        return stop.status, False
+    files = {FILENAMES[f]: encoded for f in formats if f != "term"}
+    if files:
+        try:
+            publish_bundle(f"{shown}/{REPORTS_DIR}", files, anchor=str(ctx.cwd),
+                           validate={name: (lambda data: read_report(data, tier=tier.name)) for name in files})
+        except PublishError as exc:
+            console.report(Diagnostic(exc.code, "publication", facts=(("artifact", "report"), ("detail", cli.fact_text(exc.detail)))))
+            return cli.EXIT_REPORT, coverage_failed(report)
+    for diagnostic in evaluation_diagnostics(report):
+        console.report(diagnostic)
+    if "term" in formats:
+        console.say(render_terminal(report, color=console.colored(console.stdout)).rstrip("\n"))
+    console.say(f"run {run_id}: merged {accepted} of {len(inputs)} profiles; evidence and reports are in {shown}")
+    return exit_status(report), coverage_failed(report)
 
 
 @cli.command("run")
@@ -249,6 +371,10 @@ def cmd_run(ctx: cli.Context) -> int:
         if argv[0] != name and find_command(argv[0], ctx.cwd, caller.get("PATH")) is None:
             raise _Stop(cli.EXIT_USAGE, "COV0001", "invocation", subject="run",
                         detail="the test command was not found or is not executable")
+        missing = [f for f in config.value("reports") if f not in IMPLEMENTED]
+        if missing:
+            raise _Stop(cli.EXIT_UNSUPPORTED, "COV5001", "invocation", format=missing[0],
+                        detail="this build of sv0cov does not produce this report format yet")
         driver = toolchain_driver()
         if driver is None:
             raise _Stop(cli.EXIT_UNSUPPORTED, "COV5001", "build",
@@ -277,9 +403,10 @@ def cmd_run(ctx: cli.Context) -> int:
         return stop.status
     if status != 0:
         how = f"was ended by signal {-status}" if status < 0 else f"exited with status {status}"
-        console.say(f"run {run_id}: the test command {how}; its evidence is in {shown}")
-        return cli.EXIT_TEST
-    console.say(f"run {run_id}: the test command passed; maps and profiles are in {shown}")
-    console.report(Diagnostic("COV5001", "collection", facts=(
-        ("command", "run"), ("detail", "this build of sv0cov does not merge, report and check a run yet; use sv0cov merge on its maps and profiles"))))
-    return cli.EXIT_UNSUPPORTED
+        console.say(f"run {run_id}: the test command {how}")
+    try:
+        stage, failed = finish(ctx, run_dir, shown, run_id, status)
+    except _Stop as stop:
+        console.report(stop.diagnostic)
+        stage, failed = stop.status, False
+    return final_status(status, stage, failed, bool(config.controls.get("--prefer-coverage-exit")))

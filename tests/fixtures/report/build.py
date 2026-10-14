@@ -139,7 +139,7 @@ def from_indexed(doc: dict, *, eligibility: str, evaluations: list[dict], passed
         "schema": "sv0cov.report",
         "sources": sources,
         "summary": summary,
-        "tool": {"diagnostic_registry_revision": 1, "diagnostic_registry_sha256": ix.REGISTRY_SHA, "name": "sv0cov", "version": tool_version},
+        "tool": {"diagnostic_registry_revision": 2, "diagnostic_registry_sha256": ix.REGISTRY_SHA, "name": "sv0cov", "version": tool_version},
         "version": "1.0",
     }
 

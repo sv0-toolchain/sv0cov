@@ -57,7 +57,7 @@ def manifest_object() -> dict:
             "workflow": ".github/workflows/release.yml",
         },
         "compatibility_policy_sha256": digest("compatibility"),
-        "diagnostic_registry": {"revision": 1, "sha256": "440aad98c48e372d526d4aefb7c3e8cba8a0d4fc07b31797115a55044b06e3b1"},
+        "diagnostic_registry": {"revision": 2, "sha256": "1c2cd283986f9474f0e51196d969ed9fd57f48f29ba9704a00e76b9175ed917f"},
         "evidence_manifest_sha256": hashlib.sha256(payload("sv0cov-1.0.0.evidence.json")).hexdigest(),
         "license_inventory_sha256": digest("licenses"),
         "product": "sv0cov",

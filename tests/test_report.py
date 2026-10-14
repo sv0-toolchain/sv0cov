@@ -327,8 +327,32 @@ class ThresholdTest(unittest.TestCase):
         for label, toml in cases.items():
             with self.subTest(case=label):
                 self.assertEqual(code_of(build_report, encode(ix), config(toml=toml), fixture_sources("f0", ix)), "COV5001")
-        failed = build_indexed(*self.inputs(), execution={"exit_code": 3, "signal": None, "status": "failed"}, tool_version=V)
-        self.assertEqual(code_of(build_report, encode(failed), config(), fixture_sources("f0", failed)), "COV5001")
+
+    def test_a_failed_or_signalled_test_command_fails_integrity_whatever_the_coverage(self) -> None:
+        """SPEC 21.3.5, 22.5; AC-022: the coverage result is still reported, separately."""
+        for execution, passes in (({"exit_code": 0, "signal": None, "status": "passed"}, True),
+                                  ({"exit_code": 3, "signal": None, "status": "failed"}, False),
+                                  ({"exit_code": None, "signal": 9, "status": "signaled"}, False)):
+            with self.subTest(execution=execution["status"]):
+                ix = build_indexed(*self.inputs(), execution=execution, tool_version=V)
+                report = build_report(encode(ix), config(toml=thresholds(line=87, branch=100)), fixture_sources("f0", ix), tool_version=V)
+                integrity = evaluation(report, "evidence", "integrity")
+                self.assertEqual((integrity["result"], integrity["diagnostics"]), ("pass", []) if passes else ("fail", ["COV2130"]))
+                self.assertTrue(report["complete"])  # collection is complete either way
+                self.assertEqual((evaluation(report, "line")["result"], evaluation(report, "branch")["result"]), ("pass", "fail"))
+                self.assertEqual((report["policy"]["passed"], report["evidence_eligibility"]), (False, "policy_failed"))
+                self.assertEqual(report["provenance"]["execution_status"], execution["status"])
+                self.assertEqual(read_report(encode(report)), report)
+                clean = build_report(encode(ix), config(), fixture_sources("f0", ix), tool_version=V)
+                self.assertEqual((clean["policy"]["passed"], clean["evidence_eligibility"]),
+                                 (True, "passing") if passes else (False, "policy_failed"))
+                # The code and the execution status must agree in both directions.
+                for mutate in (lambda o: evaluation(o, "evidence", "integrity").update(diagnostics=[] if not passes else ["COV2130"]),
+                               lambda o: o["provenance"].update(execution_status="passed", execution_exit_code=0, execution_signal=None)
+                               if not passes else o["provenance"].update(execution_status="failed", execution_exit_code=1)):
+                    bad = copy.deepcopy(clean)
+                    mutate(bad)
+                    self.assertIn(code_of(read_report, encode(bad)), ("COV4001", "COV4002"))
         passed = build_indexed(*self.inputs(), execution={"exit_code": 0, "signal": None, "status": "passed"}, tool_version=V)
         report = build_report(encode(passed), config(), fixture_sources("f0", passed), tool_version=V)
         self.assertEqual((report["provenance"]["execution_status"], report["provenance"]["execution_exit_code"]), ("passed", 0))
@@ -509,7 +533,7 @@ class ReaderTest(unittest.TestCase):
             "point id": (c, lambda o: o["points"][0].update(semantic_discriminator="other")),
             "context without an input": (r, lambda o: o["contexts"].append({"context_index": len(o["contexts"]), "value": "zzz"})),
             "source owned by no map": (c, lambda o: o["maps"][0].update(source_indices=[])),
-            "registry pair": (c, lambda o: o["provenance"].update(indexed_diagnostic_registry_revision=2)),
+            "registry pair": (c, lambda o: o["provenance"].update(indexed_diagnostic_registry_revision=1)),
             "two inputs with one profile ID": (c, lambda o: o["inputs"].append({**o["inputs"][0], "artifact_sha256": "f" * 64, "name": "z"})),
         }
         for label, (base, fn) in cases.items():
@@ -523,7 +547,7 @@ class ReaderTest(unittest.TestCase):
         bad["policy"]["evaluations"][0]["diagnostics"] = sorted([*bad["policy"]["evaluations"][0]["diagnostics"], "COV9998"])
         self.assertEqual(self.verdict(bad), "COV4001")
         other = copy.deepcopy(self.clean)
-        other["tool"]["diagnostic_registry_revision"] = 2
+        other["tool"]["diagnostic_registry_revision"] = 1
         self.assertEqual(self.verdict(other), "COV4001")
         registry = diagnostics.load_registry()
         newer = mock.Mock(revision=registry.revision + 1, sha256="a" * 64, entries=registry.entries)

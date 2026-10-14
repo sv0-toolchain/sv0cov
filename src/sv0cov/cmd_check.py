@@ -68,10 +68,23 @@ def evaluation_diagnostics(report: dict) -> list[Diagnostic]:
     return out
 
 
+def coverage_failed(report: dict) -> bool:
+    """Whether an assertion did not pass for a reason other than the test
+    command itself having failed (``COV2130`` on the integrity evaluation)."""
+    for e in report["policy"]["evaluations"]:
+        if e["result"] in ("pass", "not_applicable"):
+            continue
+        if e["assertion_kind"] == "integrity" and e["diagnostics"] == ["COV2130"]:
+            continue
+        return True
+    return False
+
+
 def exit_status(report: dict) -> int:
-    """SPEC 20.3: unreliable evidence is 5, a policy that did not pass is 1."""
-    (integrity,) = [e for e in report["policy"]["evaluations"] if e["assertion_kind"] == "integrity"]
-    if not report["complete"] or integrity["result"] == "fail":
+    """SPEC 20.3: incomplete evidence is 5, a policy that did not pass is 1.
+    (A reader-validated report names an evidence finding exactly when it is
+    incomplete; a failed test command alone is a policy failure here.)"""
+    if not report["complete"]:
         return cli.EXIT_EVIDENCE
     if not report["policy"]["passed"] or report["evidence_eligibility"] != "passing":
         return cli.EXIT_POLICY

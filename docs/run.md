@@ -7,16 +7,15 @@
 sv0cov run [options] -- <test-command> [args...]
 ```
 
-`run` builds the project in the working directory with coverage
-instrumentation and runs a test command against it. This page describes the
-first half of the lifecycle, which is what this build implements: reserve,
-build, execute. Collecting, merging, reporting and checking the run are the
-second half and arrive with CV-234.
+`run` is the whole lifecycle: it builds the project in the working directory
+with coverage instrumentation, runs a test command against it, merges what
+the run left, publishes the reports, and checks the policy.
 
 ```sh
 cd myproject
 sv0cov run -- myproject --self-test      # the instrumented program itself
 sv0cov run -- ./tests/run-all.sh         # or a script that calls `myproject`
+sv0cov run --threshold-line 85 --report term --report json -- myproject
 ```
 
 ## What happens
@@ -46,7 +45,17 @@ sv0cov run -- ./tests/run-all.sh         # or a script that calls `myproject`
    streams. The build must leave an executable and a coverage map this
    sv0cov accepts. The resolved raw-profile tier is passed on.
 5. **Execution.** The test command runs as the exact argv vector after
-   `--`.
+   `--`. SIGINT, SIGTERM, SIGHUP and SIGQUIT sent to sv0cov meanwhile are
+   passed on to it.
+6. **Collection and merge.** Whatever happened to the command, the maps and
+   every profile in the run directory are merged for exactly this run ID,
+   with the command's result as the execution record.
+7. **Publication.** Complete evidence becomes
+   `<run>/coverage.sv0covdata.json`. The selected nonterminal reports become
+   the bundle `<run>/reports`. A selected terminal report goes to stdout
+   unless `--quiet`.
+8. **Check.** Every assertion that did not pass is a diagnostic on stderr,
+   as in [`check`](check.md).
 
 ## The run directory
 
@@ -56,6 +65,8 @@ sv0cov run -- ./tests/run-all.sh         # or a script that calls `myproject`
     maps/<name>.sv0covmap.json    its coverage map
     profiles/                     one raw profile per process image
     build.log                     what the driver printed
+    coverage.sv0covdata.json      the merged evidence, when it is complete
+    reports/coverage.json         the nonterminal reports, when selected
 ```
 
 `sv0cov clean` removes it.
@@ -89,29 +100,54 @@ without the transport. The caller's own environment is not changed. No
 environment variable configures policy: thresholds, reports, saturation and
 limits come only from the command line and `sv0.toml`.
 
+## Reports
+
+`run` takes its formats from `[tool.sv0cov].reports` (default `["term"]`) or
+from `--report`, which replaces the configured list. `--format` belongs to
+[`report`](report.md). This build produces `term` and `json`; asking for
+another format stops the run before anything is created (exit 7).
+
+## Incomplete runs
+
+A run is complete only when every profile in its directory is whole and
+belongs to it, and there is at least one. Otherwise each problem is
+reported (a profile cut short, a runtime's uncommitted temporary, a profile
+of another run, no profile at all), nothing is published, and no report is
+made. An interrupted run is never shown as zero coverage.
+
+## A failing test command
+
+The run is still merged, reported and checked. The integrity evaluation
+fails with `COV2130` (test command failed), the report records the exit
+status or signal, and the coverage thresholds are evaluated and shown
+beside it. A run whose test command failed can never be passing evidence.
+
 ## Exit status
+
+| Test command | sv0cov's own result | Exit |
+|---|---|---:|
+| passed | everything passed | 0 |
+| passed | the policy did not pass | 1 |
+| passed | the evidence is incomplete, or a source changed since the build | 5 |
+| passed | the reports could not be published | 6 |
+| exited nonzero | anything | 4 |
+| ended by signal N | anything | 128 + N |
+
+`--prefer-coverage-exit` changes the last two rows to 1 when the coverage
+policy itself also failed (a threshold, an empty metric, saturation). It
+never turns a failing test command into success.
+
+Before the test command runs:
 
 | Exit | Meaning |
 |---:|---|
 | 2 | Invalid usage or configuration, a project name that cannot name a program, or a test command that cannot be found or started. |
 | 3 | The build failed, or left no executable or no valid coverage map (`COV1020`). |
-| 4 | The test command exited nonzero or was ended by a signal. |
 | 5 | The run directory exists (`COV4010`) or cannot be created safely (`COV6002`). |
-| 7 | No toolchain checkout beside this sv0cov; or, for now, a run whose test command passed (see below). |
+| 7 | No toolchain checkout beside this sv0cov, or a report format this build lacks. |
 | 8 | No secure random bytes for a run ID. |
-
-**Until the second half exists**, a run whose test command passed ends with
-`COV5001` and exit 7 rather than 0: nothing has been merged or checked, so
-the run has not passed. The evidence is complete and usable:
-
-```sh
-sv0cov merge .sv0cov/runs/<id>/maps .sv0cov/runs/<id>/profiles --expect-run <id>
-sv0cov check .sv0cov/coverage.sv0covdata.json
-```
 
 ## Not in this build
 
 - The VM backend. `run` builds the generated-C executable only.
-- Signal forwarding to the test command, and the host's conventional exit
-  status for a signalled command.
-- Merge, reports, policy and the combined exit status.
+- The `html`, `lcov` and `cobertura` formats.

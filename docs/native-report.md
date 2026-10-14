@@ -163,14 +163,20 @@ when a source is not current, a lossy export was used, or an exact-count use
 is ineligible; `policy_failed` when the policy did not pass; `passing`
 otherwise.
 
+### A failed test command
+
+When the evidence records a test command that exited nonzero or was ended
+by a signal, the integrity evaluation fails with `COV2130` (diagnostic
+registry revision 2), whatever the coverage says. Collection completeness
+is not changed by it, the thresholds are still evaluated, and the report is
+`policy_failed`, never `passing`.
+
 ### What this build refuses
 
 It reports `COV5001` rather than guess:
 
 - scope, entity, diff, ratchet and exclusion-cap assertions, which come with
   the policy preview;
-- evidence whose test command failed or was signalled, because the
-  diagnostic registry has no code for that yet;
 - two regions with the same source, span, kind and point set, which the
   report's ordering rule cannot tell apart.
 

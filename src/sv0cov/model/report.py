@@ -32,10 +32,13 @@ provenance against inputs and maps; the project evaluations and the
 integrity evaluation; ``passed``; and the eligibility precedence.
 
 What this build cannot do yet, and refuses rather than guess (``COV5001``):
-scope, entity, diff, ratchet and exclusion assertions (R0.1), and an
-execution record that failed or was signalled, for which the diagnostic
-registry has no code. The reader accepts evaluations of those kinds when
-they are internally consistent, because it cannot re-select their members.
+scope, entity, diff, ratchet and exclusion assertions (R0.1). The reader
+accepts evaluations of those kinds when they are internally consistent,
+because it cannot re-select their members.
+
+A lifecycle command that failed or was ended by a signal makes the integrity
+evaluation fail with ``COV2130``, whatever the coverage says (SPEC 21.3.5,
+22.5).
 
 What a reader cannot recheck is what a report does not retain: the indexed
 evidence's own diagnostics beyond their union in the integrity evaluation,
@@ -68,6 +71,8 @@ MEMBER_KEY = {"branch": "branch_indices", "contract": "clause_indices", "functio
               "region": "region_indices"}
 UNSUPPORTED_ASSERTIONS = ("scopes", "entities")
 STALE, SATURATED, LOSSY, OVERRIDE = "COV1004", "COV4020", "COV4021", "COV3002"
+#: The lifecycle command failed or was ended by a signal (registry revision 2; SPEC 21.3.5).
+COMMAND_FAILED = "COV2130"
 REPORT_TIME = (STALE, SATURATED, LOSSY)
 
 
@@ -214,8 +219,9 @@ def _report_time_codes(r: dict) -> set[str]:
 
 def _integrity(r: dict, evidence_codes: set[str]) -> dict:
     now = _report_time_codes(r)
-    result = "fail" if evidence_codes - now else "ineligible" if now else "pass"
-    return _evaluation("integrity", "integrity", "evidence", "none", result, codes=evidence_codes | now)
+    command = {COMMAND_FAILED} if r["provenance"]["execution_status"] in ("failed", "signaled") else set()
+    result = "fail" if (evidence_codes - now) or command else "ineligible" if now else "pass"
+    return _evaluation("integrity", "integrity", "evidence", "none", result, codes=evidence_codes | now | command)
 
 
 def _eligibility(r: dict) -> str:
@@ -265,9 +271,6 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
             raise ReportError("COV5001", f"this build of sv0cov cannot evaluate a [tool.sv0cov.{table}] assertion yet")
     if any(leaf.value not in (None, []) for leaf in cov["exclusions"].values()):
         raise ReportError("COV5001", "this build of sv0cov cannot evaluate [tool.sv0cov.exclusions] caps yet")
-    if ix["execution"]["status"] in ("failed", "signaled"):
-        raise ReportError("COV5001", "this build of sv0cov cannot report evidence whose test command failed: the diagnostic "
-                                     "registry has no code for it yet")
     policy = config.value("integrity.saturation")
     if sem["saturation"]["policy"] != policy:
         raise ReportError("COV0013", f"the evidence was merged under saturation policy {sem['saturation']['policy']}, "
@@ -453,7 +456,7 @@ def _cross_validate(r: dict, registry: diagnostics.Registry | None) -> None:
     if [e for e in evaluations if e["assertion_kind"] == "project"] != _project_evaluations(r, detail):
         _mismatch("policy/evaluations", "the project evaluations are not what the configured thresholds and the summary give")
     now = _report_time_codes(r)
-    evidence = set(integrity["diagnostics"]) - now
+    evidence = set(integrity["diagnostics"]) - now - {COMMAND_FAILED}
     if not now <= set(integrity["diagnostics"]) or integrity != _integrity(r, evidence):
         _mismatch("policy/evaluations", "the integrity evaluation does not carry the report-time findings, or its result is wrong")
     if bool(evidence) != (not r["complete"]):

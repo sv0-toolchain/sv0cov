@@ -41,7 +41,7 @@ INDEX_MAX = 4294967294
 U32 = 4294967295
 CAPABILITIES = ["branch-outcomes", "contexts", "contract-coverage", "exclusion-audit", "line-membership",
                 "normalized-linear-expressions", "saturation-lower-bounds", "semantic-function-ownership", "source-digests"]
-REGISTRY_SHA = "440aad98c48e372d526d4aefb7c3e8cba8a0d4fc07b31797115a55044b06e3b1"
+REGISTRY_SHA = "1c2cd283986f9474f0e51196d969ed9fd57f48f29ba9704a00e76b9175ed917f"
 
 
 def d(label: str) -> str:
@@ -92,7 +92,7 @@ def indexed(sem: dict, **over) -> dict:
         "map_inputs": [], "maps": [],
         "merge": {"allow_rejected_inputs": False,
                   "limits": {"max_bytes": 67108864, "max_counters": 4194304, "tier": "standard"},
-                  "tool": {"diagnostic_registry_revision": 1, "diagnostic_registry_sha256": REGISTRY_SHA, "name": "sv0cov",
+                  "tool": {"diagnostic_registry_revision": 2, "diagnostic_registry_sha256": REGISTRY_SHA, "name": "sv0cov",
                            "version": "0.0.0"}},
         "profile_inputs": [],
         "run_selection": {"manifest_sha256": None, "mode": "none", "requested_run_ids": [], "selected_run_ids": []},
@@ -281,7 +281,7 @@ def all_kinds() -> dict:
                "compiler_identity": "sv0c+0.1.0+be4e4b8", "map_id": map_a, "program_counter_count": len(counted), "source_indices": [0, 1],
                "target": {"kind": "executable", "name": "app"}}],
         merge={"allow_rejected_inputs": True, "limits": {"max_bytes": 268435456, "max_counters": 16777216, "tier": "large"},
-               "tool": {"diagnostic_registry_revision": 1, "diagnostic_registry_sha256": REGISTRY_SHA, "name": "sv0cov", "version": "0.1.0"}},
+               "tool": {"diagnostic_registry_revision": 2, "diagnostic_registry_sha256": REGISTRY_SHA, "name": "sv0cov", "version": "0.1.0"}},
         profile_inputs=profiles,
         run_selection={"manifest_sha256": None, "mode": "explicit-list", "requested_run_ids": [run_a, run_b],
                        "selected_run_ids": [run_a, run_b]},

@@ -52,15 +52,21 @@ class Stop(Exception):
 
 def load_report(ctx: cli.Context, *, standard_export: bool = False) -> tuple[dict, bytes]:
     """The native report of the command's one operand, and its canonical bytes."""
-    config = ctx.config
-    tier = config.tier().name
-    limit = map_limits(tier).max_bytes
+    tier = ctx.config.tier().name
     (operand,) = ctx.invocation.operands
-
-    data, fault = _read(ctx.cwd / operand, limit, follow=True)
+    data, fault = _read(ctx.cwd / operand, map_limits(tier).max_bytes, follow=True)
     if data is None:
         code, why = fault or ("COV3010", "cannot be read")
         raise Stop(code, "collection", f"the indexed profile {why}", cli.EXIT_EVIDENCE)
+    return report_of(ctx, data, standard_export=standard_export)
+
+
+def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False) -> tuple[dict, bytes]:
+    """The native report of indexed-profile bytes under the command's
+    configuration, read back through the reader, and its canonical bytes."""
+    config = ctx.config
+    tier = config.tier().name
+    limit = map_limits(tier).max_bytes
     try:
         indexed = read_indexed(data, tier=tier)
     except IndexedError as exc:

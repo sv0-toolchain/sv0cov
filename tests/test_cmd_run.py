@@ -15,10 +15,12 @@ from __future__ import annotations
 import io
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -31,6 +33,8 @@ from test_cli import records  # noqa: E402
 from test_indexed_reader import fixture_inputs  # noqa: E402
 
 from sv0cov import cli, cmd_run  # noqa: E402
+from sv0cov.model.indexed import read_indexed  # noqa: E402
+from sv0cov.model.report import read_report  # noqa: E402
 
 HEAD = '[tool.sv0cov]\nschema = "1.0"\n'
 RUN = "0123456789abcdef0123456789abcdef"
@@ -59,9 +63,28 @@ if mode != "no-map":
     open(cmap, "wb").write(open(os.environ["FAKE_MAP"], "rb").read() if mode != "bad-map" else b"{{}}")
 if mode != "no-exe":
     open(exe, "w").write("""#!{py}
-import json, os, sys
+import json, os, signal, sys
 open(os.environ["FAKE_RECORD"] + ".run", "w").write(json.dumps({{"argv": sys.argv, "cwd": os.getcwd(), "env": dict(os.environ)}}))
 print("program output")
+sys.stdout.flush()
+sys.path[:0] = [{src!r}, {tests!r}]
+from test_indexed_reader import fixture_inputs, raw
+from sv0cov.formats.rawprofile import decode
+_, m, counts = fixture_inputs("f0")
+run, where = os.environ["SV0COV_RUN_ID"], os.environ["SV0COV_PROFILE_DIR"]
+def put(n, run_id=run, cut=0, temp=False, **kw):
+    data = raw(m, counts, n, run=run_id, **kw)
+    name = run_id + "-" + decode(data).profile_id.hex() + ".sv0profraw"
+    open(os.path.join(where, "." + name + ".tmp-1234" if temp else name), "wb").write(data[:len(data) - cut])
+ctx = {{}} if "SV0COV_CONTEXT" not in os.environ else {{"context": os.environ["SV0COV_CONTEXT"]}}
+for step in os.environ.get("FAKE_PROFILES", "ok").split(","):
+    if step == "ok": put(1, **ctx)
+    elif step == "second": put(2, **ctx)
+    elif step == "cut": put(3, cut=9)
+    elif step == "temp": put(4, temp=True)
+    elif step == "foreign": put(5, run_id="f" * 32)
+if os.environ.get("FAKE_SIGNAL"):
+    os.kill(os.getpid(), int(os.environ["FAKE_SIGNAL"]))
 sys.exit(int(os.environ.get("FAKE_EXIT", "0")))
 """)
     os.chmod(exe, 0o644 if mode == "not-executable" else 0o755)
@@ -75,9 +98,9 @@ class Base(unittest.TestCase):
         self.top = Path(tmp.name).resolve()
         self.cwd = self.top / "demo"
         self.cwd.mkdir()
-        (self.cwd / "main.sv0").write_text("fn main() -> i32 { return 0; }\n")
+        (self.cwd / "main.sv0").write_bytes((ROOT / "tests" / "fixtures" / "semantic" / "f0" / "main.sv0").read_bytes())
         self.driver = self.top / "sv0"
-        self.driver.write_text(DRIVER.format(py=PY))
+        self.driver.write_text(DRIVER.format(py=PY, src=str(ROOT / "src"), tests=str(ROOT / "tests")))
         self.driver.chmod(0o755)
         self.map_file = self.top / "map.json"
         self.map_file.write_bytes(fixture_inputs("f0")[0])
@@ -109,11 +132,13 @@ class LifecycleTest(Base):
         (run_id,) = self.run_dirs()
         run_dir = self.cwd / ".sv0cov" / "runs" / run_id
         self.assertRegex(run_id, r"\A[0-9a-f]{32}\Z")
-        # The second half is not there yet: a passing command ends as unsupported, never as a pass.
-        self.assertEqual((code, [r["code"] for r in records(err)]), (7, ["COV5001"]))
-        self.assertEqual(out, f"run {run_id}: built demo; running the test command\nprogram output\n"
-                              f"run {run_id}: the test command passed; maps and profiles are in .sv0cov/runs/{run_id}\n")
-        self.assertEqual(sorted(os.listdir(run_dir)), ["bin", "build.log", "maps", "profiles"])
+        self.assertEqual((code, err), (0, ""))
+        lines = out.splitlines()
+        self.assertEqual(lines[:3], [f"run {run_id}: built demo; running the test command", "program output", "sv0cov coverage report"])
+        self.assertEqual(lines[-1], f"run {run_id}: merged 1 of 1 profiles; evidence and reports are in .sv0cov/runs/{run_id}")
+        self.assertIn("evidence:   PASSING", lines)
+        self.assertIn("execution:  passed (exit 0)", lines)
+        self.assertEqual(sorted(os.listdir(run_dir)), ["bin", "build.log", "coverage.sv0covdata.json", "maps", "profiles"])
         modes = [stat.S_IMODE((self.cwd / p).stat().st_mode) for p in (".sv0cov", ".sv0cov/runs", f".sv0cov/runs/{run_id}",
                                                                       f".sv0cov/runs/{run_id}/bin", f".sv0cov/runs/{run_id}/maps",
                                                                       f".sv0cov/runs/{run_id}/profiles", f".sv0cov/runs/{run_id}/build.log")]
@@ -135,21 +160,9 @@ class LifecycleTest(Base):
         argv = self.recorded("build")["argv"]
         self.assertEqual(argv[4:9], ["--coverage-tier=custom", "--coverage-max-counters", "7", "--coverage-max-bytes", "4096"])
 
-    def test_a_failing_test_command_is_exit_4(self) -> None:
-        for status in (1, 3, 255):
-            with self.subTest(status=status):
-                self.setUp()
-                code, out, err = self.run_cli("--", "demo", env={"FAKE_EXIT": str(status)})
-                self.assertEqual((code, err), (4, ""))
-                self.assertIn(f"the test command exited with status {status}; its evidence is in .sv0cov/runs/", out)
-        self.setUp()
-        code, out, err = self.run_cli("--", PY, "-c", "import os, signal; os.kill(os.getpid(), signal.SIGKILL)")
-        self.assertEqual((code, err), (4, ""))
-        self.assertIn("the test command was ended by signal 9", out)
-
     def test_quiet_keeps_the_test_commands_own_output(self) -> None:
         code, out, err = self.run_cli("--quiet", "--", "demo")
-        self.assertEqual((code, out, len(records(err))), (7, "program output\n", 1))
+        self.assertEqual((code, out, err), (0, "program output\n", ""))
 
     def test_other_programs_and_scripts_reach_the_instrumented_program_by_name(self) -> None:
         """The run's bin directory is first on the child's PATH."""
@@ -159,7 +172,7 @@ class LifecycleTest(Base):
         for argv in (("./tests.sh",), (str(script),), ("/bin/sh", "-c", "demo from-script"), ("env", "demo", "from-script")):
             with self.subTest(argv=argv):
                 Path(self.record + ".run").unlink(missing_ok=True)
-                self.assertEqual(self.run_cli("--", *argv)[0], 7)
+                self.assertEqual(self.run_cli("--", *argv)[0], 0)
                 ran = self.recorded("run")
                 self.assertEqual(ran["argv"][1:], ["from-script"])
                 run_dir = self.cwd / ".sv0cov/runs" / ran["env"]["SV0COV_RUN_ID"]
@@ -195,7 +208,7 @@ class RunIdTest(Base):
                 self.assertFalse(Path(self.record + ".build").exists())
 
     def test_an_explicit_run_id_is_used_and_validated(self) -> None:
-        self.assertEqual(self.run_cli("--run-id", RUN, "--", "demo")[0], 7)
+        self.assertEqual(self.run_cli("--run-id", RUN, "--", "demo")[0], 0)
         self.assertEqual((self.run_dirs(), self.recorded("run")["env"]["SV0COV_RUN_ID"]), ([RUN], RUN))
         for bad in (ZERO, RUN.upper(), RUN[:-1], RUN + "0", "g" * 32, ""):
             with self.subTest(run_id=bad):
@@ -204,7 +217,7 @@ class RunIdTest(Base):
         self.assertEqual(self.run_dirs(), [RUN])
 
     def test_an_existing_run_directory_is_a_collision(self) -> None:
-        self.assertEqual(self.run_cli("--run-id", RUN, "--", "demo")[0], 7)
+        self.assertEqual(self.run_cli("--run-id", RUN, "--", "demo")[0], 0)
         Path(self.record + ".build").unlink()
         before = sorted(str(p) for p in self.cwd.rglob("*"))
         code, out, err = self.run_cli("--run-id", RUN, "--", "demo")
@@ -223,7 +236,7 @@ class RunIdTest(Base):
         self.assertEqual((code, records(err)[0]["code"]), (5, "COV6002"))
         self.assertEqual(os.listdir(self.top / "elsewhere"), [])
         os.unlink(self.cwd / ".sv0cov")
-        self.assertEqual(self.run_cli("--output-dir", "build/cov", "--run-id", RUN, "--", "demo")[0], 7)
+        self.assertEqual(self.run_cli("--output-dir", "build/cov", "--run-id", RUN, "--", "demo")[0], 0)
         self.assertTrue((self.cwd / "build/cov/runs" / RUN / "bin/demo").is_file())
 
 
@@ -254,7 +267,7 @@ class EnvironmentTest(Base):
                 self.setUp()
                 if toml:
                     (self.cwd / "sv0.toml").write_text(HEAD + toml)
-                self.assertEqual(self.run_cli(*args, "--", "demo", env=self.POISON)[0], 7)
+                self.assertEqual(self.run_cli(*args, "--", "demo", env=self.POISON)[0], 0)
                 self.assertEqual(self.recorded("run")["env"].get("SV0COV_CONTEXT"), want)
 
     def test_ambient_variables_change_no_policy(self) -> None:
@@ -285,14 +298,14 @@ class ArgvTest(Base):
 
     def test_every_argument_reaches_the_child_unchanged(self) -> None:
         code, _, _ = self.run_cli("--", "demo", *HOSTILE)
-        self.assertEqual(code, 7)
+        self.assertEqual(code, 0)
         self.assertEqual(self.recorded("run")["argv"][1:], HOSTILE)
         self.assertEqual(sorted(p.name for p in self.cwd.iterdir()), [".sv0cov", "main.sv0"])  # nothing was interpreted
         self.assertFalse((self.top / "pwned").exists())
 
     def test_sv0cov_options_after_the_separator_belong_to_the_command(self) -> None:
         tail = ["--quiet", "--run-id", ZERO, "--diagnostic-format=json-lines", "--", "--output-dir", "/"]
-        self.assertEqual(self.run_cli("--", "demo", *tail)[0], 7)
+        self.assertEqual(self.run_cli("--", "demo", *tail)[0], 0)
         self.assertEqual(self.recorded("run")["argv"][1:], tail)
 
     def test_no_shell_is_involved_unless_the_user_names_one(self) -> None:
@@ -302,7 +315,7 @@ class ArgvTest(Base):
         self.assertFalse(build_call.kwargs.get("shell", False))
         self.assertEqual((call.args[0], call.kwargs["shell"]), (["demo", "a b"], False))
         self.assertEqual(self.run_cli("--", "demo; true")[0], 2)  # one program name, not a command line
-        self.assertEqual(self.run_cli("--", "/bin/sh", "-c", 'test "$1" = "x y"', "sh", "x y")[0], 7)  # an explicit shell is the user's
+        self.assertEqual(self.run_cli("--", "/bin/sh", "-c", 'test "$1" = "x y"', "sh", "x y")[0], 5)  # an explicit shell is the user's; it ran no instrumented program
 
     def test_a_command_that_cannot_be_found_stops_before_anything_is_created(self) -> None:
         (self.cwd / "plain.txt").write_text("not executable")
@@ -379,11 +392,191 @@ class BuildTest(Base):
             self.assertIsNone(cmd_run.toolchain_driver())
 
     def test_what_run_leaves_is_what_clean_removes(self) -> None:
-        self.assertEqual(self.run_cli("--", "demo")[0], 7)
+        self.assertEqual(self.run_cli("--", "demo")[0], 0)
         self.assertEqual(self.run_cli("--", "demo", env={"FAKE_MODE": "fail"})[0], 3)
         out, err = io.StringIO(), io.StringIO()
         self.assertEqual(cli.main(["clean"], stdout=out, stderr=err, cwd=self.cwd), 0, err.getvalue())
         self.assertEqual(sorted(p.name for p in self.cwd.iterdir()), ["main.sv0"])
+
+
+class OutcomeTest(Base):
+    """COV-CLI-004, COV-INS-008, AC-022; SPEC 20.3: pass, policy fail, test fail, killed."""
+
+    def outcome(self, *args: str, **env: str) -> tuple[int, str, list[dict], Path]:
+        self.setUp()
+        code, out, err = self.run_cli(*args, "--", "demo", env=env)
+        (run_id,) = self.run_dirs()
+        return code, out, records(err), self.cwd / ".sv0cov" / "runs" / run_id
+
+    def indexed(self, run_dir: Path) -> dict:
+        return read_indexed((run_dir / "coverage.sv0covdata.json").read_bytes())
+
+    def test_pass(self) -> None:
+        handlers = {n: signal.getsignal(n) for n in cmd_run.FORWARDED}
+        code, out, recs, run_dir = self.outcome(FAKE_PROFILES="ok,second")
+        self.assertEqual({n: signal.getsignal(n) for n in cmd_run.FORWARDED}, handlers)  # forwarding ends with the command
+        self.assertEqual((code, recs), (0, []))
+        ix = self.indexed(run_dir)
+        self.assertEqual(ix["execution"], {"exit_code": 0, "signal": None, "status": "passed"})
+        self.assertEqual(ix["run_selection"]["mode"], "explicit-list")
+        self.assertEqual(ix["run_selection"]["selected_run_ids"], [run_dir.name])
+        self.assertEqual(([r["status"] for r in ix["profile_inputs"]], ix["semantic"]["complete"]), (["accepted", "accepted"], True))
+        self.assertIn("merged 2 of 2 profiles", out)
+        self.assertEqual(stat.S_IMODE((run_dir / "coverage.sv0covdata.json").stat().st_mode), 0o600)
+        # What run publishes is what merge gives for the same files and run.
+        cli_out = io.StringIO()
+        self.assertEqual(cli.main(["merge", str(run_dir / "maps"), str(run_dir / "profiles"), "--expect-run", run_dir.name, "--output", "again.json"],
+                                  stdout=cli_out, stderr=io.StringIO(), cwd=self.cwd), 0)
+        again = read_indexed((self.cwd / "again.json").read_bytes())
+        self.assertEqual({k: v for k, v in again.items() if k != "execution"}, {k: v for k, v in ix.items() if k != "execution"})
+
+    def test_policy_fail(self) -> None:
+        code, out, recs, run_dir = self.outcome("--threshold-line", "8751bp")
+        self.assertEqual((code, [r["code"] for r in recs]), (1, ["COV4101"]))
+        self.assertIn("evidence:   POLICY FAILED", out)
+        self.assertRegex(out, r'\nFAIL +project "project" +line +>= 8751/10000 +14/16 ')
+        self.assertTrue((run_dir / "coverage.sv0covdata.json").is_file())
+        self.assertEqual(self.outcome("--threshold-line", "8750bp")[0], 0)
+
+    def test_test_fail(self) -> None:
+        """AC-022: exit 4, and the coverage policy result is still reported, separately."""
+        for status in (1, 3, 255):
+            with self.subTest(status=status):
+                code, out, recs, run_dir = self.outcome(FAKE_EXIT=str(status))
+                self.assertEqual((code, [r["code"] for r in recs]), (4, ["COV2130"]))
+                self.assertEqual(self.indexed(run_dir)["execution"], {"exit_code": status, "signal": None, "status": "failed"})
+                self.assertIn(f"run {run_dir.name}: the test command exited with status {status}", out)
+                self.assertIn(f"execution:  failed (exit {status})", out)
+                self.assertRegex(out, r'\nFAIL +integrity "integrity" +evidence .* COV2130\n')
+        code, out, recs, _ = self.outcome("--threshold-line", "100", "--threshold-branch", "0", FAKE_EXIT="1")
+        self.assertEqual((code, sorted(r["code"] for r in recs)), (4, ["COV2130", "COV4101"]))
+        self.assertRegex(out, r'\nFAIL +project "project" +line ')
+        self.assertRegex(out, r'\nPASS +project "project" +branch ')
+
+    def test_prefer_coverage_exit_is_explicit_and_needs_a_coverage_failure(self) -> None:
+        self.assertEqual(self.outcome("--prefer-coverage-exit", "--threshold-line", "100", FAKE_EXIT="2")[0], 1)
+        self.assertEqual(self.outcome("--threshold-line", "100", FAKE_EXIT="2")[0], 4)
+        self.assertEqual(self.outcome("--prefer-coverage-exit", "--threshold-line", "0", FAKE_EXIT="2")[0], 4)  # coverage did not fail
+        self.assertEqual(self.outcome("--prefer-coverage-exit", FAKE_EXIT="2")[0], 4)
+        self.assertEqual(self.outcome("--prefer-coverage-exit", "--threshold-line", "100")[0], 1)
+        self.assertEqual(self.outcome("--prefer-coverage-exit", "--threshold-line", "100", FAKE_SIGNAL="9")[0], 1)
+        self.assertEqual(self.outcome("--prefer-coverage-exit")[0], 0)
+
+    def test_killed_after_its_profile_was_published(self) -> None:
+        for number in (9, 15, 1):
+            with self.subTest(signal=number):
+                code, out, recs, run_dir = self.outcome(FAKE_SIGNAL=str(number))
+                self.assertEqual((code, [r["code"] for r in recs]), (128 + number, ["COV2130"]))
+                self.assertEqual(self.indexed(run_dir)["execution"], {"exit_code": None, "signal": number, "status": "signaled"})
+                self.assertIn(f"the test command was ended by signal {number}", out)
+                self.assertIn(f"execution:  signaled (signal {number})", out)
+
+    def test_an_interrupted_run_is_never_zero_coverage(self) -> None:
+        """COV-INS-008: no profile, a cut one, an uncommitted temporary or a foreign one is incomplete evidence."""
+        # profiles the program leaves -> (a code that must be reported, how many were accepted)
+        cases = {"none": ("COV3001", "0 of 0"), "temp": ("COV2011", "0 of 1"), "cut": (None, "0 of 1"), "ok,temp": ("COV2011", "1 of 2"),
+                 "ok,cut": (None, "1 of 2"), "ok,foreign": ("COV3003", "2 of 2"), "foreign": ("COV3003", "1 of 1")}
+        for profiles, (want, usable) in cases.items():
+            for extra, exit_want in (({}, 5), ({"FAKE_SIGNAL": "9"}, 137), ({"FAKE_EXIT": "3"}, 4)):
+                with self.subTest(profiles=profiles, extra=extra):
+                    code, out, recs, run_dir = self.outcome("--threshold-line", "0", "--report", "term", "--report", "json",
+                                                            FAKE_PROFILES=profiles, **extra)
+                    self.assertEqual(code, exit_want)
+                    codes = sorted({r["code"] for r in recs})
+                    self.assertTrue(codes and all(c[:4] in ("COV2", "COV3") for c in codes), codes)
+                    if want is not None:
+                        self.assertIn(want, codes)
+                    self.assertTrue(all(r["phase"] == "merge" for r in recs))
+                    self.assertIn(f"the evidence is incomplete ({usable} profiles accepted) and was not reported", out)
+                    self.assertNotIn("sv0cov coverage report", out)
+                    self.assertNotIn("%", out)  # no percentage of any kind
+                    self.assertEqual(sorted(os.listdir(run_dir)), ["bin", "build.log", "maps", "profiles"])  # nothing was published
+        named = self.outcome(FAKE_PROFILES="ok,temp")[2]
+        self.assertTrue(any(f["name"] == "name" and ".tmp-" in f["value"] for f in named[0]["facts"]))
+
+    def test_a_source_changed_since_the_build_is_an_integrity_failure(self) -> None:
+        self.setUp()
+        real = cmd_run.execute
+
+        def edit_then_run(*args, **kw):
+            status = real(*args, **kw)
+            (self.cwd / "main.sv0").write_bytes((self.cwd / "main.sv0").read_bytes() + b"\n")
+            return status
+
+        with mock.patch.object(cmd_run, "execute", edit_then_run):
+            code, out, err = self.run_cli("--", "demo")
+        (r,) = records(err)
+        self.assertEqual((code, r["code"]), (5, "COV1004"))
+        self.assertNotIn("sv0cov coverage report", out)
+
+    def test_final_status(self) -> None:
+        f = cmd_run.final_status
+        # (test status, sv0cov's own stage, coverage failed, prefer) -> exit
+        table = {(0, 0, False, False): 0, (0, 1, True, False): 1, (0, 5, False, False): 5, (0, 6, False, False): 6, (0, 1, True, True): 1,
+                 (3, 1, False, False): 4, (3, 1, True, False): 4, (3, 5, False, False): 4, (3, 6, True, False): 4, (3, 1, True, True): 1,
+                 (3, 1, False, True): 4, (3, 5, False, True): 4, (-9, 1, False, False): 137, (-15, 5, False, False): 143,
+                 (-9, 1, True, True): 1, (-2, 1, False, True): 130, (255, 0, False, False): 4}
+        for args, want in table.items():
+            self.assertEqual(f(*args), want, args)
+        self.assertEqual(cmd_run.execution_record(0), {"exit_code": 0, "signal": None, "status": "passed"})
+        self.assertEqual(cmd_run.execution_record(7), {"exit_code": 7, "signal": None, "status": "failed"})
+        self.assertEqual(cmd_run.execution_record(-11), {"exit_code": None, "signal": 11, "status": "signaled"})
+
+
+class ReportSelectionTest(Base):
+    """COV-CLI-008, COV-REP-016: run uses resolved `reports` or a replacing --report."""
+
+    def test_default_is_the_terminal_report_on_stdout(self) -> None:
+        code, out, _ = self.run_cli("--", "demo")
+        (run_id,) = self.run_dirs()
+        self.assertEqual(code, 0)
+        self.assertIn("sv0cov coverage report\n", out)
+        self.assertFalse((self.cwd / ".sv0cov/runs" / run_id / "reports").exists())
+        self.assertNotIn("\x1b", out)
+        colored = self.run_cli("--color", "always", "--", "demo")[1]
+        self.assertIn("\x1b[32mPASSING\x1b[0m", colored)
+
+    def test_nonterminal_reports_are_one_bundle_in_the_run_directory(self) -> None:
+        cases = ((("--report", "json"), None, False), (("--report", "json", "--report", "term"), None, True),
+                 ((), 'reports = ["json"]\n', False), (("--report", "term"), 'reports = ["json"]\n', None))
+        for args, toml, term in cases:
+            with self.subTest(args=args, toml=toml):
+                self.setUp()
+                if toml:
+                    (self.cwd / "sv0.toml").write_text(HEAD + toml)
+                code, out, err = self.run_cli(*args, "--threshold-line", "100", "--", "demo")
+                (run_id,) = self.run_dirs()
+                run_dir = self.cwd / ".sv0cov/runs" / run_id
+                self.assertEqual((code, [r["code"] for r in records(err)]), (1, ["COV4101"]))
+                self.assertEqual("sv0cov coverage report" in out, bool(term) or term is None)
+                if term is None:  # the option replaced the configured list: no bundle
+                    self.assertFalse((run_dir / "reports").exists())
+                    continue
+                self.assertEqual(os.listdir(run_dir / "reports"), ["coverage.json"])
+                self.assertEqual([stat.S_IMODE((run_dir / p).stat().st_mode) for p in ("reports", "reports/coverage.json")], [0o700, 0o600])
+                report = read_report((run_dir / "reports/coverage.json").read_bytes())
+                self.assertEqual((report["evidence_eligibility"], report["provenance"]["run_ids"], report["provenance"]["execution_status"]),
+                                 ("policy_failed", [run_id], "passed"))
+                self.assertEqual(report["resolved_configuration"]["coverage"]["thresholds"]["line"], {"source": "cli", "value": 10000})
+                self.assertEqual(report["provenance"]["indexed_input_sha256"],
+                                 __import__("hashlib").sha256((run_dir / "coverage.sv0covdata.json").read_bytes()).hexdigest())
+
+    def test_quiet_removes_the_terminal_report_and_no_diagnostic(self) -> None:
+        code, out, err = self.run_cli("--quiet", "--threshold-line", "100", "--", "demo")
+        self.assertEqual((code, out, [r["code"] for r in records(err)]), (1, "program output\n", ["COV4101"]))
+
+    def test_a_format_this_build_lacks_stops_before_anything_exists(self) -> None:
+        for args, toml in ((("--report", "html"), None), (("--report", "term", "--report", "lcov"), None), ((), 'reports = ["cobertura"]\n')):
+            with self.subTest(args=args, toml=toml):
+                self.setUp()
+                if toml:
+                    (self.cwd / "sv0.toml").write_text(HEAD + toml)
+                code, out, err = self.run_cli(*args, "--", "demo")
+                (r,) = records(err)
+                self.assertEqual((code, out, r["code"], r["phase"]), (7, "", "COV5001", "invocation"))
+                self.assertFalse((self.cwd / ".sv0cov").exists())
+        self.assertEqual(self.run_cli("--report", "term", "--report", "term", "--", "demo")[0], 2)
+        self.assertEqual(self.run_cli("--format", "term", "--", "demo")[0], 2)  # --format belongs to report
 
 
 class ProcessTest(Base):
@@ -393,13 +586,39 @@ class ProcessTest(Base):
                 "cmd_run.toolchain_driver = lambda: Path(sys.argv[2]); sys.exit(cli.main(sys.argv[3:]))")
         p = subprocess.run([PY, "-c", boot, str(ROOT / "src"), str(self.driver), "run", "--", "demo", *HOSTILE], cwd=self.cwd,
                            env={**self.environ, "SV0COV_RUN_ID": RUN, "FAKE_EXIT": "5"}, capture_output=True, timeout=120)
-        self.assertEqual((p.returncode, p.stderr), (4, b""))
+        self.assertEqual(p.returncode, 4)
+        self.assertTrue(p.stderr.startswith(b"COV2130 error: Test command failed\n"))
         lines = p.stdout.decode().splitlines()
         self.assertEqual(lines[1], "program output")
         self.assertRegex(lines[0], r"\Arun [0-9a-f]{32}: built demo; running the test command\Z")
         self.assertRegex(lines[2], r"the test command exited with status 5")
+        self.assertEqual(lines[3], "sv0cov coverage report")
         self.assertEqual(self.recorded("run")["argv"][1:], HOSTILE)
         self.assertNotEqual(self.recorded("run")["env"]["SV0COV_RUN_ID"], RUN)
+
+
+    def test_a_signal_sent_to_sv0cov_reaches_the_test_command(self) -> None:
+        """SPEC 23.3: the command is ended, and sv0cov still reports what the run left."""
+        boot = ("import sys; sys.path.insert(0, sys.argv[1]); from sv0cov import cli, cmd_run; from pathlib import Path; "
+                "cmd_run.toolchain_driver = lambda: Path(sys.argv[2]); sys.exit(cli.main(sys.argv[3:]))")
+        ready = self.top / "ready"
+        sleeper = ("import pathlib, signal, time; signal.signal(signal.SIGINT, signal.SIG_DFL); "
+                   f"pathlib.Path({str(ready)!r}).write_text('x'); time.sleep(60)")
+        for number, name in ((signal.SIGTERM, "SIGTERM"), (signal.SIGINT, "SIGINT"), (signal.SIGHUP, "SIGHUP")):
+            with self.subTest(signal=name):
+                ready.unlink(missing_ok=True)
+                p = subprocess.Popen([PY, "-c", boot, str(ROOT / "src"), str(self.driver), "run", "--diagnostic-format=json-lines", "--",
+                                      PY, "-c", sleeper], cwd=self.cwd, env=self.environ, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                deadline = time.monotonic() + 60
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertTrue(ready.exists())
+                p.send_signal(number)  # to sv0cov only, not to the process group
+                out, err = p.communicate(timeout=30)
+                self.assertEqual(p.returncode, 128 + number)
+                self.assertIn(f"the test command was ended by signal {int(number)}".encode(), out)
+                self.assertIn(b"the evidence is incomplete (0 of 0 profiles accepted) and was not reported", out)
+                self.assertEqual([r["code"] for r in records(err.decode())], ["COV3001", "COV3003"])
 
 
 if __name__ == "__main__":

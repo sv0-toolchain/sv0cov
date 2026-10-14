@@ -28,6 +28,11 @@ SPEC = Path.home() / "Documents" / "project-specs" / "sv0cov" / "SPEC.md"
 # Revision 1 is F0 golden evidence (SPEC 20.5.1): these digests freeze it.
 REVISION_1_REGISTRY_SHA256 = "440aad98c48e372d526d4aefb7c3e8cba8a0d4fc07b31797115a55044b06e3b1"
 REVISION_1_FILE_SHA256 = "10174e49ffa3628a0ddcc6863af286fd0c9204bb334dc94e8adf07ed8e846093"
+REVISION_1_PATH = ROOT / "tests" / "fixtures" / "diagnostics" / "registry-revision-1.json"
+REGISTRY_SHA256 = "1c2cd283986f9474f0e51196d969ed9fd57f48f29ba9704a00e76b9175ed917f"  # revision 2
+REGISTRY_FILE_SHA256 = "f6db652ee61f7910ef1d34d1b375b043144170aef2116f7a6186f8b045c46950"
+#: Codes appended after revision 1, by the revision that added them (the SPEC table is revision 1).
+APPENDED = {2: [("COV2130", "error", "Test command failed")]}
 
 SPAN = d.Span(start_byte=10, end_byte=20, start_line=2, start_column=3, end_line=2, end_column=13)
 
@@ -44,12 +49,21 @@ def reencode(obj: dict) -> bytes:
 
 
 class RegistryTest(unittest.TestCase):
-    def test_revision_1_is_frozen(self) -> None:
+    def test_the_registry_is_frozen_at_its_revision(self) -> None:
         reg = d.load_registry()
-        self.assertEqual(reg.revision, 1)
-        self.assertEqual(reg.sha256, REVISION_1_REGISTRY_SHA256)
-        self.assertEqual(len(reg.entries), 71)
-        self.assertEqual(hashlib.sha256(REGISTRY_PATH.read_bytes()).hexdigest(), REVISION_1_FILE_SHA256)
+        self.assertEqual((reg.revision, reg.sha256, len(reg.entries)), (2, REGISTRY_SHA256, 72))
+        self.assertEqual(hashlib.sha256(REGISTRY_PATH.read_bytes()).hexdigest(), REGISTRY_FILE_SHA256)
+
+    def test_every_published_revision_is_kept_and_only_appended_to(self) -> None:
+        """SPEC 20.5.1: revision 1 is retained byte for byte; revision 2 adds entries and changes none."""
+        self.assertEqual(hashlib.sha256(REVISION_1_PATH.read_bytes()).hexdigest(), REVISION_1_FILE_SHA256)
+        first = d.validate_registry(REVISION_1_PATH.read_bytes())
+        self.assertEqual((first.revision, first.sha256, len(first.entries)), (1, REVISION_1_REGISTRY_SHA256, 71))
+        now = d.load_registry()
+        d.check_append_only(first, now)
+        added = [(e.code, e.default_severity, e.title) for c, e in now.entries.items() if c not in first.entries]
+        self.assertEqual(added, APPENDED[2])
+        self.assertEqual(now.entries["COV2130"].domain, "collection")
 
     def test_file_is_canonical_and_self_consistent(self) -> None:
         obj = registry_obj()
@@ -61,7 +75,8 @@ class RegistryTest(unittest.TestCase):
         text = SPEC.read_text(encoding="utf-8")
         section = text[text.index("Registry revision 1 reserves") : text.index("An entry is immutable after")]
         rows = re.findall(r"^\| `(COV\d{4})` \| (error|warning|note) \| (.+?) \|$", section, re.M)
-        got = [(e.code, e.default_severity, e.title) for e in d.load_registry().entries.values()]
+        later = {code for added in APPENDED.values() for code, _, _ in added}
+        got = [(e.code, e.default_severity, e.title) for e in d.load_registry().entries.values() if e.code not in later]
         self.assertEqual(got, rows)
 
     def test_every_domain_matches_its_range(self) -> None:
@@ -113,7 +128,7 @@ class RegistryTest(unittest.TestCase):
 
 
 class AppendOnlyTest(unittest.TestCase):
-    def successor(self, fn, revision: int = 2) -> d.Registry:
+    def successor(self, fn, revision: int = 3) -> d.Registry:
         obj = registry_obj()
         fn(obj)
         obj["revision"] = revision
@@ -144,14 +159,14 @@ class AppendOnlyTest(unittest.TestCase):
             {"code": "COV8004", "default_severity": "error", "domain": "internal", "title": "x"}
         )
         with self.assertRaises(d.RegistryError):
-            d.check_append_only(d.load_registry(), self.successor(add, revision=3))
+            d.check_append_only(d.load_registry(), self.successor(add, revision=4))
 
 
 class RecordTest(unittest.TestCase):
     def test_record_takes_severity_and_message_from_registry(self) -> None:
         obj = d.Diagnostic("COV4021", "report").to_json()
         self.assertEqual((obj["severity"], obj["message"]), ("warning", "Lossy saturated export requested"))
-        self.assertEqual(obj["registry_sha256"], REVISION_1_REGISTRY_SHA256)
+        self.assertEqual(obj["registry_sha256"], REGISTRY_SHA256)
 
     def test_unknown_code_rejected(self) -> None:
         for code in ("COV9999", "COV0000", "COV1234"):
@@ -180,7 +195,7 @@ class RecordTest(unittest.TestCase):
         cases = {
             "severity": ("severity", "warning"),
             "message": ("message", "Something else"),
-            "revision": ("registry_revision", 2),
+            "revision": ("registry_revision", 1),
             "digest": ("registry_sha256", "0" * 64),
             "phase": ("phase", "linking"),
             "extra key": ("extra", 1),

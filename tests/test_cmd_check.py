@@ -258,6 +258,21 @@ class EvidenceTest(Base):
         self.assertEqual((code, out, self.codes(err)), (7, "", ["COV5001"]))
 
 
+class CommandFailedTest(Base):
+    def test_evidence_of_a_failed_test_command_never_passes_a_check(self) -> None:
+        """SPEC 22.5."""
+        data, m, counts = fixture_inputs("f0")
+        for execution in ({"exit_code": 3, "signal": None, "status": "failed"}, {"exit_code": None, "signal": 15, "status": "signaled"}):
+            with self.subTest(status=execution["status"]):
+                self.setUp()
+                self.project(evidence=merge([Artifact("m", data)], [Artifact("a", raw(m, counts, 1))], execution=execution).data)
+                code, out, err = self.check("--threshold-line", "0")
+                (r,) = records(err)
+                self.assertEqual((code, r["code"], r["phase"]), (1, "COV2130", "policy"))
+                self.assertIn(f"execution:  {execution['status']}", out)
+                self.assertRegex(out, r'\nFAIL +integrity "integrity" +evidence .* COV2130\n')
+
+
 class OperandTest(Base):
     def test_the_operand_must_be_one_readable_indexed_profile(self) -> None:
         self.project()
@@ -365,10 +380,15 @@ class ModelTest(unittest.TestCase):
         failed["evidence_eligibility"] = "policy_failed"
         self.assertEqual(cmd_check.exit_status(failed), 1)
         self.assertEqual(cmd_check.exit_status({**passing, "evidence_eligibility": "diagnostic_only"}), 1)
-        broken = json.loads(json.dumps(passing))
-        broken["policy"]["evaluations"][0].update(result="fail", diagnostics=["COV3004"])
-        self.assertEqual(broken["policy"]["evaluations"][0]["assertion_kind"], "integrity")
-        self.assertEqual(cmd_check.exit_status(broken), 5)
+        self.assertEqual(cmd_check.exit_status({**passing, "complete": False}), 5)
+        self.assertFalse(cmd_check.coverage_failed(passing))
+        self.assertTrue(cmd_check.coverage_failed(failed))
+        command = json.loads(json.dumps(passing))
+        self.assertEqual(command["policy"]["evaluations"][0]["assertion_kind"], "integrity")
+        command["policy"]["evaluations"][0].update(result="fail", diagnostics=["COV2130"])
+        self.assertFalse(cmd_check.coverage_failed(command))  # only the test command failed
+        command["policy"]["evaluations"][0].update(diagnostics=["COV2130", "COV4020"])
+        self.assertTrue(cmd_check.coverage_failed(command))
 
 
 if __name__ == "__main__":
