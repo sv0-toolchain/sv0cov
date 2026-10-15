@@ -175,7 +175,7 @@ def main(argv: list[str] | None = None, *, stdout: TextIO | None = None, stderr:
     return status
 
 
-from sv0cov import cmd_check, cmd_clean, cmd_merge, cmd_report, cmd_run  # noqa: E402,F401 - register the command handlers
+from sv0cov import cmd_check, cmd_clean, cmd_doctor, cmd_merge, cmd_report, cmd_run  # noqa: E402,F401 - register the command handlers
 
 if __name__ == "__main__":
     sys.exit(main())

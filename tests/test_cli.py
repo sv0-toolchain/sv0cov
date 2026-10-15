@@ -171,10 +171,11 @@ class ExitCodeTest(unittest.TestCase):
                           cli.EXIT_REPORT, cli.EXIT_UNSUPPORTED, cli.EXIT_INTERNAL], list(range(9)))
 
     def test_a_valid_invocation_of_an_unimplemented_command_is_unsupported(self) -> None:
-        pending = [c for c in C.COMMANDS if c not in cli.HANDLERS]
-        self.assertEqual(sorted(cli.HANDLERS), ["check", "clean", "merge", "report", "run", "version"])
-        for command in pending:
-            with self.subTest(command=command):
+        # Every command has a handler now; the rule still holds for one that is withdrawn.
+        self.assertEqual(sorted(cli.HANDLERS), sorted(C.COMMANDS))
+        for command in C.COMMANDS:
+            with self.subTest(command=command), mock.patch.dict(cli.HANDLERS):
+                del cli.HANDLERS[command]
                 code, out, err = run(*argv(command, "--diagnostic-format=json-lines"))
                 (rec,) = records(err)
                 self.assertEqual((code, out, rec["code"], rec["phase"]), (7, "", "COV5001", "invocation"))
@@ -230,7 +231,7 @@ class UsageMatrixTest(unittest.TestCase):
     def test_every_base_invocation_is_accepted_by_the_usage_checks(self) -> None:
         for command in C.COMMANDS:
             code, _, err = run(*argv(command))
-            self.assertEqual(code, {"version": 0, "merge": 5, "check": 5, "report": 5, "clean": 0}.get(command, 7), (command, err))
+            self.assertEqual(code, {"version": 0, "merge": 5, "check": 5, "report": 5, "clean": 0, "doctor": 0}.get(command, 7), (command, err))
 
     def test_every_option_on_every_command(self) -> None:
         accepted = refused = 0
@@ -305,7 +306,7 @@ class UsageMatrixTest(unittest.TestCase):
     def test_version_and_doctor_do_not_read_the_project(self) -> None:
         broken = {"sv0.toml": b"[tool.sv0cov]\nnot toml"}
         self.assertEqual(run("version", files=broken)[0], 0)
-        self.assertEqual(run("doctor", files=broken)[0], 7)
+        self.assertEqual(run("doctor", files=broken)[0], 0)
         self.assertEqual(run("check", "x", files=broken)[0], 2)
 
 
@@ -386,7 +387,7 @@ class ProcessTest(unittest.TestCase):
         self.assertEqual((p.returncode, p.stdout), (2, b""))
         (rec,) = records(p.stderr.decode())
         self.assertEqual(rec["code"], "COV0001")
-        p = self.process("doctor")
+        p = self.process("doctor", "--toolchain-root", ".")
         self.assertEqual((p.returncode, p.stdout), (7, b""))
         self.assertTrue(p.stderr.startswith(b"COV5001 error: Unsupported installation or platform\n"))
         self.assertNotIn(b"\x1b", p.stderr)  # a pipe is not a terminal

@@ -14,10 +14,11 @@ sv0cov version [--json]
 ```
 
 This page describes the framework every command shares (SPEC §18.2.3,
-§20.1 to §20.3, §20.5.2). Today `version`, [`run`](run.md), [`merge`](merge.md),
-[`report`](report.md), [`check`](check.md) and [`clean`](clean.md) are
-implemented; the other commands are checked for correct usage and then
-report that this build does not provide them yet.
+§20.1 to §20.3, §20.5.2). Every command is implemented: `version`, [`run`](run.md),
+[`merge`](merge.md), [`report`](report.md), [`check`](check.md),
+[`clean`](clean.md) and standalone [`doctor`](doctor.md). A command
+without a handler would be checked for correct usage and then reported as
+unsupported (`COV5001`, exit 7).
 
 ## Arguments
 

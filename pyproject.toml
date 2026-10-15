@@ -92,3 +92,5 @@ exclude = ["__pycache__", "*.pyc"]
 [tool.hatch.build.targets.wheel.force-include]
 "registries" = "sv0cov/_resources/registries"
 "schemas" = "sv0cov/_resources/schemas"
+"runtime/c/sv0cov_rt.c" = "sv0cov/_resources/runtime/c/sv0cov_rt.c"
+"runtime/c/sv0cov_rt.h" = "sv0cov/_resources/runtime/c/sv0cov_rt.h"

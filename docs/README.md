@@ -18,6 +18,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Report](report.md): formats, the destination matrix, and the exit statuses of `sv0cov report`.
 - [Check](check.md): what `sv0cov check` evaluates, its exit statuses, and its output.
 - [Clean](clean.md): what `sv0cov clean` recognizes as its own and how it refuses everything else.
+- [Doctor](doctor.md): the standalone probes D001 to D008, their facts, and the exit statuses.
 - [Planning conventions](planning-conventions.md): how the planner assigns entities, regions, and counters.
 - [Publication](publication.md): how outputs are written without ever replacing anything, and the primitive used per host.
 - [Release policy](release-policy.md): release identity, versioning, attestations, checksums, SBOM, approval, publication, retention.
