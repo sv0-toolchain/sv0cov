@@ -286,7 +286,9 @@ def _check_points(ctx: _Ctx) -> dict[str, dict]:
         by_id[p["point_id"]] = p
     _strictly_ordered(points, lambda p: p["point_id"], "points (by point_id)")
     count = obj["program_counter_count"]
-    if sorted(counted) != list(range(count)):
+    # Distinct indexes, as many as declared, from 0 to count-1: exactly 0..count-1. Compared
+    # without building a sequence of the declared size, which the input does not bound.
+    if len(counted) != count or (counted and (min(counted) != 0 or max(counted) != count - 1)):
         _fail("COV1015", "counter indexes must be exactly 0..program_counter_count-1")
     _check_fragments(ctx, counted)
     return by_id

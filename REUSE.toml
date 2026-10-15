@@ -53,6 +53,12 @@ SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
 
 [[annotations]]
+path = "tests/fixtures/fuzz/**.bin"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+[[annotations]]
 path = "tests/fixtures/terminal/**.txt"
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"

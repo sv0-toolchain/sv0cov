@@ -98,7 +98,10 @@ def check_expression(expr: object, counted: Iterable[str] | None = None) -> list
             raise ExprError("COV1010", f"coefficient {c} is outside the signed 32-bit range")
         if not isinstance(p, str):
             raise ExprError("COV1010", "point_id is not a string")
-        key = p.encode("utf-8")
+        try:
+            key = p.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ExprError("COV1010", "point_id is not valid Unicode text") from None
         if prev is not None and key <= prev:
             raise ExprError("COV1010", f"terms are not strictly ordered by point ID at {p}"
                             + (" (duplicate point)" if key == prev else ""))

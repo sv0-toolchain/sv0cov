@@ -159,11 +159,15 @@ def _line_indices(r: dict, affected: dict) -> list[int]:
     """The lines an exclusion touches: those naming one of its regions, or
     lying within one of its branches or clauses."""
     spots = {(r["regions"][i]["source_index"], n) for i in affected["region_indices"] for n in r["regions"][i]["line_numbers"]}
+    # A span is compared with the line records rather than enumerated: its line range comes
+    # from the input and can be four billion lines long.
+    spans: dict[int, list[tuple[int, int]]] = {}
     for key, records in (("branch_indices", r["branches"]), ("clause_indices", r["contracts"])):
         for i in affected[key]:
             rec = records[i]
-            spots |= {(rec["source_index"], n) for n in range(rec["span"]["start_line"], rec["span"]["end_line"] + 1)}
-    return [x["line_index"] for x in r["lines"] if (x["source_index"], x["line"]) in spots]
+            spans.setdefault(rec["source_index"], []).append((rec["span"]["start_line"], rec["span"]["end_line"]))
+    return [x["line_index"] for x in r["lines"]
+            if (x["source_index"], x["line"]) in spots or any(a <= x["line"] <= b for a, b in spans.get(x["source_index"], ()))]
 
 
 # ── policy ──────────────────────────────────────────────────────────────────

@@ -101,3 +101,36 @@ jobs:
 
       - name: Reproducible sdist -> wheel build
         run: python tools/check_packaging.py build "$RUNNER_TEMP/dist"
+
+  # CV-236 (SPEC 28.4): every push fuzzes each harness of tools/fuzz.py with a
+  # fresh seed. A finding fails the job and its minimized input is uploaded;
+  # checked into tests/fixtures/fuzz/<harness>/ it becomes a regression
+  # fixture the test suite replays. Standard library only.
+  fuzz:
+    name: fuzz (linux-x86_64 / py3.14)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Replay the regression corpus
+        run: python tools/fuzz.py replay
+
+      - name: Fuzz every harness (60 s each, seed from this run)
+        run: python tools/fuzz.py run --seconds 60 --seed "${{ github.run_id }}${{ github.run_attempt }}" --crash-dir "$RUNNER_TEMP/fuzz-findings"
+
+      - name: Upload minimized findings
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-findings
+          path: ${{ runner.temp }}/fuzz-findings
+          if-no-files-found: ignore
