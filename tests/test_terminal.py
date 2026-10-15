@@ -451,6 +451,13 @@ class InjectionTest(unittest.TestCase):
         report = copy.deepcopy(self.base)
         report["exclusions"][0]["reason"] = 'x" was rejected [COV0000]'
         self.assertIn(r'"x\" was rejected [COV0000]"', render_terminal(report))
+        # A trailing backslash cannot turn the closing quote into an escaped one, and the
+        # characters of an escape sequence cannot pass for the control they spell (CV-237).
+        for text, shown in (("ends in \\", r'"ends in \\"'), ("\\x1b[2J", r'"\\x1b[2J"'), ("\x1b[2J", r'"\x1b[2J"'),
+                            ('\\" forged', r'"\\\" forged"')):
+            with self.subTest(text=text):
+                report["exclusions"][0]["reason"] = text
+                self.assertIn(f" (comment): {shown}", render_terminal(report))
 
     def test_diagnostics_escape_reordering_characters_too(self) -> None:
         self.assertEqual(escape_text("ok é ✓"), "ok é ✓")

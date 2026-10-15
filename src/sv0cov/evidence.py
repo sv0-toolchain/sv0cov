@@ -76,8 +76,18 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False) -
         raise Stop(exc.code, "collection", exc.detail, cli.EXIT_EVIDENCE) from None
 
     sources = {}
+    root = ctx.cwd.resolve()
     for s in indexed["semantic"]["sources"]:
-        sources[s["path"]], _ = _read(ctx.cwd / s["path"], limit, follow=True)
+        path = ctx.cwd / s["path"]
+        # A source is read only where it really is inside the project: a symlink (of the file or
+        # of a directory on the way) may point elsewhere in the project, never out of it (COV-SEC-002).
+        try:
+            inside = path.resolve().is_relative_to(root)
+        except (OSError, RuntimeError):  # a symlink loop
+            inside = False
+        if not inside:
+            raise Stop("COV6002", "report", f"source {s['path']} resolves outside the project", cli.EXIT_EVIDENCE)
+        sources[s["path"]], _ = _read(path, limit, follow=True)
     try:
         encoded = encode(build_report(data, config, sources, standard_export=standard_export))
         return read_report(encoded, tier=tier), encoded

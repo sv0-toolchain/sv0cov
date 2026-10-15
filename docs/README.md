@@ -20,6 +20,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Clean](clean.md): what `sv0cov clean` recognizes as its own and how it refuses everything else.
 - [Doctor](doctor.md): the standalone probes D001 to D008, their facts, and the exit statuses.
 - [Fuzzing](fuzzing.md): the parser fuzzer, its harnesses and rules, the regression corpus, and where it runs.
+- [Security suite](security.md): no network, containment, injection and environment poisoning across every command.
 - [Planning conventions](planning-conventions.md): how the planner assigns entities, regions, and counters.
 - [Publication](publication.md): how outputs are written without ever replacing anything, and the primitive used per host.
 - [Release policy](release-policy.md): release identity, versioning, attestations, checksums, SBOM, approval, publication, retention.

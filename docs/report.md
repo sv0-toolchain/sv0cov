@@ -62,7 +62,7 @@ follows `--color`, and color only repeats status words.
 |---:|---|
 | 0 | The selected formats were published. |
 | 2 | Invalid usage or configuration, including a saturation policy other than the one the evidence was merged under. |
-| 5 | The evidence cannot be read or is invalid, or a source file is missing or has changed. |
+| 5 | The evidence cannot be read or is invalid, a source file is missing or has changed, or a source path resolves outside the project through a symlink (`COV6002`). |
 | 6 | The destination exists, or publication failed. Every artifact is validated before it is committed; one that fails is not published. |
 | 7 | A format or a policy assertion this build cannot produce, or a native report operand. |
 

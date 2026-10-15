@@ -71,7 +71,11 @@ def ranges(numbers: Iterable[int]) -> str:
 
 
 def _quoted(text: str) -> str:
-    return '"' + escape_text(text).replace('"', '\\"') + '"'
+    r"""Text between double quotes. A backslash is doubled before anything is
+    escaped, so neither an escape sequence nor a closing quote can be forged:
+    the text ``a\`` reads ``"a\\"``, the ESC character reads ``"\x1b"`` and
+    the four characters backslash, x, 1, b read ``"\\x1b"``."""
+    return '"' + escape_text(text.replace("\\", "\\\\")).replace('"', '\\"') + '"'
 
 
 def _plural(n: int, one: str, many: str | None = None) -> str:

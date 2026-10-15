@@ -46,7 +46,7 @@ than passed without it.
 | 0 | The evidence is complete and current and every assertion passed. |
 | 1 | The evidence is sound and an assertion did not pass: a threshold failed (`COV4101`), a selected metric was empty (`COV4102`), or saturation made a check ineligible (`COV4020`). |
 | 2 | Invalid usage or configuration, including a saturation policy other than the one the evidence was merged under (`COV0013`). |
-| 5 | The evidence cannot be relied on: it cannot be read or is invalid (`COV3010`, `COV6001`), it is incomplete, or a source file is missing or has changed (`COV1004`). |
+| 5 | The evidence cannot be relied on: it cannot be read or is invalid (`COV3010`, `COV6001`), it is incomplete, a source file is missing or has changed (`COV1004`), or a source path resolves outside the project through a symlink (`COV6002`). |
 | 7 | The policy needs an assertion this build cannot evaluate, or the operand is a native report (`COV5001`). |
 | 8 | Internal failure, including a result the reader rejects. |
 

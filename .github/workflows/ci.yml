@@ -8,8 +8,8 @@
 # allowlisted artifacts.
 #
 # Third-party actions are pinned by full commit SHA (SPEC 25.4.3). Network
-# access is used only to populate the locked environment. OS-level network
-# denial for the test step is deferred to the security suite (CV-237).
+# access is used only to populate the locked environment. On Linux the
+# security suite (CV-237) also runs inside an empty network namespace.
 
 name: CI
 
@@ -81,6 +81,14 @@ jobs:
 
       - name: Stdlib-only test run (no third-party packages)
         run: python -m unittest discover -s tests
+
+      - name: Security suite in an empty network namespace (Linux; CV-237, COV-SEC-001)
+        if: startsWith(matrix.host, 'linux')
+        run: >-
+          sudo unshare --net --
+          setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups --
+          env PATH="$PATH" HOME="$HOME" SV0COV_REQUIRE_NETWORK_DENIAL=1
+          "${{ steps.py.outputs.python-path }}" -m unittest -v tests.test_security
 
       - name: Locked test environment
         run: >-
