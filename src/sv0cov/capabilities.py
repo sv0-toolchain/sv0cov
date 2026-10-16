@@ -10,11 +10,11 @@ Identity sources:
 - product version: the static ``[project].version`` (from ``pyproject.toml``
   in a source checkout, else from installed distribution metadata);
 - implementation revision: the Git commit of the source checkout the code
-  runs from, read directly from ``.git`` without running Git. An installed
-  distribution has no reliable revision source yet: SPEC 20.6 requires the
-  40-hex commit while SPEC 25.2.7 forbids build hooks and dynamic metadata.
-  This gap is recorded in the planning hub; until it is resolved, an
-  installed distribution fails ``version --json`` rather than guess.
+  runs from, read directly from ``.git`` without running Git; for an
+  installed distribution, the release build-info resource
+  ``sv0cov/_build_info.json`` that the release script writes before the
+  build (SPEC 25.2.7.1, COV-PKG-028, DEC-089). A distribution built without
+  it is not a release and fails ``version --json`` rather than guess.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import tomllib
 from importlib import metadata
 from pathlib import Path
 
+from sv0cov.formats.canonical_json import CanonicalJsonError, decode_canonical, encode
 from sv0cov.formats.version_manifest import Advertised, ManifestError
 from sv0cov.model.inventory import RE_REVISION
 
@@ -59,10 +60,41 @@ def _git_dir(root: Path) -> Path:
     raise ManifestError("no Git metadata for the source checkout")
 
 
+BUILD_INFO = "_build_info.json"
+BUILD_INFO_SCHEMA = "sv0cov.build-info"
+
+
+def build_info(commit: str) -> bytes:
+    """The release build-info resource for ``commit``: canonical JSON with
+    exactly ``revision``, ``schema`` and ``version`` (SPEC 25.2.7.1), a pure
+    function of the commit."""
+    if not RE_REVISION.fullmatch(commit):
+        raise ManifestError("a build-info revision is a lowercase 40-hex commit")
+    return encode({"revision": commit, "schema": BUILD_INFO_SCHEMA, "version": "1.0"})
+
+
+def read_build_info(data: bytes) -> str:
+    """The revision a build-info resource records; ManifestError unless it is exactly one."""
+    try:
+        obj = decode_canonical(data)
+    except CanonicalJsonError as exc:
+        raise ManifestError(f"build-info is not canonical JSON: {exc}") from None
+    if not isinstance(obj, dict) or sorted(obj) != ["revision", "schema", "version"] or obj["schema"] != BUILD_INFO_SCHEMA \
+            or obj["version"] != "1.0" or not isinstance(obj["revision"], str) or not RE_REVISION.fullmatch(obj["revision"]):
+        raise ManifestError("build-info must be exactly {revision, schema: sv0cov.build-info, version: 1.0}")
+    return obj["revision"]
+
+
 def revision() -> str:
-    """The 40-hex commit of the running source checkout."""
+    """The 40-hex commit of the running source checkout, or the one the
+    release build-info of an installed distribution records."""
     if not _is_checkout():
-        raise ManifestError("implementation revision is unavailable for an installed distribution")
+        resource = Path(__file__).resolve().parent / BUILD_INFO
+        try:
+            data = resource.read_bytes()
+        except OSError:
+            raise ManifestError("implementation revision is unavailable: this installed distribution has no release build-info") from None
+        return read_build_info(data)
     git = _git_dir(_CHECKOUT)
     head = (git / "HEAD").read_text(encoding="utf-8").strip()
     if head.startswith("ref: "):

@@ -85,6 +85,7 @@ HOSTS = {
 }
 RE_REQ = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([0-9][A-Za-z0-9.!+-]*)$")
 
+#: SPEC 25.2.7's exact sdist allowlist, plus the PKG-INFO the backend writes.
 SDIST_ALLOW = {
     "README.md",
     "LICENSE",
@@ -99,9 +100,7 @@ SDIST_ALLOW = {
     "schemas",
     "docs",
     "tests",
-    "tools",
     "scripts",
-    "bench",
     "runtime",
     "resources",
     "PKG-INFO",
@@ -193,6 +192,11 @@ def check_pyproject(py: dict) -> list[str]:
             errors.append(f"hatch {name} target must set reproducible = true")
         if not target.get("only-include"):
             errors.append(f"hatch {name} target must use an only-include allowlist")
+    sdist = build.get("targets", {}).get("sdist", {}).get("only-include", [])
+    if sorted(sdist) != sorted(SDIST_ALLOW - {"PKG-INFO"}):
+        errors.append(f"the sdist allowlist must be exactly SPEC 25.2.7's {sorted(SDIST_ALLOW - {'PKG-INFO'})}, got {sorted(sdist)}")
+    if build.get("ignore-vcs") is not True:
+        errors.append("[tool.hatch.build].ignore-vcs must be true (membership comes from the allowlists, never from .gitignore)")
     return errors
 
 

@@ -101,6 +101,14 @@ class PyprojectPolicyTest(unittest.TestCase):
             lambda p: p["tool"]["hatch"]["build"]["targets"]["wheel"].__setitem__("reproducible", False)
         )
 
+    def test_sdist_allowlist_is_exactly_the_spec_list(self) -> None:
+        """SPEC 25.2.7: tools/ and bench/ are not sdist members (CV-243 found them listed)."""
+        sdist = lambda p: p["tool"]["hatch"]["build"]["targets"]["sdist"]["only-include"]  # noqa: E731
+        self.assert_rejected(lambda p: sdist(p).append("tools"))
+        self.assert_rejected(lambda p: sdist(p).append("bench"))
+        self.assert_rejected(lambda p: sdist(p).remove("resources"))
+        self.assert_rejected(lambda p: p["tool"]["hatch"]["build"].__setitem__("ignore-vcs", False))
+
 
 class LockPolicyTest(unittest.TestCase):
     def test_non_registry_source_rejected(self) -> None:

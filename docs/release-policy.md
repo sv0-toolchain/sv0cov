@@ -4,7 +4,9 @@
 
 This document fixes how an sv0cov public release is identified, built,
 approved, published, verified, retained, and withdrawn. It is the procedure
-the R1 release pipeline (CV-243, CV-411, CV-413) implements; nothing here is
+the release pipeline implements: CV-243 built it as a dry run
+(`tools/release.py`, section 8), CV-411 adds the supply-chain closure and
+CV-413 attestation, approval and publication. Nothing here has been
 exercised by a real publication yet. Machine-checkable parts live in
 `sv0cov.formats.release` and `schemas/sv0cov.release-manifest-1.0.schema.json`,
 with fixtures in `tests/fixtures/release/`.
@@ -120,11 +122,17 @@ with fixtures in `tests/fixtures/release/`.
 - Permissions are default-deny and job-scoped; only the protected
   publication job gets short-lived `contents: write`, and it consumes only
   verified frozen artifacts.
-- **Open decision D-3.** This procedure needs a second accountable human.
-  The project currently has one maintainer, so R1 publication (CV-413) is
-  blocked until D-3 names the approver or the specification is amended.
-  Missing reviewer availability delays a release; it never creates an
-  exception.
+- **Single maintainer (D-3, resolved as DEC-087, SPEC 25.4.5).** While the
+  project has one accountable maintainer, the release owner may approve,
+  with compensating controls: the protected `release` environment still
+  requires an explicit approval, recorded at least 24 hours after the
+  candidate input set is frozen; the approval record states that no second
+  person was available and lists the whole review set above; every
+  automated gate, both reproducible builds, every attestation and every
+  verification pass with no manual override; the prohibitions above still
+  hold; and the release is labelled `single-maintainer-approved`. The same
+  applies to a withdrawal. The two-person rule returns with the first
+  release after a second accountable person is available.
 
 ## 6. Immutable publication and verification (F0-G33)
 
@@ -167,3 +175,50 @@ with fixtures in `tests/fixtures/release/`.
   keep digests, status, advisory, and replacement. Withdrawal is contained
   only after every supported toolchain pin has moved through its normal
   policy/gitlink change.
+
+## 8. The dry run (CV-243, R0-G8)
+
+`python tools/release.py dry-run OUT [--commit REV]` runs the pipeline up to,
+and never including, tagging, attestation and publication; the tool has no
+such step. `python tools/release.py verify OUT [--commit REV]` re-checks a
+result from its bytes. CI runs both on all eight host/interpreter cells and
+requires the eight `SHA256SUMS` to be identical.
+
+1. **Preflight.** The commit's static `[project].version` is a valid product
+   version; a `v<version>` tag, if present, peels to the commit (a dry run
+   does not need one).
+2. **Input.** The commit's tree from `git archive`, never the working tree.
+   Only regular files, except relative symlinks inside the vendored suite
+   (`tests/vendor/`), which the sdist excludes. The release build-info
+   `src/sv0cov/_build_info.json` (SPEC 25.2.7.1) is written into the export,
+   naming the commit; it is ignored by Git and never tracked.
+3. **Build once, twice.** The locked `build` group in a fresh environment,
+   `SOURCE_DATE_EPOCH` = the commit time, the sdist from the export and the
+   wheel from that sdist, without build isolation (as
+   `tools/check_packaging.py build`); the two results are byte-identical.
+4. **Inspection.** Sdist and wheel allowlists, metadata, records; every
+   sdist member is the commit's file, except `PKG-INFO` and the build-info,
+   which both archives carry unchanged; the wheel, unpacked and run as
+   installed, reports the version and the commit in `version --json`
+   (COV-PKG-028) and passes the standalone doctor.
+5. **Attachments** (role): `sv0cov-<v>.tar.gz` and
+   `sv0cov-<v>-py3-none-any.whl` (package); `sv0cov-<v>-source.tar.gz`, the
+   complete tree (source); `sv0cov-<v>-protocol.tar.gz`, schemas, registry
+   and the doctor fixture (protocol); `CHANGELOG.md` and
+   `sv0cov-<v>.compatibility-matrix.json`, what the release supports and
+   advertises (documentation); `sv0cov-<v>.compatibility-policy.json`, the
+   root policy that would select it (support); `sv0cov-<v>.licenses.json`
+   (license); `sv0cov-<v>.spdx.json` (sbom); `sv0cov-<v>.evidence.json`, the
+   build record: backend and Hatchling lock identity, argv and environment
+   rule, commit and epoch, sdist-to-wheel edge, member inventories,
+   reproduction and installed results (evidence). Then
+   `sv0cov-<v>.release.json` and `SHA256SUMS`. The archives are reproducible
+   (sorted members, fixed time, owner and modes, gzip without name or time),
+   so every attachment is a pure function of the commit.
+
+The dry-run SBOM describes the product, the sdist and wheel and the
+generated build-info; the closure of build distributions, the CPython
+runtime and every component license comes with CV-411. The dry run makes no
+public-channel claim (COV-PKG-001): its output is a local directory, and a
+CI snapshot is never a release.
+

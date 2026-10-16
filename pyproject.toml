@@ -75,12 +75,12 @@ only-include = [
     "schemas",
     "docs",
     "tests",
-    "tools",
     "scripts",
-    "bench",
     "runtime",
     "resources",
 ]
+# SPEC 25.2.7 lists the sdist members exactly; tools/ and bench/ are not among
+# them and ship only in the complete source archive of a release.
 exclude = ["tests/vendor", "__pycache__", "*.pyc"]
 
 [tool.hatch.build.targets.wheel]

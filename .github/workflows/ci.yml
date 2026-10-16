@@ -110,6 +110,52 @@ jobs:
       - name: Reproducible sdist -> wheel build
         run: python tools/check_packaging.py build "$RUNNER_TEMP/dist"
 
+      # CV-243 (SPEC 25.2.7, 25.4; R0-G8): the release pipeline, dry run only.
+      # Build once from the commit (twice for byte identity), inspect, install,
+      # produce every attachment, SHA256SUMS and the release manifest, verify;
+      # nothing is tagged, attested or published.
+      - name: Release dry run
+        run: python tools/release.py dry-run "$RUNNER_TEMP/release"
+
+      - name: Release dry-run checks (verify refuses every tampered copy)
+        env:
+          SV0COV_RELEASE_DRY_RUN: ${{ runner.temp }}/release
+        run: python -m unittest -v tests.test_release_pipeline
+
+      - name: Keep this cell's SHA256SUMS for the cross-cell comparison
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-sums-${{ matrix.host }}-py${{ matrix.python }}
+          path: ${{ runner.temp }}/release/SHA256SUMS
+          if-no-files-found: error
+
+  # CV-243 (SPEC 25.2.7): every attachment is byte-identical across CPython
+  # 3.13 and 3.14 and the four required hosts.
+  release-agreement:
+    name: release dry run identical on all eight cells
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: release-sums-*
+          path: sums
+
+      - name: Compare
+        run: |
+          set -eu
+          ls sums
+          test "$(ls sums | wc -l)" -eq 8
+          first=$(ls sums | head -1)
+          for cell in sums/*; do
+            if ! cmp -s "sums/$first/SHA256SUMS" "$cell/SHA256SUMS"; then
+              echo "::error::$(basename "$cell") differs from $first"
+              diff "sums/$first/SHA256SUMS" "$cell/SHA256SUMS" || true
+              exit 1
+            fi
+          done
+          cat "sums/$first/SHA256SUMS"
+
   # CV-236 (SPEC 28.4): every push fuzzes each harness of tools/fuzz.py with a
   # fresh seed. A finding fails the job and its minimized input is uploaded;
   # checked into tests/fixtures/fuzz/<harness>/ it becomes a regression
