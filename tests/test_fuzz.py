@@ -12,7 +12,6 @@ without bound are pinned.
 
 from __future__ import annotations
 
-import copy
 import importlib.util
 import json
 import sys
@@ -35,8 +34,6 @@ from sv0cov import expr  # noqa: E402
 from sv0cov.formats import rawprofile  # noqa: E402
 from sv0cov.formats.canonical_json import encode  # noqa: E402
 from sv0cov.formats.map import MapError, map_id, validate_map  # noqa: E402
-from sv0cov.formats.report import ReportError  # noqa: E402
-from sv0cov.model.report import read_report  # noqa: E402
 
 REGRESSIONS = ROOT / "tests" / "fixtures" / "fuzz"
 #: Iterations per harness in the unit suite; CI's fuzz job runs far longer with a fresh seed.

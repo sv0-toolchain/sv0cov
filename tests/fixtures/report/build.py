@@ -27,7 +27,6 @@ the producer and reader (CV-229).
 
 from __future__ import annotations
 
-import copy
 import hashlib
 import importlib.util
 import sys

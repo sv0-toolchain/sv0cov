@@ -32,7 +32,6 @@ import argparse
 import base64
 import email.parser
 import hashlib
-import io
 import os
 import re
 import shutil
@@ -104,6 +103,7 @@ SDIST_ALLOW = {
     "scripts",
     "bench",
     "runtime",
+    "resources",
     "PKG-INFO",
 }
 

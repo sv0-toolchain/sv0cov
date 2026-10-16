@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import json
 import os
 import re
 import shutil
@@ -98,8 +97,9 @@ class InventoryTest(unittest.TestCase):
         import tomllib
         mapping = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
         for logical in probes.RESOURCES:
-            top = logical.split("/")[0]
-            self.assertTrue(mapping.get(top) == f"sv0cov/_resources/{top}" or mapping.get(logical) == f"sv0cov/_resources/{logical}", logical)
+            parts = logical.split("/")
+            prefixes = ["/".join(parts[:n]) for n in range(1, len(parts) + 1)]
+            self.assertTrue(any(mapping.get(p) == f"sv0cov/_resources/{p}" for p in prefixes), logical)
 
     def test_an_installed_layout_gives_the_same_counts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -257,12 +257,12 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(self.run_cli("--quiet"), (0, "", ""))
 
     def test_a_failure_is_exit_7_and_every_output_agrees(self) -> None:
-        real = probes.run_standalone
+        real = probes.run
 
         def broken(**kw):
             return real(observed=probes.Observed(runtime_version="3.12.9"), **kw)
 
-        with mock.patch.object(cli.cmd_doctor.probes, "run_standalone", broken):
+        with mock.patch.object(cli.cmd_doctor.probes, "run", broken):
             code, out, err = self.run_cli("--json", "--diagnostic-format=json-lines")
             human = self.run_cli()
         obj = doctor.validate(out.encode())
@@ -275,13 +275,12 @@ class CommandTest(unittest.TestCase):
         self.assertTrue(human[2].startswith("COV0016 error: Unsupported Python interpreter\n"))
 
     def test_a_bootstrap_failure_is_exit_8_with_no_json(self) -> None:
-        with mock.patch.object(cli.cmd_doctor.probes, "run_standalone", side_effect=probes.Bootstrap("D001: no manifest")):
+        with mock.patch.object(cli.cmd_doctor.probes, "run", side_effect=probes.Bootstrap("D001: no manifest")):
             code, out, err = self.run_cli("--json", "--diagnostic-format=json-lines")
         self.assertEqual((code, out, [r["code"] for r in records(err)]), (8, "", ["COV8001"]))
 
-    def test_toolchain_mode_is_not_in_this_build(self) -> None:
-        code, out, err = self.run_cli("--toolchain-root", ".", "--diagnostic-format=json-lines")
-        self.assertEqual((code, out, [r["code"] for r in records(err)]), (7, "", ["COV5001"]))
+    def test_toolchain_root_is_given_once(self) -> None:
+        """Toolchain mode itself is tested in test_doctor_toolchain."""
         self.assertEqual(self.run_cli("--toolchain-root", ".", "--toolchain-root", ".")[0], 2)
 
     def test_project_configuration_is_not_read(self) -> None:

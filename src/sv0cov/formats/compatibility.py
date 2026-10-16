@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
-"""Root compatibility policy 1.0 (SPEC 20.6.1).
+"""Root compatibility policy 1.0 (SPEC 20.6.1, 20.6.2).
 
 ``compatibility/sv0cov.json`` in sv0-toolchain selects one exact sv0cov
-release. This module owns its closed schema, canonical encoding, and
-self-digest. The self-digest detects accidental mutation; it does not
-authenticate anything.
+release. This module owns its closed schema, canonical encoding,
+self-digest, and the comparison with a capability manifest
+(:func:`evaluate`), which the root preflight and doctor D012 share. The
+self-digest detects accidental mutation; it does not authenticate anything.
 """
 
 from __future__ import annotations
@@ -79,3 +80,51 @@ def validate_policy(data: bytes) -> dict:
         raise PolicyError(str(exc)) from exc
     check_policy_object(obj)
     return obj
+
+
+class Incompatible(ValueError):
+    """A valid policy and a valid capability manifest that do not agree (SPEC 20.6.2; COV5002)."""
+
+
+def evaluate(policy: dict, manifest: dict, host: dict, registry: dict) -> None:
+    """Rules 3 to 9 of SPEC 20.6.2, in order, for a validated policy and a
+    validated capability manifest. ``host`` is the effective host the caller
+    observed itself (``{"architecture", "operating_system"}``) and
+    ``registry`` the ``{"revision", "sha256"}`` of the registry the pinned
+    components carry. Rules 1 and 2 (the policy itself, the gitlink) are the
+    caller's. Raises :class:`Incompatible` with the first disagreement."""
+    # 3. the manifest version
+    if manifest["version"] != policy["version_manifest_version"]:
+        raise Incompatible(f"manifest version {manifest['version']} != {policy['version_manifest_version']}")
+    # 4. identity
+    tool, impl = manifest["tool"], manifest["implementation"]
+    if tool != policy["expected_tool"]:
+        raise Incompatible(f"sv0cov reports {tool['name']} {tool['version']}, the policy expects "
+                           f"{policy['expected_tool']['name']} {policy['expected_tool']['version']}")
+    if impl["revision"] != policy["expected_revision"]:
+        raise Incompatible(f"sv0cov reports revision {impl['revision']}, the policy expects {policy['expected_revision']}")
+    # 5. implementation language
+    if impl["language"] not in policy["allowed_implementation_languages"] or impl["language"] != policy["default_implementation_language"]:
+        raise Incompatible(f"sv0cov reports implementation {impl['language']}, the policy selects {policy['default_implementation_language']}")
+    # 6. host
+    if manifest["host"] != host:
+        raise Incompatible(f"sv0cov reports host {manifest['host']['operating_system']}-{manifest['host']['architecture']}, "
+                           f"this is {host['operating_system']}-{host['architecture']}")
+    composite = f"{host['operating_system']}-{host['architecture']}"
+    if composite not in policy["required_hosts"] or composite not in manifest["supported_hosts"]:
+        raise Incompatible(f"host {composite} is not both required by the policy and supported by sv0cov")
+    # 7. required capability sets
+    for name in ("commands", "backends", "bytecode_profiles", "features"):
+        missing = [v for v in policy[f"required_{name}"] if v not in manifest[name]]
+        if missing:
+            raise Incompatible(f"sv0cov does not advertise required {name.replace('_', ' ')}: {', '.join(missing)}")
+    # 8. artifact versions
+    for family, versions in policy["expected_artifact_versions"].items():
+        missing = [v for v in versions if v not in manifest["artifact_versions"].get(family, [])]
+        if missing:
+            raise Incompatible(f"sv0cov does not read or write {family} {', '.join(missing)}")
+    # 9. the diagnostic registry: revision and digest, allowed and the components' own
+    advertised = manifest["diagnostic_registry"]
+    if advertised not in policy["allowed_diagnostic_registries"] or advertised != registry:
+        raise Incompatible(f"sv0cov reports diagnostic registry revision {advertised['revision']} ({advertised['sha256'][:12]}), "
+                           "which is not the allowed registry the components carry")

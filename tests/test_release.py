@@ -16,7 +16,6 @@ HERE = ROOT / "tests" / "fixtures" / "release"
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(HERE))
 
-import build as B  # noqa: E402
 
 from sv0cov.formats import release as R  # noqa: E402
 from sv0cov.formats.canonical_json import encode  # noqa: E402

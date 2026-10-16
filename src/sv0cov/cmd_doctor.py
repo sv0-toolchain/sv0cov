@@ -1,10 +1,15 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
-"""The ``doctor`` command, standalone mode (CV-235; SPEC 20.7; COV-CLI-011)::
+"""The ``doctor`` command (CV-235, CV-242; SPEC 20.7; COV-CLI-011)::
 
-    sv0cov doctor [--json] [--quiet]
+    sv0cov doctor [--toolchain-root <path>] [--json] [--quiet]
 
-It runs the standalone probes (:mod:`sv0cov.probes`) and reports one model
+Without ``--toolchain-root`` it runs the standalone probes D001 to D008
+(:mod:`sv0cov.probes`); with it, also the toolchain probes D009 to D018
+(:mod:`sv0cov.toolchain`) against that sv0-toolchain checkout. The path is
+resolved from the working directory and must name an existing directory
+that is not a symlink, or the invocation is refused (exit 2); it is never
+written anywhere. It reports one model
 three ways, which therefore always agree:
 
 - ``--json``: the canonical ``sv0cov.doctor`` 1.0 aggregate on stdout and
@@ -16,11 +21,13 @@ three ways, which therefore always agree:
 
 Exit 0 when every applicable probe passed, 7 when one failed or was skipped,
 8 when the bootstrap probes cannot pass or the private directory cannot be
-removed (and then no JSON is written). ``--toolchain-root`` selects toolchain
-mode, which this build does not have yet: ``COV5001``, exit 7.
+removed (and then no JSON is written).
 """
 
 from __future__ import annotations
+
+import os
+import stat
 
 from sv0cov import cli, probes
 from sv0cov.diagnostics import Diagnostic
@@ -50,12 +57,20 @@ def render(obj: dict) -> str:
 @cli.command("doctor")
 def cmd_doctor(ctx: cli.Context) -> int:
     console, controls = ctx.console, ctx.config.controls
-    if "--toolchain-root" in controls:
-        console.report(Diagnostic("COV5001", "invocation", facts=(
-            ("detail", "this build of sv0cov has only the standalone doctor; toolchain mode comes with the toolchain probes"),)))
-        return cli.EXIT_UNSUPPORTED
+    root = None
+    if controls.get("--toolchain-root") is not None:
+        given = ctx.cwd / controls["--toolchain-root"]
+        try:
+            st = os.lstat(given)
+        except OSError:
+            st = None
+        if st is None or not stat.S_ISDIR(st.st_mode):
+            console.report(Diagnostic("COV0001", "invocation", facts=(
+                ("detail", "--toolchain-root must name an existing directory that is not a symlink"), ("subject", "--toolchain-root"))))
+            return cli.EXIT_USAGE
+        root = given.resolve()
     try:
-        data = probes.run_standalone()
+        data = probes.run(toolchain_root=root)
         obj = validate(data)
     except (probes.Bootstrap, ValueError) as exc:
         console.report(Diagnostic("COV8001", "internal", facts=(("detail", cli.fact_text(str(exc))),)))

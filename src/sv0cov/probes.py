@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 Sasank Vishnubhatla
-"""The standalone doctor probes D001 to D008 (CV-235; SPEC 20.7; COV-CLI-011).
+"""The doctor probe engine and the standalone probes D001 to D008 (CV-235,
+CV-242; SPEC 20.7; COV-CLI-011).
 
-:func:`run_standalone` executes the eight probes that check the installed
-sv0cov product itself and assembles the closed ``sv0cov.doctor`` 1.0
-aggregate (:mod:`sv0cov.formats.doctor`). Toolchain probes D009 to D018 are
-``not_applicable`` in this mode.
+:func:`run` executes the eight probes that check the installed sv0cov
+product itself and, given a toolchain root, the toolchain probes D009 to
+D018 of :mod:`sv0cov.toolchain`; it runs each applicable probe in registry
+order unless a direct prerequisite failed or was skipped, and assembles the
+closed ``sv0cov.doctor`` 1.0 aggregate (:mod:`sv0cov.formats.doctor`).
+Without a root, D009 to D018 are ``not_applicable``.
 
 Every probe checks fixed logical members, never a directory listing, so the
 counts are the same for a source checkout and an installed wheel:
@@ -78,6 +81,7 @@ MODULES = (
     "sv0cov/invocation.py", "sv0cov/lines.py", "sv0cov/model/__init__.py", "sv0cov/model/identity.py", "sv0cov/model/indexed.py",
     "sv0cov/model/inventory.py", "sv0cov/model/logical.py", "sv0cov/model/merge.py", "sv0cov/model/report.py",
     "sv0cov/model/semantic.py", "sv0cov/parity.py", "sv0cov/probes.py", "sv0cov/publish.py", "sv0cov/resolve.py",
+    "sv0cov/toolchain.py",
 )
 REGISTRY = "registries/diagnostics-v1.json"
 #: The packaged C runtime sources and their exact bytes.
@@ -85,7 +89,9 @@ RUNTIME_SHA256 = {
     "runtime/c/sv0cov_rt.c": "d398ab7d8c016bfad5b465de097691c9797f33914da8cf1170d652d3fc8efe96",
     "runtime/c/sv0cov_rt.h": "7fe0fa39e66a00d3ebf55202d7f351085a32078e891eb51689eca12be86ccd1f",
 }
-RESOURCES = (REGISTRY, *(f"schemas/{s}" for s in SCHEMAS), *RUNTIME_SHA256)
+#: The doctor's smoke fixture and its hand-checked oracle (CV-242; SPEC 20.7).
+SMOKE = ("resources/doctor/doctor-r1-smoke.oracle.json", "resources/doctor/doctor-r1-smoke.sv0")
+RESOURCES = (REGISTRY, *(f"schemas/{s}" for s in SCHEMAS), *RUNTIME_SHA256, *SMOKE)
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
 RE_VALIDATOR_DIGEST = re.compile(r"^# schema-sha256: ([0-9a-f]{64})$", re.M)
 PROBE_BYTES = b"sv0cov doctor D007\n"
@@ -232,17 +238,34 @@ def d008_runtime(layout: Layout) -> dict:
 
 
 def _attempt(check: Callable[[], dict]) -> tuple:
+    from sv0cov import toolchain
+
     try:
         return ("pass", check())
-    except _Failed as exc:
+    except (_Failed, toolchain.Failed) as exc:
         return ("fail", exc.code)
     except OSError:
         return ("fail", "COV5004")
 
 
-def run_standalone(*, manifest: bytes | None = None, registry: Registry | None = None, observed: Observed | None = None,
-                   layout: Layout | None = None) -> bytes:
-    """The standalone aggregate, as canonical bytes. Raises :class:`Bootstrap`."""
+def _execute(mode: str, man: dict, table: dict[str, Callable[[], dict]], results: dict) -> dict:
+    """Run each applicable probe in registry order unless a direct
+    prerequisite failed or was skipped; ``results`` holds D001 and D002."""
+    status = {pid: outcome for pid, (outcome, _) in results.items()}
+    for probe in doctor.PROBES:
+        if probe.id in results:
+            continue
+        if not doctor.applicable(probe, mode, man):
+            status[probe.id] = "not_applicable"
+        elif any(status.get(p) in ("fail", "skipped") for p in probe.prerequisites):
+            status[probe.id] = "skipped"
+        else:
+            results[probe.id] = _attempt(table[probe.id])
+            status[probe.id] = results[probe.id][0]
+    return results
+
+
+def _bootstrap(manifest: bytes | None, registry: Registry | None) -> tuple[dict, Registry]:
     try:
         reg = registry or load_registry()
     except RegistryError as exc:
@@ -257,27 +280,50 @@ def run_standalone(*, manifest: bytes | None = None, registry: Registry | None =
         raise Bootstrap(f"D001: {exc}") from None
     if (man["diagnostic_registry"]["revision"], man["diagnostic_registry"]["sha256"]) != (reg.revision, reg.sha256):
         raise Bootstrap("D002: the manifest names another diagnostic registry")
+    return man, reg
+
+
+def run(*, toolchain_root: Path | None = None, manifest: bytes | None = None, registry: Registry | None = None,
+        observed: Observed | None = None, layout: Layout | None = None) -> bytes:
+    """The doctor aggregate, as canonical bytes: standalone, or toolchain mode
+    for the physical root ``toolchain_root``. Raises :class:`Bootstrap`."""
+    from sv0cov import toolchain
+
+    man, reg = _bootstrap(manifest, registry)
     seen = observed or Observed()
     where = layout or Layout.current()
+    mode = "standalone" if toolchain_root is None else "toolchain"
     results = {
         "D001": ("pass", {"manifest_sha256": man["manifest_sha256"]}),
         "D002": ("pass", {"registry_revision": reg.revision, "registry_sha256": reg.sha256}),
     }
     private = Path(tempfile.mkdtemp(prefix="sv0cov-doctor-"))
+    policy = lambda: None  # noqa: E731
     try:
-        results["D003"] = _attempt(lambda: d003_schemas(where))
-        results["D004"] = _attempt(lambda: d004_layout(where))
-        results["D005"] = _attempt(lambda: d005_host(man, seen))
-        results["D006"] = _attempt(lambda: d006_runtime(man, seen, where))
-        results["D007"] = _attempt(lambda: d007_storage(private))
-        if results["D004"][0] == "pass":
-            results["D008"] = _attempt(lambda: d008_runtime(where))
+        table = {
+            "D003": lambda: d003_schemas(where),
+            "D004": lambda: d004_layout(where),
+            "D005": lambda: d005_host(man, seen),
+            "D006": lambda: d006_runtime(man, seen, where),
+            "D007": lambda: d007_storage(private),
+            "D008": lambda: d008_runtime(where),
+        }
+        if toolchain_root is not None:
+            more, policy = toolchain.checks(toolchain_root, private, man, reg, lambda logical: _regular(where.resource(logical)))
+            table.update(more)
+        _execute(mode, man, table, results)
     finally:
         try:
             shutil.rmtree(private)
         except OSError as exc:
             raise Bootstrap(f"the private temporary directory could not be removed ({type(exc).__name__})") from None
+    observed_root = toolchain.observed(toolchain_root) if toolchain_root is not None else None
     try:
-        return doctor.build(mode="standalone", manifest=man, policy=None, toolchain=None, results=results, registry=reg)
+        return doctor.build(mode=mode, manifest=man, policy=policy(), toolchain=observed_root, results=results, registry=reg)
     except doctor.DoctorError as exc:
         raise Bootstrap(f"the aggregate is invalid: {exc}") from None
+
+
+def run_standalone(**kw) -> bytes:
+    """The standalone aggregate (CV-235)."""
+    return run(**kw)

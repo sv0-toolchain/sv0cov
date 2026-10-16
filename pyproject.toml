@@ -79,6 +79,7 @@ only-include = [
     "scripts",
     "bench",
     "runtime",
+    "resources",
 ]
 exclude = ["tests/vendor", "__pycache__", "*.pyc"]
 
@@ -94,3 +95,4 @@ exclude = ["__pycache__", "*.pyc"]
 "schemas" = "sv0cov/_resources/schemas"
 "runtime/c/sv0cov_rt.c" = "sv0cov/_resources/runtime/c/sv0cov_rt.c"
 "runtime/c/sv0cov_rt.h" = "sv0cov/_resources/runtime/c/sv0cov_rt.h"
+"resources/doctor" = "sv0cov/_resources/resources/doctor"

@@ -1,0 +1,22 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov doctor smoke fixture (SPEC 20.7, CV-242): every function, line, region and branch outcome runs. */
+
+fn step(n: i32) -> i32 {
+  let mut r = n;
+  if n > 2 {
+    r = n - 1;
+  } else {
+    r = n + 2;
+  };
+  return r;
+}
+
+fn main() -> i32 {
+  let mut total = 0;
+  let mut i = 0;
+  while i < 4 {
+    total = total + step(i);
+    i = i + 1;
+  };
+  return total - 11;
+}

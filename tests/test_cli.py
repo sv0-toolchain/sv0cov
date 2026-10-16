@@ -42,7 +42,7 @@ SAMPLE = {"--color": "never", "--diagnostic-format": "json-lines", "--run-id": R
           "--output-dir": "o", "--report": "json", "--empty": "pass", "--context": "c", "--reproducible-epoch": "1",
           "--saturation-policy": "fail", "--raw-profile-tier": "large", "--ratchet-tolerance-basis-points": "1",
           "--diff-base": "HEAD", "--ratchet-baseline": "b.json", "--ratchet-metric": "line", "--raw-profile-max-counters": "1",
-          "--raw-profile-max-bytes": "1", "--run-manifest": "m.json", "--output": "out", "--toolchain-root": "/r"}
+          "--raw-profile-max-bytes": "1", "--run-manifest": "m.json", "--output": "out", "--toolchain-root": "."}
 
 
 class Tty(io.StringIO):
@@ -387,9 +387,9 @@ class ProcessTest(unittest.TestCase):
         self.assertEqual((p.returncode, p.stdout), (2, b""))
         (rec,) = records(p.stderr.decode())
         self.assertEqual(rec["code"], "COV0001")
-        p = self.process("doctor", "--toolchain-root", ".")
-        self.assertEqual((p.returncode, p.stdout), (7, b""))
-        self.assertTrue(p.stderr.startswith(b"COV5001 error: Unsupported installation or platform\n"))
+        p = self.process("doctor", "--toolchain-root", "missing")
+        self.assertEqual((p.returncode, p.stdout), (2, b""))
+        self.assertTrue(p.stderr.startswith(b"COV0001 error: Invalid command-line invocation\n"))
         self.assertNotIn(b"\x1b", p.stderr)  # a pipe is not a terminal
         p = self.process("version", "--json", "--diagnostic-format", "json-lines")
         self.assertEqual((p.returncode, p.stderr), (0, b""))

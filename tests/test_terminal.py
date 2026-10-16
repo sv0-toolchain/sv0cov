@@ -365,7 +365,7 @@ class DetailTest(unittest.TestCase):
         clause["count_true"]["by_context"][1].update(lower_bound=True)
         text = render_terminal(report)
         self.assertIn(f">={U64}", sections(text)["Contracts"][1])
-        self.assertRegex(text, rf'contract 0 true +src/app\.sv0:2:1 +context "shard é" +>=2\n')
+        self.assertRegex(text, r'contract 0 true +src/app\.sv0:2:1 +context "shard é" +>=2\n')
         clause["count_false"].update(lower_bound=True)
         report["branches"][0]["outcomes"][0]["count"].update(saturated=True)
         rows = sections(render_terminal(report))["Saturation"]
