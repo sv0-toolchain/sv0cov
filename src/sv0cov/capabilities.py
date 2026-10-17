@@ -28,7 +28,17 @@ from sv0cov.formats.canonical_json import CanonicalJsonError, decode_canonical, 
 from sv0cov.formats.version_manifest import Advertised, ManifestError
 from sv0cov.model.inventory import RE_REVISION
 
-ADVERTISED = Advertised(commands=("version",), backends=(), bytecode_profiles=(), features=())
+#: What passed the R0 gate review (CV-244, 2026-10-17): every command, the
+#: generated-C and VM-v1 backends with the v1 bytecode profile, and the
+#: features the R0 gates proved. VM-v2, HTML, LCOV, Cobertura, ratchets,
+#: changed-region, contexts, scopes, contract coverage, exclusion audit and
+#: process-tree spawn wait for their own gates (pre-R1 subsets, SPEC 15.6).
+ADVERTISED = Advertised(
+    commands=("check", "clean", "doctor", "merge", "report", "run", "version"),
+    backends=("native", "vm-v1"),
+    bytecode_profiles=("sv0vm-v1-coverage",),
+    features=("native-json-report", "run-sets", "saturation-lower-bounds", "self-contained-indexed", "source-integrity"),
+)
 
 _CHECKOUT = Path(__file__).resolve().parents[2]
 

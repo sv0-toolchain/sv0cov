@@ -12,9 +12,12 @@ through GitHub Release assets and the `sv0-toolchain` submodule pin; see
 
 ## Unreleased (`0.0.0`)
 
-The development tree. `sv0cov version --json` advertises only the `version`
-command until the R0 gate review (CV-244); the other commands work but are
-not yet part of the advertised contract.
+The development tree. Since the R0 gate review (CV-244), `sv0cov version
+--json` advertises every command, the `native` and `vm-v1` backends, the
+`sv0vm-v1-coverage` profile, and the features `native-json-report`,
+`run-sets`, `saturation-lower-bounds`, `self-contained-indexed` and
+`source-integrity`; before it, only `version`. Other features are advertised
+when their gates pass.
 
 ### Formats and protocols (F0)
 
