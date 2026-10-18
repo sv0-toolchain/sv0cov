@@ -263,14 +263,14 @@ Added in CV-207 (R0): zero-counter programs.
   to an off build and a binding counting 0.
 - Such a source is not an executable: both backends need `main`, and
   `main`'s entry is always counted. So no runnable sv0 program has zero
-  counters until exclusions (CV-305) can exclude a whole program. An empty
+  counters unless exclusions (CV-305) exclude the whole program. An empty
   file is not an sv0 program.
-- Until then the lifecycle is tested with a stand-in for a fully excluded
-  build (owner's choice): an ordinary program's uninstrumented C or
-  bytecode with the zero-counter registration or binding. It runs like the
-  off build and publishes one complete empty profile (no pairs, no
-  overflow words, no overflow flag) bound to the zero-counter map. CV-305
-  repeats the test with a real fully excluded program.
+- The lifecycle is tested with a stand-in for a fully excluded build
+  (owner's choice, CV-207: an ordinary program's uninstrumented C or
+  bytecode with the zero-counter registration or binding) and, since
+  CV-305, with a real fully excluded program. Each runs like the off build
+  and publishes one complete empty profile (no pairs, no overflow words, no
+  overflow flag) bound to the zero-counter map.
 - sv0vm rejects any disagreement between the binding's count and the
   presence of `COVER_HIT` before user code (COV2201).
 
@@ -291,3 +291,33 @@ Added in CV-209 (R0): ownership and default scope.
   and a null package is invalid). Root metrics count `user` sources only
   (`sv0cov.lines.user_source_indices`).
 
+Added in CV-305 (R0.1): exclusions.
+
+- An exclusion record per `coverage` attribute and per comment directive
+  (mode `off`, origin `comment`), ordered by source, span, mode, reason.
+  Its span is the attribute (`#` through `]`) or the directive comment;
+  its reason is the literal's decoded value.
+- `off`, and every directive, takes the function entities, branches and
+  regions whose spans lie wholly inside its construct: the item or
+  statement it attaches to (an `ignore-next` takes the next item,
+  statement, or `if`/`match` expression; a region takes the statements
+  between its two directives). `branch_off` takes the outcomes of the
+  branch whose span starts at its decision's keyword. An excluded entity's
+  `function_entry` and every outcome of an excluded branch become
+  uncounted `excluded` points (a `statically_unreachable` outcome or
+  region inside an exclusion becomes `excluded` too); excluded regions get
+  the empty expression. `?` propagate points are never excluded.
+- Excluding code never changes an ordinary count. Where an ordinary
+  region's expression names an excluded outcome (the body of a
+  `branch_off` decision; the code after an excluded `if` that returns),
+  every reachable outcome of that branch gets a counted
+  `synthetic_support` point of kind `region` (owner decisions): span and
+  entity of the branch, discriminator `support:<kind>:<outcome name>`
+  (`support:if:true`, `support:loop:exit`, `support:match:arm:1`), hit
+  where the outcome would be, and counter in the outcome's place in the
+  counter order. The ordinary expression names the support point instead.
+  Whole branches keep the outcome hits consecutive, as lowering places
+  them; a support point no region reads costs one counter and enters no
+  denominator.
+- `contract_off` waits for contract coverage (CV-306): sv0c refuses it in
+  coverage builds.
