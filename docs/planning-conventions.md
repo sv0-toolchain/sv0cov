@@ -319,5 +319,32 @@ Added in CV-305 (R0.1): exclusions.
   Whole branches keep the outcome hits consecutive, as lowering places
   them; a support point no region reads costs one counter and enters no
   denominator.
-- `contract_off` waits for contract coverage (CV-306): sv0c refuses it in
-  coverage builds.
+- `contract_off` (CV-306) takes the contract clauses its function owns
+  directly: the record lists their clause indexes, contract entities and,
+  for runtime-checked clauses, their two points, which stay counted with
+  classification `contract`.
+
+Added in CV-306 (R0.1): contract clauses.
+
+- One `contract` entity per `requires`, `ensures`, `loop_invariant` and
+  `assert` of a function with a body, owned by that function (sv0 has no
+  nested functions). Span: the keyword through the clause's `)`, or for an
+  `assert` through the last token of its expression. Qualified name:
+  `<function>#<kind>:<k>`, k counting the function's clauses of that kind in
+  source order (`clamp#requires:1`). In the entity order a function is
+  followed by its clauses.
+- Enforcement follows what the compiler checks: contract mode `disabled` ->
+  `disabled`; a clause using `old`, `forall` or `exists` -> `unsupported`
+  (not checked at runtime); contract mode `verified` with the clause's line
+  in the proof results (ensures, loop_invariant) -> `statically_verified`
+  with evidence identity `sv0c:smt:<kind>:<line>`; otherwise
+  `runtime_checked`.
+- A runtime-checked clause has a counted `contract_true` and
+  `contract_false` point (classification `contract`, discriminator = the
+  kind, span = the clause span), counted in that order at the clause
+  keyword's place. Each evaluation counts once: an `ensures` before every
+  return that reaches it, a `loop_invariant` at the head of every iteration
+  and once more when the loop exits. A failing evaluation is counted before
+  the program stops.
+- Contract points never enter ordinary expressions, and `off` never takes a
+  contract clause.
