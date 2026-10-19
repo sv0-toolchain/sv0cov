@@ -253,9 +253,21 @@ class EvidenceTest(Base):
 
     def test_what_this_build_cannot_evaluate_is_refused(self) -> None:
         self.project()
-        self.put("sv0.toml", (HEAD + '[[tool.sv0cov.scopes]]\nname = "core"\ninclude = ["src/**"]\nline = 80\n').encode())
+        self.put("sv0.toml", (HEAD + '[tool.sv0cov.ratchet]\nbaseline = "b.json"\nmetrics = ["line"]\n').encode())
         code, out, err = self.check()
         self.assertEqual((code, out, self.codes(err)), (7, "", ["COV5001"]))
+
+    def test_a_scope_is_checked_and_an_unknown_source_is_a_configuration_error(self) -> None:
+        """CV-310: a named scope is its own assertion; a source it names must exist."""
+        self.project()
+        self.put("sv0.toml", (HEAD + '[[tool.sv0cov.scopes]]\nname = "all"\ninclude = ["**"]\nline = 100\n').encode())
+        code, out, err = self.check()
+        self.assertEqual(code, 1)
+        self.assertIn("COV4101", self.codes(err))
+        self.put("sv0.toml", (HEAD + '[[tool.sv0cov.scopes]]\nname = "x"\nsources = ["absent.sv0"]\n').encode())
+        code, out, err = self.check()
+        (r,) = records(err)
+        self.assertEqual((code, out, r["code"], r["phase"]), (2, "", "COV0013", "configuration"))
 
 
 class CommandFailedTest(Base):

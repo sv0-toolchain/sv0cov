@@ -68,3 +68,29 @@ class CorpusTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MatcherParityTest(unittest.TestCase):
+    """CV-310 (COV-SCP-007, COV-SCP-009 corpus): the production matcher, with
+    no Git, reproduces every frozen verdict and the line of the deciding
+    pattern for every file and directory of the tree."""
+
+    def test_the_matcher_reproduces_the_oracle(self) -> None:
+        from sv0cov.gitignore import Matcher
+
+        corpus = json.loads(CORPUS.read_text(encoding="utf-8"))
+        patterns = {c["id"]: c["patterns"] for c in corpus["cases"]}
+        for result in corpus["results"]:
+            with self.subTest(case=result["id"]):
+                m = Matcher(patterns[result["id"]])
+                lines, selected = {}, []
+                for node in corpus["tree"]:
+                    line, chosen = m.explain(node["path"], node["kind"] == "dir")
+                    if line is not None:
+                        lines[node["path"]] = line
+                    if chosen:
+                        selected.append(node["path"])
+                    if node["kind"] == "file":
+                        self.assertEqual(m.selects(node["path"]), chosen, node["path"])
+                self.assertEqual(sorted(selected), sorted(result["selected"]))
+                self.assertEqual(lines, result["matched_line"])

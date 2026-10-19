@@ -47,7 +47,8 @@ and the current source bytes behind ``observed_digest``.
 Failures raise :class:`sv0cov.formats.report.ReportError`: ``COV4001``
 structure, ``COV4002`` a redundant fact that disagrees, ``COV1004`` a source
 that is not current, ``COV0013`` a configuration that conflicts with the
-evidence, ``COV5001`` something this build cannot evaluate.
+evidence (including a scope package or source, or an entity, the evidence
+does not have), ``COV5001`` something this build cannot evaluate.
 """
 
 from __future__ import annotations
@@ -59,6 +60,7 @@ from sv0cov import capabilities, diagnostics
 from sv0cov.config_resolve import Resolved
 from sv0cov.formats.indexed import IndexedError
 from sv0cov.formats.report import METRICS, ReportError, decode_report_structure, ratio
+from sv0cov.gitignore import Matcher
 from sv0cov.model import indexed as _ix
 
 CAPABILITIES = ["branch-outcomes", "contexts", "contract-coverage", "exclusion-audit", "policy-assertions", "saturation-lower-bounds",
@@ -69,7 +71,7 @@ NO_MEMBERS = {"branch_indices": [], "clause_indices": [], "entity_indices": [], 
               "source_indices": []}
 MEMBER_KEY = {"branch": "branch_indices", "contract": "clause_indices", "function": "entity_indices", "line": "line_indices",
               "region": "region_indices"}
-UNSUPPORTED_ASSERTIONS = ("scopes", "entities")
+APPLICABLE = {"function": METRICS, "contract": ("contract",)}
 STALE, SATURATED, LOSSY, OVERRIDE = "COV1004", "COV4020", "COV4021", "COV3002"
 #: The lifecycle command failed or was ended by a signal (registry revision 2; SPEC 21.3.5).
 COMMAND_FAILED = "COV2130"
@@ -149,10 +151,33 @@ class _Detail:
                 "line": self._metric(covered, total, partial),
                 "region": self._regions(mine)}
 
-    def members(self, metric: str) -> list[int]:
+    def members(self, metric: str, keep=lambda rec: True) -> list[int]:
+        """The denominator membership of ``metric`` over the units ``keep`` selects."""
+        r = self.r
         if metric == "branch":
-            return sorted({b for b, _ in self.outcomes})
-        return {"contract": self.clauses, "function": self.functions, "line": self.lines, "region": self.regions}[metric]
+            return sorted({b for b, _ in self.outcomes if keep(r["branches"][b])})
+        if metric == "contract":
+            return [i for i in self.clauses if keep(r["contracts"][i])]
+        if metric == "function":
+            return [i for i in self.functions if keep(r["entities"][i])]
+        if metric == "line":
+            return [i for i in self.lines if keep(r["lines"][i])]
+        return [i for i in self.regions if keep(r["regions"][i])]
+
+    def entity_members(self, e: dict, metric: str) -> list[int]:
+        """SPEC 22.2.1: the denominator membership of ``metric`` for the entity."""
+        n, r = e["entity_index"], self.r
+        if metric == "function":
+            return [n]
+        if metric == "contract":
+            field = "entity_index" if e["kind"] == "contract" else "function_entity_index"
+            return [i for i in self.clauses if r["contracts"][i][field] == n]
+        if metric == "region":
+            return [i for i in self.regions if r["regions"][i]["entity_index"] == n]
+        if metric == "branch":
+            return sorted({b for b, _ in self.outcomes if r["branches"][b]["entity_index"] == n})
+        owned = {i for i in self.regions if r["regions"][i]["entity_index"] == n}
+        return [x["line_index"] for x in r["lines"] if any(i in owned for i in x["region_indices"])]
 
 
 def _line_indices(r: dict, affected: dict) -> list[int]:
@@ -177,6 +202,100 @@ def _evaluation(kind: str, name: str, metric: str, comparison: str, result: str,
                 codes=(), members=None) -> dict:
     return {"actual": actual, "assertion_kind": kind, "assertion_name": name, "comparison": comparison, "diagnostics": sorted(codes),
             "limit": limit, "members": {**NO_MEMBERS, **(members or {})}, "metric": metric, "result": result, "threshold_source": source}
+
+
+def _threshold_evaluation(r: dict, kind: str, name: str, metric: str, m: dict, limit_value: int | None, source: str | None,
+                          members: dict) -> dict:
+    """One assertion's evaluation of one metric (SPEC 22.1, 22.2, 11.6,
+    14.2.1): no threshold reports the fraction and checks nothing."""
+    cov, sat = r["resolved_configuration"]["coverage"], r["saturation"]
+    actual = None if m["total"] == 0 else {"denominator": m["total"], "numerator": m["covered"]}
+    if limit_value is None:
+        return _evaluation(kind, name, metric, "none", "not_applicable", actual=actual, members=members)
+    limit = {"denominator": 10000, "numerator": limit_value}
+    base = dict(limit=limit, source=source, members=members)
+    contract_points = {p["point_id"] for p in r["points"] if p["kind"] in ("contract_true", "contract_false")}
+    if sat["any"] and (sat["policy"] == "fail" or (metric == "contract" and contract_points & set(sat["affected_point_ids"]))):
+        return _evaluation(kind, name, metric, "at_least", "ineligible", codes=[SATURATED], **base)
+    if m["total"] == 0:
+        passes = cov["empty"]["value"] == "pass"
+        return _evaluation(kind, name, metric, "at_least", "pass" if passes else "fail", codes=[] if passes else ["COV4102"], **base)
+    passes = m["covered"] * 10000 >= m["total"] * limit_value
+    return _evaluation(kind, name, metric, "at_least", "pass" if passes else "fail", actual=actual,
+                       codes=[] if passes else ["COV4101"], **base)
+
+
+def _inherit(assertion: dict, project: dict, metric: str) -> tuple[int | None, str | None]:
+    """SPEC 22.2: an explicit value is the assertion's own; an omitted one
+    inherits the project threshold for that metric only; no cascade."""
+    own = assertion[metric]["value"]
+    if own is not None:
+        return own, "assertion"
+    if project[metric] is not None:
+        return project[metric], "project"
+    return None, None
+
+
+def scope_sources(r: dict, scope: dict) -> list[int]:
+    """The sources a scope selects (SPEC 18.2.2, 18.3, 22.2): the union of
+    its ``include`` patterns, ``packages`` and ``sources``, each source once.
+    A configured package or source path the evidence does not have is
+    ``COV0013``; patterns that select nothing make an empty scope."""
+    name = scope["name"]["value"]
+    chosen: set[int] = set()
+    patterns = scope["include"]["value"]
+    if patterns is not None:
+        m = Matcher(patterns)
+        chosen |= {s["source_index"] for s in r["sources"] if m.selects(s["path"])}
+    packages = {s["package"] for s in r["sources"] if s["package"] is not None}
+    for pkg in scope["packages"]["value"] or []:
+        if pkg not in packages:
+            raise ReportError("COV0013", f"scope {name}: no compiled source belongs to the package {pkg!r}")
+        chosen |= {s["source_index"] for s in r["sources"] if s["package"] == pkg}
+    paths = {s["path"] for s in r["sources"]}
+    for path in scope["sources"]["value"] or []:
+        if path not in paths:
+            raise ReportError("COV0013", f"scope {name}: the source {path!r} was not compiled into this evidence")
+        chosen |= {s["source_index"] for s in r["sources"] if s["path"] == path}
+    return sorted(chosen)
+
+
+def resolve_entity(r: dict, entity: dict) -> dict:
+    """The one entity of the evidence an entity assertion names (SPEC
+    18.2.2): source path, qualified name and kind; none or several is
+    ``COV0013``."""
+    name, want = entity["name"]["value"], (entity["source"]["value"], entity["qualified_name"]["value"], entity["kind"]["value"])
+    path = {s["source_index"]: s["path"] for s in r["sources"]}
+    found = [e for e in r["entities"] if (path[e["source_index"]], e["qualified_name"], e["kind"]) == want]
+    if len(found) != 1:
+        what = "no entity" if not found else f"{len(found)} entities"
+        raise ReportError("COV0013", f"entity {name}: {what} of kind {want[2]} named {want[1]!r} in {want[0]!r}")
+    return found[0]
+
+
+def _assertion_evaluations(r: dict, detail: _Detail) -> list[dict]:
+    """Every named scope and entity assertion, each metric on its own
+    (SPEC 22.2, 22.2.1; COV-SCP-005/006, COV-POL-002/022/023/026,
+    COV-CFG-008). Assertions are independent: none overrides another."""
+    cov = r["resolved_configuration"]["coverage"]
+    project = {m: cov["thresholds"][m]["value"] for m in METRICS}
+    out = []
+    for scope in cov["scopes"]:
+        chosen = frozenset(scope_sources(r, scope))
+        keep = lambda rec, c=chosen: rec["source_index"] in c  # noqa: E731
+        summary = detail.group(keep)
+        for metric in METRICS:
+            limit, source = _inherit(scope, project, metric)
+            members = {"source_indices": sorted(chosen), MEMBER_KEY[metric]: detail.members(metric, keep)}
+            out.append(_threshold_evaluation(r, "scope", scope["name"]["value"], metric, summary[metric], limit, source, members))
+    for entity in cov["entities"]:
+        e = resolve_entity(r, entity)
+        summary = detail.entity(e)
+        for metric in APPLICABLE[e["kind"]]:
+            limit, source = _inherit(entity, project, metric)
+            members = {"entity_indices": [e["entity_index"]], MEMBER_KEY[metric]: detail.entity_members(e, metric)}
+            out.append(_threshold_evaluation(r, "entity", entity["name"]["value"], metric, summary[metric], limit, source, members))
+    return out
 
 
 def _project_evaluations(r: dict, detail: _Detail) -> list[dict]:
@@ -267,9 +386,6 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     ix = _ix.read_indexed(indexed, tier=tier)
     sem = ix["semantic"]
     cov = config.coverage
-    for table in UNSUPPORTED_ASSERTIONS:
-        if cov[table]:
-            raise ReportError("COV5001", f"this build of sv0cov cannot evaluate [[tool.sv0cov.{table}]] assertions yet")
     for table in ("diff", "ratchet"):
         if cov[table] is not None:
             raise ReportError("COV5001", f"this build of sv0cov cannot evaluate a [tool.sv0cov.{table}] assertion yet")
@@ -342,7 +458,8 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     evidence = set(ix["diagnostics"]) | set(sem["diagnostics"])
     if not sem["complete"] and not evidence:
         evidence.add(OVERRIDE)  # incomplete only because rejected inputs were allowed: the reason must still be named
-    evaluations = sorted([_integrity(r, evidence), *_project_evaluations(r, detail)], key=_evaluation_key)
+    evaluations = sorted([_integrity(r, evidence), *_project_evaluations(r, detail), *_assertion_evaluations(r, detail)],
+                         key=_evaluation_key)
     r["policy"] = {"evaluations": evaluations, "passed": all(e["result"] in ("pass", "not_applicable") for e in evaluations)}
     r["evidence_eligibility"] = _eligibility(r)
     return dict(sorted(r.items()))
@@ -459,6 +576,12 @@ def _cross_validate(r: dict, registry: diagnostics.Registry | None) -> None:
             _mismatch(f"policy/evaluations[{n}]", "the result does not follow from the two fractions")
     if [e for e in evaluations if e["assertion_kind"] == "project"] != _project_evaluations(r, detail):
         _mismatch("policy/evaluations", "the project evaluations are not what the configured thresholds and the summary give")
+    try:
+        derived = sorted(_assertion_evaluations(r, detail), key=_evaluation_key)
+    except ReportError as exc:
+        _mismatch("policy/evaluations", f"the configured assertions do not resolve against the report: {exc.detail}")
+    if [e for e in evaluations if e["assertion_kind"] in ("entity", "scope")] != derived:
+        _mismatch("policy/evaluations", "the scope and entity evaluations are not what their configuration and the detail give")
     now = _report_time_codes(r)
     evidence = set(integrity["diagnostics"]) - now - {COMMAND_FAILED}
     if not now <= set(integrity["diagnostics"]) or integrity != _integrity(r, evidence):

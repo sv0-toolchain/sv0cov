@@ -71,6 +71,29 @@ Everything below fails before anything else runs.
 A value error from a CLI option names the option; one from the file names the
 dotted key.
 
+## Scope `include` patterns
+
+A scope's `include` array is read as a virtual root-level `.gitignore` (SPEC
+§18.3): a logical source path is selected exactly when Git 2.55.0 would call
+it ignored by that file. Comments, escapes, trailing spaces, `!` negation,
+leading/middle/trailing `/`, `*`, `?`, bracket expressions, `**`, and the
+parent-directory rule (a file under an excluded directory cannot be
+re-included) all follow Git. Matching is case-sensitive on the exact UTF-8
+bytes. Nothing else is consulted: no `.gitignore` file, `.git/info/exclude`,
+`core.excludesFile`, repository, environment, or the `git` executable.
+
+The matcher is `sv0cov.gitignore`. `tests/fixtures/gitignore/matcher-corpus.json`
+freezes Git's answers for several hundred pattern/path groups. It is built by
+real Git 2.55.0 only:
+
+```text
+python3 tests/fixtures/gitignore/build.py           # check (no Git needed)
+python3 tests/fixtures/gitignore/build.py --write   # regenerate (refuses any other Git)
+```
+
+`tests/test_gitignore.py` requires the matcher to reproduce every group.
+(`corpus.json` in the same directory is the separate CV-030 tree oracle.)
+
 ## The resolved record
 
 `Resolved.document()` is the `sv0cov.resolved-configuration` 1.0 record that

@@ -77,7 +77,7 @@ MODULES = (
     "sv0cov/expr.py", "sv0cov/formats/__init__.py", "sv0cov/formats/canonical_json.py", "sv0cov/formats/compatibility.py",
     "sv0cov/formats/crc32c.py", "sv0cov/formats/doctor.py", "sv0cov/formats/html.py", "sv0cov/formats/indexed.py", "sv0cov/formats/map.py",
     "sv0cov/formats/rawprofile.py", "sv0cov/formats/release.py", "sv0cov/formats/report.py", "sv0cov/formats/runset.py",
-    "sv0cov/formats/structural.py", "sv0cov/formats/terminal.py", "sv0cov/formats/version_manifest.py", "sv0cov/formats/vmbinding.py",
+    "sv0cov/formats/structural.py", "sv0cov/formats/terminal.py", "sv0cov/formats/version_manifest.py", "sv0cov/formats/vmbinding.py", "sv0cov/gitignore.py",
     "sv0cov/invocation.py", "sv0cov/lines.py", "sv0cov/model/__init__.py", "sv0cov/model/context.py", "sv0cov/model/identity.py", "sv0cov/model/indexed.py",
     "sv0cov/model/inventory.py", "sv0cov/model/logical.py", "sv0cov/model/merge.py", "sv0cov/model/report.py",
     "sv0cov/model/semantic.py", "sv0cov/parity.py", "sv0cov/probes.py", "sv0cov/publish.py", "sv0cov/resolve.py",

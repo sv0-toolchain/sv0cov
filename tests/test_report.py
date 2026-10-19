@@ -318,8 +318,6 @@ class ThresholdTest(unittest.TestCase):
     def test_assertions_this_build_cannot_evaluate_are_refused(self) -> None:
         ix = simple("f0")
         cases = {
-            "scope": '[[tool.sv0cov.scopes]]\nname = "s"\ninclude = ["**"]\nline = 1\n',
-            "entity": '[[tool.sv0cov.entities]]\nname = "e"\nsource = "main.sv0"\nqualified_name = "main"\nkind = "function"\n',
             "diff": '[tool.sv0cov.diff]\nbase = "HEAD"\nline = 1\n',
             "ratchet": '[tool.sv0cov.ratchet]\nbaseline = "b.json"\nmetrics = ["line"]\n',
             "exclusion cap": "[tool.sv0cov.exclusions]\nmax_records = 0\n",
@@ -553,21 +551,31 @@ class ReaderTest(unittest.TestCase):
         newer = mock.Mock(revision=registry.revision + 1, sha256="a" * 64, entries=registry.entries)
         self.assertEqual(code_of(read_report, encode(self.clean), registry=newer), "COV4001")
 
-    def test_evaluations_of_kinds_this_build_does_not_produce_are_read_when_consistent(self) -> None:
-        scope = {"actual": {"denominator": 4, "numerator": 3}, "assertion_kind": "scope", "assertion_name": "core", "comparison": "at_least",
-                 "diagnostics": [], "limit": {"denominator": 10000, "numerator": 7500},
-                 "members": {**dict.fromkeys(("branch_indices", "clause_indices", "entity_indices", "region_indices"), []),
-                             "line_indices": [0, 1, 2, 3], "source_indices": [0]},
-                 "metric": "line", "result": "pass", "threshold_source": "assertion"}
+    def test_scope_and_entity_evaluations_are_rederived_from_their_configuration(self) -> None:
+        """CV-310: the reader works scope and entity evaluations out again from
+        the resolved configuration in the report; an unconfigured, altered or
+        missing one is a contradiction."""
+        toml = ('[[tool.sv0cov.scopes]]\nname = "core"\ninclude = ["**"]\nline = 75\n'
+                '[[tool.sv0cov.entities]]\nname = "m"\nsource = "main.sv0"\nqualified_name = "main"\nkind = "function"\n')
+        good, _ = fixture_report("f0", config(toml=toml))
+        self.assertEqual(self.verdict(good), "valid")
+        evals = good["policy"]["evaluations"]
+        n = next(i for i, e in enumerate(evals) if e["assertion_kind"] == "scope" and e["metric"] == "line")
+        scope = evals[n]
+        self.assertEqual((scope["threshold_source"], scope["members"]["source_indices"]), ("assertion", [0]))
+        for change in ({"limit": {"denominator": 10000, "numerator": 7501}}, {"result": "fail", "diagnostics": ["COV4101"]},
+                       {"members": {**scope["members"], "source_indices": []}}, {"threshold_source": "project"}):
+            with self.subTest(change=sorted(change)):
+                o = copy.deepcopy(good)
+                o["policy"]["evaluations"][n] = {**scope, **change}
+                self.assertIn(self.verdict(o), ("COV4001", "COV4002"))  # structure or re-derivation
+        o = copy.deepcopy(good)
+        del o["policy"]["evaluations"][n]
+        self.assertEqual(self.verdict(o), "COV4002")
         o = copy.deepcopy(self.clean)
-        o["policy"]["evaluations"].append(scope)
-        self.assertEqual(self.verdict(o), "valid")
-        o["policy"]["evaluations"][-1] = {**scope, "limit": {"denominator": 10000, "numerator": 7501}}
-        self.assertEqual(self.verdict(o), "COV4002")
-        o["policy"]["evaluations"][-1] = {**scope, "result": "fail", "diagnostics": ["COV4101"]}
-        self.assertEqual(self.verdict(o), "COV4002")
-        o["policy"]["evaluations"][-1] = {**scope, "members": {**scope["members"], "line_indices": [0, 10**6]}}
-        self.assertEqual(self.verdict(o), "COV4002")
+        o["policy"]["evaluations"].append({**scope, "members": {**scope["members"], "line_indices": [0]}})
+        o["policy"]["evaluations"].sort(key=lambda e: (e["assertion_kind"], e["assertion_name"], e["metric"]))
+        self.assertEqual(self.verdict(o), "COV4002")  # no scope is configured in this report
         # `passed` is recomputed from the evaluations.
         ok, _ = fixture_report("f0", config(toml=thresholds(line=1)))
         self.assertTrue(ok["policy"]["passed"])

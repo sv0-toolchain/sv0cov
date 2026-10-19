@@ -168,6 +168,21 @@ contexts and does not depend on whether contexts were collected.
   by `covered * 10000 >= total * threshold` on integers. The rounded ratio
   is never used. A zero denominator passes only under `empty = "pass"`;
   otherwise it fails with `COV4102`.
+- **Scopes and entities** (CV-310, SPEC 22.2). Every `[[scopes]]` entry
+  is its own assertion with one evaluation per metric, over the sources it
+  selects: the union of its `include` patterns (a virtual root
+  `.gitignore`, `sv0cov.gitignore`), `packages` and `sources`, each source
+  once. Every `[[entities]]` entry names one entity by source, qualified
+  name and kind and has one evaluation per applicable metric (a function:
+  all five, with the membership of SPEC 22.2.1; a contract: only
+  `contract`). A metric's threshold is the assertion's own value
+  (`threshold_source` `assertion`), else the project's (`project`), else
+  none: the fraction is still reported, with `comparison` `none` and result
+  `not_applicable`. An explicit value never reaches another assertion or
+  metric, and no assertion overrides another: the policy passes only when
+  every one does. A package, source or entity the evidence does not have is
+  `COV0013`. The reader works every scope and entity evaluation out again
+  from the resolved configuration in the report.
 - **Saturation.** Under the `fail` policy any saturation makes every
   threshold `ineligible`. Under `allow-ordinary`, function, region, line and
   branch are evaluated; a contract threshold is `ineligible` when one of its
@@ -199,7 +214,7 @@ is not changed by it, the thresholds are still evaluated, and the report is
 
 It reports `COV5001` rather than guess:
 
-- scope, entity, diff, ratchet and exclusion-cap assertions, which come with
+- diff, ratchet and exclusion-cap assertions, which come with the rest of
   the policy preview;
 - two regions with the same source, span, kind and point set, which the
   report's ordering rule cannot tell apart.

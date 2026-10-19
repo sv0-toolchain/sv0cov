@@ -28,3 +28,15 @@ sparse image works):
 Replay the capture and require identical bytes by omitting `--write`.
 Without `--git`, the tool checks that `corpus.json` was captured from the
 current cases and Git pin.
+
+## The matcher corpus (CV-310)
+
+`matcher-corpus.json` is a second, wider oracle for the production matcher
+`sv0cov.gitignore`: 351 groups (6,479 file paths) of patterns and paths, each
+group its own virtual tree, covering every form of SPEC 18.3 plus large
+groups. `build.py --write` captures it from Git 2.55.0 `check-ignore
+--no-index` (it refuses any other version) with the same isolation; `build.py`
+alone checks the file and its `cases_sha256`, and re-captures and compares
+when Git 2.55.0 is on `PATH`. `tests/test_gitignore.py` requires the matcher
+to reproduce it, and `tests/test_gitignore_corpus.py` requires it to reproduce
+`corpus.json` above, deciding lines included.
