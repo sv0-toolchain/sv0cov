@@ -285,6 +285,13 @@ def nearest_rank(sorted_values: list[int], q_num: int, q_den: int) -> int:
     return sorted_values[rank - 1]
 
 
+# Sample variance is in squared measurement units, so in raw nanoseconds or bytes it
+# leaves the canonical-JSON integer range (2**64 - 1) as soon as the standard deviation
+# passes ~4.3 s or ~4.3 GB (a noisy managed macOS runner does that on a long fixture).
+# It is therefore reported in a coarser, recorded unit: (divisor, unit label).
+VARIANCE_UNITS = {"wall_ns": (1_000, "us^2"), "rss_bytes": (1_024, "KiB^2")}
+
+
 def statistics(runs: list[dict]) -> dict:
     out = {}
     for key in ("wall_ns", "rss_bytes"):
@@ -294,7 +301,8 @@ def statistics(runs: list[dict]) -> dict:
             continue
         n = len(values)
         mean_num = sum(values)
-        var = sum((v * n - mean_num) ** 2 for v in values) // (n * n * (n - 1)) if n > 1 else 0
+        div, var_unit = VARIANCE_UNITS[key]
+        var = sum((v * n - mean_num) ** 2 for v in values) // (n * n * (n - 1) * div * div) if n > 1 else 0
         q1, q3 = nearest_rank(values, 1, 4), nearest_rank(values, 3, 4)
         iqr = q3 - q1
         out[key] = {
@@ -307,6 +315,7 @@ def statistics(runs: list[dict]) -> dict:
             "outliers": sum(1 for v in values if v < q1 - 3 * iqr or v > q3 + 3 * iqr),
             "p95": nearest_rank(values, 95, 100),
             "variance": var,
+            "variance_unit": var_unit,
         }
     return out
 

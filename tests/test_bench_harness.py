@@ -11,6 +11,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,7 +67,19 @@ class ProtocolTest(unittest.TestCase):
         s = H.statistics(runs)["wall_ns"]
         self.assertEqual((s["median"], s["p95"], s["min"], s["max"], s["count"]), (30, 1000, 10, 1000, 5))
         self.assertEqual(s["outliers"], 1)
-        self.assertEqual(s["variance"], 190250)  # sum of squared deviations 761000 / (n - 1)
+        self.assertEqual(s["variance"], 0)  # 190250 ns^2 reported in us^2 (floor)
+        big = H.statistics([{"rss_bytes": 1, "wall_ns": v} for v in (10**9, 40 * 10**9, 90 * 10**9)])["wall_ns"]
+        self.assertEqual(big["variance_unit"], "us^2")
+        self.assertEqual(big["variance"], 1_990_333_333_333_333)  # 1990.33 s^2 in us^2 (raw ns^2 would be 2e21)
+
+    def test_statistics_stay_in_canonical_range_for_macos_rss_and_noisy_wall(self) -> None:
+        # macOS reports ru_maxrss in bytes (Linux: KiB); wide spreads must still encode.
+        for mac in (True, False):
+            with mock.patch.object(H.sys, "platform", "darwin" if mac else "linux"):
+                rss = [H._maxrss_bytes(k * 1_000_000_000 // (1 if mac else 1024)) for k in (1, 8, 20, 30)]
+            runs = [{"rss_bytes": r, "wall_ns": w} for r, w in zip(rss, (2 * 10**9, 30 * 10**9, 70 * 10**9, 120 * 10**9))]
+            data = encode({"statistics": H.statistics(runs)})  # raises CanonicalJsonError on overflow
+            self.assertIn(b"variance_unit", data)
 
 
 class ExecutionTest(unittest.TestCase):
