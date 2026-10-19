@@ -1,0 +1,51 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov R0.1 fixture (CV-307): `&&` and `||` over all four truth combinations, a chain, mixed precedence, a short circuit in an `if` condition, and a right operand that never runs (a partial line). */
+
+fn seen(b: bool) -> bool {
+  return b;
+}
+
+fn both(a: bool, b: bool) -> bool {
+  return a && seen(b);
+}
+
+fn either(a: bool, b: bool) -> bool {
+  return a || seen(b);
+}
+
+fn chain(a: bool, b: bool, c: bool) -> bool {
+  return a && b && seen(c);
+}
+
+fn mixed(a: bool, b: bool, c: bool) -> bool {
+  return a || b && seen(c);
+}
+
+fn gate(ready: bool, n: i32) -> i32 {
+  if ready && n > 2 {
+    return 1;
+  }
+  return 0;
+}
+
+fn never(ready: bool) -> bool {
+  let ok: bool = ready && seen(true);
+  return ok;
+}
+
+fn count(x: bool) -> i32 {
+  if x {
+    return 1;
+  }
+  return 0;
+}
+
+fn main() -> i32 {
+  let a = count(both(true, true)) + count(both(true, false)) + count(both(false, true)) + count(both(false, false));
+  let b = count(either(true, true)) + count(either(true, false)) + count(either(false, true)) + count(either(false, false));
+  let c = count(chain(true, true, true)) + count(chain(true, true, false)) + count(chain(true, false, true)) + count(chain(false, true, true));
+  let d = count(mixed(true, false, false)) + count(mixed(false, true, true)) + count(mixed(false, true, false)) + count(mixed(false, false, true));
+  let e = gate(true, 5) + gate(true, 1) + gate(false, 5);
+  let f = count(never(false));
+  return a + b + c + d + e + f - 8;
+}

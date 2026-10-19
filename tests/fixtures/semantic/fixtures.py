@@ -446,6 +446,93 @@ def question() -> Fixture:
     return Fixture(p, counts, {m: lines}, 0, ["question: never propagates", "question: propagates", "question: twice in one statement", "question: on a variable", "question: in a loop body", "question: in a loop condition", "regions: synthetic support"])
 
 
+# ── R0.1 (CV-307) ──────────────────────────────────────────────────────────
+
+
+def boolean() -> Fixture:
+    m = "main.sv0"
+    p = Plan("boolean", read("boolean", m))
+
+    def short(fn: Function, text: str, rhs: tuple[int, int], after: int = 0) -> Branch:
+        """The short circuit spelled ``text``; its right operand ``rhs`` is an
+        `expression` region counted by `evaluated`."""
+        b = p.branch(fn, "short_circuit", p.find(m, text, after=after))
+        p.region(fn, "expression", rhs, b["evaluated"])
+        return b
+
+    seen = p.function(m, "seen")
+    p.region(seen, "return", p.find(m, "return b;"), seen.entry)
+
+    both = p.function(m, "both")
+    p.region(both, "return", p.find(m, "return a && seen(b);"), both.entry)
+    bb = short(both, "a && seen(b)", p.find(m, "seen(b)", after=both.span[0]))
+
+    either = p.function(m, "either")
+    p.region(either, "return", p.find(m, "return a || seen(b);"), either.entry)
+    eb = short(either, "a || seen(b)", p.find(m, "seen(b)", after=either.span[0]))
+
+    # `a && b && seen(c)` is `(a && b) && seen(c)`: two decisions starting at `a`.
+    chain = p.function(m, "chain")
+    p.region(chain, "return", p.find(m, "return a && b && seen(c);"), chain.entry)
+    cs = chain.span[0]
+    c_outer = short(chain, "a && b && seen(c)", p.find(m, "seen(c)", after=cs), after=cs)
+    inner_b = p.find(m, "b && seen(c)", after=cs)[0]
+    c_inner = short(chain, "a && b", (inner_b, inner_b + 1), after=cs)
+
+    # `a || b && seen(c)` is `a || (b && seen(c))`.
+    mixed = p.function(m, "mixed")
+    p.region(mixed, "return", p.find(m, "return a || b && seen(c);"), mixed.entry)
+    ms = mixed.span[0]
+    m_outer = short(mixed, "a || b && seen(c)", p.find(m, "b && seen(c)", after=ms), after=ms)
+    m_inner = short(mixed, "b && seen(c)", p.find(m, "seen(c)", after=ms), after=ms)
+
+    gate = p.function(m, "gate")
+    g_if = p.branch(gate, "if", p.through_block(m, "if ready && n > 2 {"))
+    p.region(gate, "expression", p.find(m, "ready && n > 2"), gate.entry)
+    g_sc = short(gate, "ready && n > 2", p.find(m, "n > 2"))
+    p.region(gate, "branch_body", p.through_block(m, "{", after=g_if.span[0]), g_if["true"], lc=False)
+    p.region(gate, "return", p.find(m, "return 1;", after=gate.span[0]), g_if["true"])
+    p.region(gate, "return", p.find(m, "return 0;", after=gate.span[0]), gate.entry, (g_if["true"], -1))
+
+    # Called only with `ready` false: the right operand never runs, so its
+    # line is partial (SPEC 27.3).
+    never = p.function(m, "never")
+    p.region(never, "initializer", p.find(m, "let ok: bool = ready && seen(true);"), never.entry)
+    n_sc = short(never, "ready && seen(true)", p.find(m, "seen(true)"))
+    p.region(never, "return", p.find(m, "return ok;"), never.entry)
+
+    count = p.function(m, "count")
+    k_if = p.branch(count, "if", p.through_block(m, "if x {"))
+    p.region(count, "expression", p.find(m, "x", after=k_if.span[0] + 3), count.entry)
+    p.region(count, "branch_body", p.through_block(m, "{", after=k_if.span[0]), k_if["true"], lc=False)
+    p.region(count, "return", p.find(m, "return 1;", after=count.span[0]), k_if["true"])
+    p.region(count, "return", p.find(m, "return 0;", after=count.span[0]), count.entry, (k_if["true"], -1))
+
+    main = p.function(m, "main")
+    for start in ("let a = ", "let b = ", "let c = ", "let d = ", "let e = ", "let f = "):
+        at = p.find(m, start)[0]
+        p.region(main, "initializer", (at, p.find(m, ";", after=at)[1]), main.entry)
+    p.region(main, "return", p.find(m, "return a + b + c + d + e + f - 8;"), main.entry)
+
+    counts = {
+        seen.entry: 8,
+        both.entry: 4, bb["evaluated"]: 2, bb["skipped"]: 2,
+        either.entry: 4, eb["evaluated"]: 2, eb["skipped"]: 2,
+        chain.entry: 4, c_inner["evaluated"]: 3, c_inner["skipped"]: 1, c_outer["evaluated"]: 2, c_outer["skipped"]: 2,
+        mixed.entry: 4, m_outer["evaluated"]: 3, m_outer["skipped"]: 1, m_inner["evaluated"]: 2, m_inner["skipped"]: 1,
+        gate.entry: 3, g_if["true"]: 1, g_if["false"]: 2, g_sc["evaluated"]: 2, g_sc["skipped"]: 1,
+        never.entry: 1, n_sc["evaluated"]: 0, n_sc["skipped"]: 1,
+        count.entry: 17, k_if["true"]: 7, k_if["false"]: 10,
+        main.entry: 1,
+    }
+    fn1 = [N, C, N, N]  # a function of one statement, then a blank line
+    lines = ([N] * 3 + fn1 * 5 + [N, C, C, N, C, N, N] + [N, P, C, N, N] + [N, C, C, N, C, N, N]
+             + [N] + [C] * 7 + [N])
+    return Fixture(p, counts, {m: lines}, 0, ["boolean: && all truth combinations", "boolean: || all truth combinations",
+                                              "boolean: chain", "boolean: mixed precedence", "boolean: in an if condition",
+                                              "boolean: right operand never evaluated (partial line)"])
+
+
 FIXTURES = {
     "f0": f0,
     "functions": functions,
@@ -455,4 +542,5 @@ FIXTURES = {
     "source-text": source_text,
     "project": project,
     "question": question,
+    "boolean": boolean,
 }

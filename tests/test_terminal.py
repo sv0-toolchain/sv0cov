@@ -72,7 +72,7 @@ class GoldenTest(unittest.TestCase):
     def test_goldens_are_current_and_complete(self) -> None:
         """SPEC 22: terminal output is byte-identical when color is disabled."""
         expected = golden.artifacts()
-        self.assertEqual(len(expected), 12)
+        self.assertEqual(len(expected), 13)
         for path, data in expected.items():
             with self.subTest(golden=path.name):
                 self.assertEqual(path.read_bytes(), data)

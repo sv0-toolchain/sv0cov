@@ -1,0 +1,74 @@
+sv0cov coverage report
+======================
+evidence:   PASSING
+complete:   yes
+policy:     passed
+tool:       sv0cov 0.0.0-test
+backends:   native
+execution:  not applicable
+runs:       1 (implicit-single)
+inputs:     1 accepted
+sources:    current
+contexts:   (default)
+
+Summary
+-------
+metric     covered/total    percent
+functions            9/9  100.0000%
+regions            29/30   96.6667%
+lines              19/20   95.0000%  1 partial
+branches           19/20   95.0000%
+
+Contracts are reported separately and are not part of the metrics above.
+contracts  0/0  N/A
+
+Files
+-----
+                   functions      regions         lines           branches        contracts
+[user] no package
+  main.sv0         9/9 100.0000%  29/30 96.6667%  19/20 95.0000%  19/20 95.0000%  0/0 N/A
+    fn seen        1/1 100.0000%  1/1 100.0000%   1/1 100.0000%   0/0 N/A         0/0 N/A
+    fn both        1/1 100.0000%  2/2 100.0000%   1/1 100.0000%   2/2 100.0000%   0/0 N/A
+    fn either      1/1 100.0000%  2/2 100.0000%   1/1 100.0000%   2/2 100.0000%   0/0 N/A
+    fn chain       1/1 100.0000%  3/3 100.0000%   1/1 100.0000%   4/4 100.0000%   0/0 N/A
+    fn mixed       1/1 100.0000%  3/3 100.0000%   1/1 100.0000%   4/4 100.0000%   0/0 N/A
+    fn gate        1/1 100.0000%  5/5 100.0000%   3/3 100.0000%   4/4 100.0000%   0/0 N/A
+    fn never       1/1 100.0000%  2/3 66.6667%    1/2 50.0000%    1/2 50.0000%    0/0 N/A
+    fn count       1/1 100.0000%  4/4 100.0000%   3/3 100.0000%   2/2 100.0000%   0/0 N/A
+    fn main        1/1 100.0000%  7/7 100.0000%   7/7 100.0000%   0/0 N/A         0/0 N/A
+
+Partial lines
+-------------
+main.sv0: 32
+
+Uncovered lines
+---------------
+(none)
+
+Uncovered branch outcomes
+-------------------------
+main.sv0:32:18  short_circuit  not taken: evaluated
+
+Contracts
+---------
+(none)
+
+Exclusions
+----------
+excluded: 0 functions, 0 regions, 0 lines, 0 branches, 0 contracts
+statically unreachable: 0 branch outcomes
+
+Warnings
+--------
+(none)
+
+Policy
+------
+result  assertion              metric    required  actual  threshold source  members  diagnostics
+PASS    integrity "integrity"  evidence  -         -       -                 -        -
+policy passed
+
+Saturation
+----------
+policy: fail
+no count is saturated

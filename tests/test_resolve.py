@@ -57,7 +57,7 @@ def by_counter(m: dict, by_point: dict[str, int]) -> dict[int, int]:
 class ResolveTest(unittest.TestCase):
     def test_fixture_counts_round_trip(self) -> None:
         names = sorted(p.name for p in SEMANTIC.iterdir() if (p / "expected-counts.json").is_file())
-        self.assertEqual(len(names), 8)
+        self.assertEqual(len(names), 9)
         for name in names:
             with self.subTest(name):
                 data, m, exp = fixture(name)

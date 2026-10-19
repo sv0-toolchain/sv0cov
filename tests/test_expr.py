@@ -119,7 +119,7 @@ class ExpressionPropertyTest(unittest.TestCase):
 class SemanticFixtureExpressionTest(unittest.TestCase):
     def test_fixture_regions(self) -> None:
         names = sorted(p.parent.name for p in SEMANTIC.glob("*/expected-map.json"))
-        self.assertEqual(len(names), 8)
+        self.assertEqual(len(names), 9)
         for name in names:
             with self.subTest(fixture=name):
                 m = json.loads((SEMANTIC / name / "expected-map.json").read_bytes())

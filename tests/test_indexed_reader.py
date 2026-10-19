@@ -116,7 +116,7 @@ def code_of(obj: dict) -> tuple[str | None, IndexedError | None]:
 
 class ProducerTest(unittest.TestCase):
     def test_every_fixture_reads_back_and_holds_the_expected_semantic_object(self) -> None:
-        self.assertEqual(len(FIXTURES), 8)
+        self.assertEqual(len(FIXTURES), 9)
         for name in FIXTURES:
             with self.subTest(fixture=name):
                 obj = simple(name)

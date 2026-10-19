@@ -348,3 +348,34 @@ Added in CV-306 (R0.1): contract clauses.
   the program stops.
 - Contract points never enter ordinary expressions, and `off` never takes a
   contract clause.
+
+Added in CV-307 (R0.1): short circuits.
+
+- Every `&&` and `||` in a function body is a `short_circuit` branch with
+  outcomes `evaluated` (the right operand ran) and `skipped`, both counted
+  directly, in that order. Span: the left operand's first token through the
+  right operand's last. The operand boundaries follow sv0's precedence:
+  `||` binds looser than `&&`, both associate left, and an operand ends at
+  `,` `:` `=` `=>` `..` `..=`, a compound assignment, `return` or `break`.
+  So `a || b && c` is an `||` over `a` and `b && c` (two branches), and
+  `a && b && c` is an `&&` whose left operand is `a && b`.
+- The right operand is an `expression` region counted by `evaluated`, so a
+  line whose right operand never ran is `partial` (SPEC §27.3). A construct
+  or block inside the right operand is planned at that count, less what has
+  left through a `?` inside it.
+- A short circuit inside a match guard is planned the same way (nothing
+  else in a guard is). One inside a contract clause is not: contract
+  expressions belong to the contract model (§11.7).
+- `a && b && c` has two decisions starting at the same byte. Counters
+  follow source and span start, then span end, so the inner (shorter)
+  decision's outcomes come first and each decision's two outcomes stay
+  consecutive. The reviewed `boolean` fixture pins this.
+- A literal operand (`true && x`) proves nothing to the planner: both
+  outcomes stay eligible, as for `if true`.
+- `branch_off` goes only on decision statements, which a short circuit
+  never starts, so a short circuit in an `if` condition stays ordinary when
+  the `if` is `branch_off`. `off` and `ignore-next` take the short circuits
+  inside what they exclude.
+- Lowering evaluates the right operand only when the left one does not
+  decide the result, with the `evaluated` hit in that arm and the `skipped`
+  hit in the other, on the C backend and on sv0vm alike.

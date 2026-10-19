@@ -27,7 +27,7 @@ from sv0cov.model.identity import NO_ORDINAL, EntityKind, PointIdentity, PointKi
 
 KIND_ORDER = {"function_entry": 0, "branch_outcome": 1, "region": 1}
 POINT_KINDS = {"function_entry": PointKind.FUNCTION_ENTRY, "branch_outcome": PointKind.BRANCH_OUTCOME, "region": PointKind.REGION}
-OUTCOMES = {"if": ("true", "false"), "loop": ("body", "exit")}
+OUTCOMES = {"if": ("true", "false"), "loop": ("body", "exit"), "short_circuit": ("evaluated", "skipped")}
 
 
 @dataclass(eq=False)
@@ -151,7 +151,7 @@ class Plan:
 
     def points(self) -> list[Point]:
         pts = [f.entry for f in self.functions] + [o for b in self.branches for o in b.outcomes] + self.questions
-        return sorted(pts, key=lambda p: (p.path, p.span[0], KIND_ORDER[p.kind], p.ordinal or 0))
+        return sorted(pts, key=lambda p: (p.path, p.span[0], KIND_ORDER[p.kind], p.span[1], p.ordinal or 0))
 
     def _span(self, path: str, span: tuple[int, int]) -> dict:
         t = _Text(self.sources[path])
@@ -172,7 +172,9 @@ class Plan:
             for i, f in enumerate(fns)
         ]
 
-        ordered = sorted(self.points(), key=lambda p: (src_index[p.path], p.span[0], KIND_ORDER[p.kind], p.ordinal or 0))
+        # Two decisions starting at one byte (`a && b && c`) count the inner
+        # (shorter) one first, so each decision's outcomes stay consecutive (CV-307).
+        ordered = sorted(self.points(), key=lambda p: (src_index[p.path], p.span[0], KIND_ORDER[p.kind], p.span[1], p.ordinal or 0))
         counter = {id(p): n for n, p in enumerate(q for q in ordered if q.evidence is None)}
         ids: dict[int, str] = {}
         records = []

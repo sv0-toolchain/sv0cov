@@ -95,7 +95,7 @@ TINY = "fn main() -> i32 {\n  let a = 1;\n  if a > 0 {\n    return 1;\n  }\n  re
 class FixtureModelTest(unittest.TestCase):
     def test_model_equals_the_expected_semantic_object(self) -> None:
         """The done-when: every reviewed fixture, CV-027's f0 first."""
-        self.assertEqual(len(FIXTURES), 8)
+        self.assertEqual(len(FIXTURES), 9)
         self.assertIn("f0", FIXTURES)
         for name in FIXTURES:
             with self.subTest(fixture=name):

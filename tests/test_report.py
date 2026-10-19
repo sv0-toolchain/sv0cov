@@ -102,7 +102,7 @@ def as_tuples(summary: dict) -> dict[str, tuple]:
 
 class RoundTripTest(unittest.TestCase):
     def test_every_fixture_builds_reads_back_and_passes(self) -> None:
-        self.assertEqual(len(FIXTURES), 8)
+        self.assertEqual(len(FIXTURES), 9)
         for name in FIXTURES:
             with self.subTest(fixture=name):
                 report, ix = fixture_report(name)

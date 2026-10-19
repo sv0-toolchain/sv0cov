@@ -18,6 +18,7 @@ byte for byte.
 | `source-text/` | CRLF endings, tabs, no final newline, CJK text, several regions on one line, a partial line |
 | `project/` | a two-module project whose files share a basename |
 | `question/` | the `?` operator (CV-213): never propagating, propagating, twice in one statement, on a variable, in a loop body, in a loop condition; each is one counted `synthetic_support` point outside every ordinary metric |
+| `boolean/` | `&&` and `\|\|` (CV-307): all four truth combinations of each, a chain (`a && b && c`: two decisions starting at one byte, the inner counted first), mixed precedence, a short circuit in an `if` condition, and a right operand that never runs (a partial line) |
 
 Each fixture directory holds the program, `expected-map.json`,
 `expected-counts.json` (the per-point counts of one run with no input), and
