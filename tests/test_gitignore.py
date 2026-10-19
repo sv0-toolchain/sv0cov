@@ -168,7 +168,11 @@ class ComplexityTest(unittest.TestCase):
         """A 4096-byte logical path may have ~2000 components; depth must not exhaust the stack."""
         path = "/".join(["a"] * 2047) + "/f"
         self.assertLessEqual(len(path.encode()), 4096)
-        for pats, want in ((["x"], []), (["a/"], [path]), (["/a/a/a/"], [path]), (["**/f"], [path])):
+        # Each leading directory is matched on its own (the parent rule), so
+        # these once cost depth x length; head/tail/word filters keep them cheap.
+        for pats, want in ((["x"], []), (["a/"], [path]), (["/a/a/a/"], [path]), (["**/f"], [path]), (["**/b*"], []),
+                           (["**/b/**"], []), (["**/a/**/c"], []), (["**/a/**/f"], [path]),
+                           ([f"p{i}/*.sv0" for i in range(1000)], [])):
             dt, out = self.timed(pats, [path])
             self.assertEqual(out, want, pats)
             self.assertLess(dt, self.BOUND, pats)

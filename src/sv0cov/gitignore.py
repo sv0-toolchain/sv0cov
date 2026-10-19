@@ -274,6 +274,9 @@ class Pattern:
     must_be_dir: bool
     no_dir: bool  # no slash: matches the last component at any depth
     line: int = 0  # 1-based line in the pattern file
+    head: bytes = b""  # literal bytes every match starts with (path patterns)
+    tail: bytes | None = None  # what the last path component must match, when that is decidable alone
+    words: frozenset = frozenset()  # literal components that must each equal some path component
 
 
 def _trim_trailing_spaces(line: bytes) -> bytes:
@@ -297,6 +300,33 @@ def _trim_trailing_spaces(line: bytes) -> bytes:
     return line if last_space is None else line[:last_space]
 
 
+def _filters(raw: bytes, no_dir: bool) -> tuple[bytes, bytes | None, frozenset]:
+    """Cheap necessary conditions for a path pattern, checked before
+    ``wildmatch`` (deep paths are matched once per leading directory):
+
+    - ``head``: the literal bytes before the first special character; Git
+      compares this prefix first too.
+    - ``tail``: the pattern's last component. With ``WM_PATHNAME`` a single
+      ``*`` cannot cross ``/`` and only a component that is exactly ``**``
+      can span components, so unless the last component is ``**`` it must
+      match the path's last component on its own.
+    - ``words``: the components with no special character. Nothing in one
+      can consume a ``/``, so each must equal a whole path component.
+
+    ``tail`` and ``words`` are left out when the pattern has a backslash (an
+    escaped ``/`` is not a separator)."""
+    if no_dir:
+        return b"", None, frozenset()
+    n = 0
+    while n < len(raw) and raw[n] not in _GLOB_SPECIAL:
+        n += 1
+    if b"\\" in raw:
+        return raw[:n], None, frozenset()
+    parts = raw.split(b"/")
+    words = frozenset(c for c in parts if c and not any(b in _GLOB_SPECIAL for b in c))
+    return raw[:n], None if parts[-1] == b"**" else parts[-1], words
+
+
 def parse(lines: Iterable[str]) -> list[Pattern]:
     """The patterns of an ordered pattern file; comments and blanks dropped."""
     out = []
@@ -313,7 +343,7 @@ def parse(lines: Iterable[str]) -> list[Pattern]:
         no_dir = b"/" not in raw
         if raw.startswith(b"/"):
             raw = raw[1:]
-        out.append(Pattern(raw, negative, must_be_dir, no_dir, number))
+        out.append(Pattern(raw, negative, must_be_dir, no_dir, number, *_filters(raw, no_dir)))
     return out
 
 
@@ -323,6 +353,12 @@ def _matches(pat: Pattern, path: bytes, is_dir: bool) -> bool:
     if pat.no_dir:
         base = path[path.rfind(b"/") + 1:]
         return wildmatch(pat.text, base, pathname=False)
+    if not path.startswith(pat.head):
+        return False
+    if pat.tail is not None and not wildmatch(pat.tail, path[path.rfind(b"/") + 1:], pathname=True):
+        return False
+    if pat.words and not pat.words <= set(path.split(b"/")):
+        return False
     return wildmatch(pat.text, path, pathname=True)
 
 
