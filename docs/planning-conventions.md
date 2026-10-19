@@ -363,8 +363,10 @@ Added in CV-307 (R0.1): short circuits.
   line whose right operand never ran is `partial` (SPEC §27.3). A construct
   or block inside the right operand is planned at that count, less what has
   left through a `?` inside it.
-- A short circuit inside a match guard is planned the same way (nothing
-  else in a guard is). One inside a contract clause is not: contract
+- A short circuit inside a match guard is planned the same way. A construct
+  (`if`, `match`, `while`, `for`, `loop`), a block expression or a `?` in a
+  guard makes the build refuse (a guard's evaluation count is not
+  expressible with the counters). A short circuit inside a contract clause is not: contract
   expressions belong to the contract model (§11.7).
 - `a && b && c` has two decisions starting at the same byte. Counters
   follow source and span start, then span end, so the inner (shorter)
