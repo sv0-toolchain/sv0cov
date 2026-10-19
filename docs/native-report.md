@@ -133,6 +133,30 @@ its clauses, and each line once where one of its regions contributes, with
 that line's status worked out from its own regions alone. A contract entity
 has only the `contract` metric of its one clause.
 
+### Contexts
+
+Every count record holds the aggregate and, in `by_context`, each context's
+own count (a context missing there counted exactly zero). The aggregate is
+the saturating sum of the contexts and is there whether or not any context
+was collected: the same runs with and without labels give the same
+aggregate. `contexts` lists every context an input carried, absent (`null`)
+first, then the empty string, then the rest bytewise.
+
+`sv0cov.model.context.context_view(report, context_index)` is the context
+filter (CV-308): a new object with the report's points, regions, lines,
+branches, contracts, entities and sources, every count replaced by that
+context's count, and line statuses, outcome statuses, runtime results and
+the five metrics (whole report, each source, each entity) worked out again
+from those counts. It equals the report built from that context's profiles
+alone. The report itself is never changed, so filtering cannot move the
+aggregate, and policy is not part of a view: thresholds read the aggregate.
+The HTML report (CV-309) offers it as its context filter.
+`tests/test_context.py` checks each view against the report of that
+context alone (every semantic fixture under four contexts, and the two-map
+sample with contracts, an exclusion and a saturated count), that taking
+views leaves the report unchanged, and that the aggregate is the sum of the
+contexts and does not depend on whether contexts were collected.
+
 ### Policy
 
 - **Integrity.** One evaluation carries every finding about the evidence
