@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from sv0cov import cli  # noqa: E402
+from sv0cov import cli, probes  # noqa: E402
 from sv0cov.diagnostics import load_registry  # noqa: E402
 from sv0cov.formats import doctor  # noqa: E402
 from sv0cov.formats.canonical_json import decode_canonical, encode  # noqa: E402
@@ -30,6 +30,8 @@ from sv0cov.formats.version_manifest import Advertised, ManifestError, build, ma
 from sv0cov.model import inventory as inv  # noqa: E402
 
 REG = load_registry()
+# D004 validates each member of probes.MODULES and of probes.RESOURCES.
+MEMBER_COUNT = len(probes.MODULES) + len(probes.RESOURCES)
 FIXTURES = ROOT / "tests" / "fixtures" / "doctor"
 
 
@@ -225,7 +227,7 @@ def standalone_pass() -> bytes:
         "D001": ("pass", {"manifest_sha256": manifest["manifest_sha256"]}),
         "D002": ("pass", {"registry_revision": REG.revision, "registry_sha256": REG.sha256}),
         "D003": ("pass", {"validated_schema_count": 13}),
-        "D004": ("pass", {"validated_member_count": 80}),
+        "D004": ("pass", {"validated_member_count": MEMBER_COUNT}),
         "D005": ("pass", {"host": "macos-arm64"}),
         "D006": ("pass", {"language": "python", "runtime_name": "cpython", "runtime_version": "3.13.0"}),
         "D007": ("pass", {}),
@@ -241,7 +243,7 @@ def toolchain_d012_fail() -> bytes:
         "D001": ("pass", {"manifest_sha256": manifest["manifest_sha256"]}),
         "D002": ("pass", {"registry_revision": REG.revision, "registry_sha256": REG.sha256}),
         "D003": ("pass", {"validated_schema_count": 13}),
-        "D004": ("pass", {"validated_member_count": 80}),
+        "D004": ("pass", {"validated_member_count": MEMBER_COUNT}),
         "D005": ("pass", {"host": "macos-arm64"}),
         "D006": ("pass", {"language": "python", "runtime_name": "cpython", "runtime_version": "3.13.0"}),
         "D007": ("pass", {}),
