@@ -50,20 +50,25 @@ class Stop(Exception):
         self.status = status
 
 
-def load_report(ctx: cli.Context, *, standard_export: bool = False) -> tuple[dict, bytes]:
-    """The native report of the command's one operand, and its canonical bytes."""
+def load_report(ctx: cli.Context, *, standard_export: bool = False,
+                sources_out: dict[str, bytes | None] | None = None) -> tuple[dict, bytes]:
+    """The native report of the command's one operand, and its canonical bytes.
+    ``sources_out``, when given, receives the source bytes that were read."""
     tier = ctx.config.tier().name
     (operand,) = ctx.invocation.operands
     data, fault = _read(ctx.cwd / operand, map_limits(tier).max_bytes, follow=True)
     if data is None:
         code, why = fault or ("COV3010", "cannot be read")
         raise Stop(code, "collection", f"the indexed profile {why}", cli.EXIT_EVIDENCE)
-    return report_of(ctx, data, standard_export=standard_export)
+    return report_of(ctx, data, standard_export=standard_export, sources_out=sources_out)
 
 
-def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False) -> tuple[dict, bytes]:
+def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
+              sources_out: dict[str, bytes | None] | None = None) -> tuple[dict, bytes]:
     """The native report of indexed-profile bytes under the command's
-    configuration, read back through the reader, and its canonical bytes."""
+    configuration, read back through the reader, and its canonical bytes.
+    ``sources_out``, when given, receives the source bytes that were read
+    (``None`` for a file that could not be), for the HTML report."""
     config = ctx.config
     tier = config.tier().name
     limit = map_limits(tier).max_bytes
@@ -88,6 +93,8 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False) -
         if not inside:
             raise Stop("COV6002", "report", f"source {s['path']} resolves outside the project", cli.EXIT_EVIDENCE)
         sources[s["path"]], _ = _read(path, limit, follow=True)
+    if sources_out is not None:
+        sources_out.update(sources)
     try:
         encoded = encode(build_report(data, config, sources, standard_export=standard_export))
         return read_report(encoded, tier=tier), encoded

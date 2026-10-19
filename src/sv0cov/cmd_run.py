@@ -84,6 +84,7 @@ from sv0cov.cmd_report import FILENAMES, IMPLEMENTED, REPORTS_DIR
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.evidence import report_of
 from sv0cov.formats import runset
+from sv0cov.formats.html import check_html, render_html
 from sv0cov.formats.map import MapError, map_limits, validate_map
 from sv0cov.formats.runset import RunIdError, parse_run_id
 from sv0cov.formats.terminal import render_terminal
@@ -341,15 +342,16 @@ def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int
     except PublishError as exc:
         raise _Stop(cli.EXIT_EVIDENCE, exc.code, "publication", artifact="indexed-profile", detail=exc.detail) from None
     try:
-        report, encoded = report_of(ctx, result.data)
+        sources: dict[str, bytes | None] = {}
+        report, encoded = report_of(ctx, result.data, sources_out=sources)
     except evidence.Stop as stop:
         console.report(stop.diagnostic)
         return stop.status, False
-    files = {FILENAMES[f]: encoded for f in formats if f != "term"}
+    files = {FILENAMES[f]: (render_html(report, sources) if f == "html" else encoded) for f in formats if f != "term"}
+    checks = {FILENAMES["json"]: lambda data: read_report(data, tier=tier.name), FILENAMES["html"]: check_html}
     if files:
         try:
-            publish_bundle(f"{shown}/{REPORTS_DIR}", files, anchor=str(ctx.cwd),
-                           validate={name: (lambda data: read_report(data, tier=tier.name)) for name in files})
+            publish_bundle(f"{shown}/{REPORTS_DIR}", files, anchor=str(ctx.cwd), validate={name: checks[name] for name in files})
         except PublishError as exc:
             console.report(Diagnostic(exc.code, "publication", facts=(("artifact", "report"), ("detail", cli.fact_text(exc.detail)))))
             return cli.EXIT_REPORT, coverage_failed(report)

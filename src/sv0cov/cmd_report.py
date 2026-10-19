@@ -12,8 +12,8 @@ and publishes the selected formats without replacing anything
 **Formats.** Only ``--format`` selects them; ``[tool.sv0cov].reports`` is
 for ``run`` and is not read. Request order does not matter: artifacts are
 produced in the canonical order ``term``, ``html``, ``json``, ``lcov``,
-``cobertura``. This build produces ``term`` and ``json``; asking for another
-is refused with ``COV5001`` before anything is read.
+``cobertura``. This build produces ``term``, ``html`` and ``json``; asking
+for another is refused with ``COV5001`` before anything is read.
 
 **Destination** (SPEC 20.2.2).
 
@@ -44,13 +44,14 @@ from __future__ import annotations
 from sv0cov import cli
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.evidence import Stop, load_report
+from sv0cov.formats.html import check_html, render_html
 from sv0cov.formats.terminal import render_terminal, terminal_bytes
 from sv0cov.model.report import read_report
 from sv0cov.publish import PublishError, check_destination, publish_bundle, publish_file, publish_stdout
 
 #: Canonical order and primary filename of every format (SPEC 20.2.1).
 FILENAMES = {"term": "coverage.txt", "html": "coverage.html", "json": "coverage.json", "lcov": "lcov.info", "cobertura": "cobertura.xml"}
-IMPLEMENTED = ("term", "json")
+IMPLEMENTED = ("term", "html", "json")
 REPORTS_DIR = "reports"
 
 
@@ -94,7 +95,7 @@ def cmd_report(ctx: cli.Context) -> int:
     def native(data: bytes) -> None:
         read_report(data, tier=tier)
 
-    validators = {"coverage.txt": _plain_text, "coverage.json": native}
+    validators = {"coverage.txt": _plain_text, "coverage.json": native, "coverage.html": check_html}
     try:
         if not to_stdout:
             try:
@@ -102,12 +103,14 @@ def cmd_report(ctx: cli.Context) -> int:
             except PublishError as exc:
                 console.report(_publish_failure(exc))
                 return cli.EXIT_REPORT
-        report, encoded = load_report(ctx)
+        sources: dict[str, bytes | None] = {}
+        report, encoded = load_report(ctx, sources_out=sources)
     except Stop as stop:
         console.report(stop.diagnostic)
         return stop.status
 
-    files = {FILENAMES[f]: (terminal_bytes(report) if f == "term" else encoded) for f in formats}
+    render = {"term": lambda: terminal_bytes(report), "html": lambda: render_html(report, sources), "json": lambda: encoded}
+    files = {FILENAMES[f]: render[f]() for f in formats}
     first = next(iter(files))
     try:
         if to_stdout:

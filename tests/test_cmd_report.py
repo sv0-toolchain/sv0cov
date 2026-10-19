@@ -163,7 +163,7 @@ class SelectionTest(ReportBase):
     def test_a_format_this_build_lacks_is_refused_before_anything_is_read(self) -> None:
         self.project()
         before = self.tree()
-        for fmt in ("html", "lcov", "cobertura"):
+        for fmt in ("lcov", "cobertura"):
             for extra in ((), ("--format", "term")):
                 with self.subTest(format=fmt, extra=extra):
                     code, out, err = self.run_report("--format", fmt, *extra, operand="absent.json")
@@ -171,9 +171,27 @@ class SelectionTest(ReportBase):
                     self.assertEqual((code, out, r["code"], r["phase"]), (7, "", "COV5001", "invocation"))
                     self.assertIn({"name": "format", "value": fmt}, r["facts"])
         self.assertEqual(self.tree(), before)
-        self.assertEqual(cmd_report.IMPLEMENTED, ("term", "json"))
+        self.assertEqual(cmd_report.IMPLEMENTED, ("term", "html", "json"))
         self.assertEqual(list(cmd_report.FILENAMES.items()), [("term", "coverage.txt"), ("html", "coverage.html"), ("json", "coverage.json"),
                                                                ("lcov", "lcov.info"), ("cobertura", "cobertura.xml")])
+
+
+class HtmlTest(ReportBase):
+    """CV-309: the HTML report on its own, in a bundle, and on stdout."""
+
+    def test_html_alone_in_a_bundle_and_on_stdout(self) -> None:
+        from sv0cov.formats.html import check_html
+        self.project()
+        code, out, err = self.run_report("--format", "html")
+        self.assertEqual((code, err), (0, ""))
+        page = (self.cwd / ".sv0cov/reports/coverage.html").read_bytes()
+        check_html(page)
+        self.assertEqual(self.run_report("--format", "json", "--format", "html", "--format", "term", "--output", "all")[0], 0)
+        self.assertEqual(sorted(os.listdir(self.cwd / "all")), ["coverage.html", "coverage.json", "coverage.txt"])
+        self.assertEqual((self.cwd / "all/coverage.html").read_bytes(), page)  # the same evidence gives the same bytes
+        code, out, err = self.run_report("--format", "html", "--output", "-")
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(out.encode("utf-8"), page)
 
 
 class CollisionTest(ReportBase):

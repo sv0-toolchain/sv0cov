@@ -561,12 +561,29 @@ class ReportSelectionTest(Base):
                 self.assertEqual(report["provenance"]["indexed_input_sha256"],
                                  __import__("hashlib").sha256((run_dir / "coverage.sv0covdata.json").read_bytes()).hexdigest())
 
+    def test_html_joins_the_bundle(self) -> None:
+        """AC-103: term and HTML selected: the terminal report is printed and
+        one self-contained coverage.html is published beside the native report."""
+        from sv0cov.formats.html import check_html
+        (self.cwd / "sv0.toml").write_text(HEAD + 'reports = ["term", "html", "json"]\n')
+        code, out, err = self.run_cli("--", "demo")
+        (run_id,) = self.run_dirs()
+        run_dir = self.cwd / ".sv0cov/runs" / run_id
+        self.assertEqual(code, 0)
+        self.assertIn("sv0cov coverage report", out)
+        self.assertEqual(sorted(os.listdir(run_dir / "reports")), ["coverage.html", "coverage.json"])
+        self.assertEqual(stat.S_IMODE((run_dir / "reports/coverage.html").stat().st_mode), 0o600)
+        page = (run_dir / "reports/coverage.html").read_bytes()
+        check_html(page)
+        report = read_report((run_dir / "reports/coverage.json").read_bytes())
+        self.assertIn(report["provenance"]["indexed_input_sha256"].encode(), page)
+
     def test_quiet_removes_the_terminal_report_and_no_diagnostic(self) -> None:
         code, out, err = self.run_cli("--quiet", "--threshold-line", "100", "--", "demo")
         self.assertEqual((code, out, [r["code"] for r in records(err)]), (1, "program output\n", ["COV4101"]))
 
     def test_a_format_this_build_lacks_stops_before_anything_exists(self) -> None:
-        for args, toml in ((("--report", "html"), None), (("--report", "term", "--report", "lcov"), None), ((), 'reports = ["cobertura"]\n')):
+        for args, toml in ((("--report", "lcov"), None), (("--report", "term", "--report", "lcov"), None), ((), 'reports = ["cobertura"]\n')):
             with self.subTest(args=args, toml=toml):
                 self.setUp()
                 if toml:

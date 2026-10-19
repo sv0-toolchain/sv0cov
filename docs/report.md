@@ -23,7 +23,7 @@ and under the canonical names:
 | Format | File | This build |
 |---|---|---|
 | `term` | `coverage.txt` | yes ([terminal-report.md](terminal-report.md)) |
-| `html` | `coverage.html` | not yet |
+| `html` | `coverage.html` | yes ([html-report.md](html-report.md)) |
 | `json` | `coverage.json` | yes ([native-report.md](native-report.md)) |
 | `lcov` | `lcov.info` | not yet |
 | `cobertura` | `cobertura.xml` | not yet |

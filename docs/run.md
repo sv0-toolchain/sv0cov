@@ -150,4 +150,4 @@ Before the test command runs:
 ## Not in this build
 
 - The VM backend. `run` builds the generated-C executable only.
-- The `html`, `lcov` and `cobertura` formats.
+- The `lcov` and `cobertura` formats. (`html` is produced: [html-report.md](html-report.md).)
