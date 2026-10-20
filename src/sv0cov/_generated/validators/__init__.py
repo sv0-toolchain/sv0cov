@@ -6,6 +6,7 @@
 GENERATOR_FORMAT = '2'
 
 SCHEMAS = {
+    'sv0cov_baseline_1_0': ('sv0cov.baseline-1.0.schema.json', '9ba20db8d1b317442dffefd9bdc8d21621a938b2398f13ed8bcfe9b5878797a4'),
     'sv0cov_compatibility_1_0': ('sv0cov.compatibility-1.0.schema.json', '04d468b205e235b08cbdf7322d8469391ce0af5d1a934f2baed7782a1c8ce07f'),
     'sv0cov_diagnostic_1_0': ('sv0cov.diagnostic-1.0.schema.json', 'b81ff9d6cb7f9754830b5785f74c99d58c60800c38e909f88ee81cea2865e0e2'),
     'sv0cov_diagnostic_registry_1_0': ('sv0cov.diagnostic-registry-1.0.schema.json', '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'),
@@ -14,7 +15,7 @@ SCHEMAS = {
     'sv0cov_indexed_semantic_1_0': ('sv0cov.indexed-semantic-1.0.schema.json', 'b387f30c628fd2769c4a80fc80f2d94709c2d23ba099226ee07473ec26a51f75'),
     'sv0cov_map_1_0': ('sv0cov.map-1.0.schema.json', 'b77082e414db15bee9a3b8b5fc114540e7e9e49199bb8b6f3994e46a6ec224c8'),
     'sv0cov_release_manifest_1_0': ('sv0cov.release-manifest-1.0.schema.json', 'a78bda572fea2095538191fb0a62d9c35d3fe3716be1cea5b1a8230588e6454c'),
-    'sv0cov_report_1_0': ('sv0cov.report-1.0.schema.json', '1943dcd33005607dddb94bd0af9c81b5a8e15fc69871e46f07a118d4687a5bf5'),
+    'sv0cov_report_1_0': ('sv0cov.report-1.0.schema.json', '555794d3b759bbfad0b9fa72859466f6e1b21232f8b863f3529c012a281d4b84'),
     'sv0cov_resolved_configuration_1_0': ('sv0cov.resolved-configuration-1.0.schema.json', '4aab6d7ed16e9b02a4cacd0ff4d43692f0bfc2fde8281f531db3140ae7923cab'),
     'sv0cov_run_set_1_0': ('sv0cov.run-set-1.0.schema.json', '05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2'),
     'sv0cov_version_1_0': ('sv0cov.version-1.0.schema.json', 'bd763071b96e95f298462744e5b113aa9888455ab698a20d600f45820ce5eee5'),

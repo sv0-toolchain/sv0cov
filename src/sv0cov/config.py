@@ -37,7 +37,7 @@ from sv0cov.formats.runset import RunIdError, parse_run_id
 from sv0cov.model.logical import LogicalValueError, check_logical_path
 
 SCHEMA_VERSION = "1.0"
-COMMANDS = ("run", "merge", "report", "check", "clean", "doctor", "version")
+COMMANDS = ("run", "merge", "report", "check", "baseline", "clean", "doctor", "version")
 METRICS = ("function", "region", "line", "branch", "contract")
 REPORT_FORMATS = ("term", "html", "json", "lcov", "cobertura")
 DENOMINATOR = 10000
@@ -134,12 +134,15 @@ def _thresholds(keys: tuple[str, ...] = METRICS) -> tuple[Key, ...]:
     return tuple(Key(m, THRESHOLD) for m in keys)
 
 
+#: The ratchet table also names the baseline that ``baseline`` writes (CV-313).
+RATCHET = ("run", "check", "baseline")
+
 TABLES = (
     Table(
         "tool.sv0cov",
         (
             Key("schema", SCHEMA, required=True, commands=COMMANDS),
-            Key("output_dir", ARTIFACT_PATH, ".sv0cov", commands=("run", "merge", "report", "check", "clean")),
+            Key("output_dir", ARTIFACT_PATH, ".sv0cov", commands=("run", "merge", "report", "check", "baseline", "clean")),
             Key("reports", REPORTS, ["term"], commands=("run",)),
             Key("empty", EMPTY, "fail", commands=("run", "check")),
             Key("context", CONTEXT, commands=("run",)),
@@ -147,7 +150,7 @@ TABLES = (
         ),
         tables=("integrity", "limits", "thresholds", "scopes", "entities", "diff", "ratchet", "exclusions"),
     ),
-    Table("tool.sv0cov.integrity", (Key("saturation", SATURATION, "fail", commands=("run", "merge", "report", "check")),)),
+    Table("tool.sv0cov.integrity", (Key("saturation", SATURATION, "fail", commands=("run", "merge", "report", "check", "baseline")),)),
     Table("tool.sv0cov.limits", (), tables=("raw_profile",)),
     Table(
         "tool.sv0cov.limits.raw_profile",
@@ -178,9 +181,9 @@ TABLES = (
     Table(
         "tool.sv0cov.ratchet",
         (
-            Key("baseline", ARTIFACT_PATH, required=True),
-            Key("metrics", METRIC_SET, required=True),
-            Key("tolerance_basis_points", BASIS_POINTS, 0),
+            Key("baseline", ARTIFACT_PATH, required=True, commands=RATCHET),
+            Key("metrics", METRIC_SET, required=True, commands=RATCHET),
+            Key("tolerance_basis_points", BASIS_POINTS, 0, commands=RATCHET),
         ),
     ),
     Table(
@@ -247,7 +250,7 @@ OPTIONS = (
     Option("--output", ("merge", "report"), "scalar", kind=PATH_ARG),
     Option("--format", ("report",), "repeatable", kind=FORMAT, required=("report",)),
     Option("--quiet", ("run", "merge", "report", "check", "clean", "doctor"), "flag"),
-    Option("--color", ("run", "merge", "report", "check", "doctor"), "scalar", kind=COLOR),
+    Option("--color", ("run", "merge", "report", "check", "baseline", "doctor"), "scalar", kind=COLOR),
     Option("--diagnostic-format", COMMANDS, "scalar", kind=DIAGNOSTIC_FORMAT),
     Option("--json", ("doctor", "version"), "flag"),
     Option("--toolchain-root", ("doctor",), "scalar", kind=PATH_ARG),

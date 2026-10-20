@@ -253,7 +253,7 @@ class EvidenceTest(Base):
 
     def test_what_this_build_cannot_evaluate_is_refused(self) -> None:
         self.project()
-        self.put("sv0.toml", (HEAD + '[tool.sv0cov.ratchet]\nbaseline = "b.json"\nmetrics = ["line"]\n').encode())
+        self.put("sv0.toml", (HEAD + '[tool.sv0cov.exclusions]\nmax_records = 0\n').encode())
         code, out, err = self.check()
         self.assertEqual((code, out, self.codes(err)), (7, "", ["COV5001"]))
 
@@ -383,7 +383,9 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(len(got), want)
         self.assertTrue(all(d.phase == "policy" for d in got))
         ratchet = next(d for d in got if dict(d.facts)["assertion"] == "ratchet:ratchet")
-        self.assertEqual(dict(ratchet.facts), {"assertion": "ratchet:ratchet", "metric": "line", "result": "ineligible", "required": ">= 7/12"})
+        self.assertEqual(dict(ratchet.facts), {
+            "assertion": "ratchet:ratchet", "baseline": "ok", "metric": "line", "outcomes": "denominator_growth, exclusion_growth",
+            "required": ">= 7/12", "result": "ineligible", "sources": "1 added (vendor/dep/hot.sv0), 0 removed"})
         passing = json.loads((ROOT / "tests" / "fixtures" / "report" / "passing.json").read_bytes())
         self.assertEqual((cmd_check.exit_status(passing), cmd_check.evaluation_diagnostics(passing)), (0, []))
         failed = json.loads(json.dumps(passing))

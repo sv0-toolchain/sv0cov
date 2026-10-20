@@ -55,7 +55,7 @@ from sv0cov.formats.canonical_json import CanonicalJsonError, decode_canonical
 from sv0cov.formats.indexed import IndexedError
 from sv0cov.formats.map import map_limits
 from sv0cov.formats.structural import StructuralError
-from sv0cov.model.logical import LogicalValueError, check_logical_string
+from sv0cov.model.logical import LogicalValueError, check_logical_path, check_logical_string
 
 METRICS = ("branch", "contract", "function", "line", "region")
 RE_RATIO = re.compile(r"0\.[0-9]{6}|1\.000000")
@@ -242,8 +242,8 @@ def _check_policy(p: dict) -> None:
                 _fail(w, "the integrity evaluation has metric evidence, no comparison, no fraction, and no member")
         elif e["metric"] == "evidence":
             _fail(f"{w}/metric", "only the integrity evaluation uses the evidence metric")
-        if (e["metric"] == "exclusion_records") and kind != "exclusion":
-            _fail(f"{w}/metric", "only an exclusion evaluation counts exclusion records")
+        if (e["metric"] == "exclusion_records") and kind not in ("exclusion", "ratchet"):
+            _fail(f"{w}/metric", "only an exclusion or ratchet evaluation counts exclusion records")
         if kind == "diff" and e["metric"] not in ("branch", "line", "region"):
             _fail(f"{w}/metric", "a diff evaluation uses line, region, or branch")
     if integrity != 1:
@@ -284,6 +284,52 @@ def _check_changes(c: dict) -> None:
             _fail(f"{w}/changed_lines", "an unchanged source has no changed line")
     if c["clean"] != (not any(s["staged"] or s["unstaged"] for s in c["sources"])):
         _fail("/changes/clean", "clean exactly when no source has a staged or unstaged change")
+
+
+def _check_ratchet(t: dict) -> None:
+    """The ratchet record (SPEC 22.4) as far as it decides itself."""
+    for key in ("head",):
+        if t[key] is not None and not RE_COMMIT.fullmatch(t[key]):
+            _fail(f"/ratchet/{key}", "a Git object name is 40 or 64 lowercase hex digits")
+    if t["baseline_sha256"] is not None:
+        _shared(_ix._digest, t["baseline_sha256"], "/ratchet/baseline_sha256")
+    b = t["baseline"]
+    if b is not None:
+        if b["commit"] is not None and not RE_COMMIT.fullmatch(b["commit"]):
+            _fail("/ratchet/baseline/commit", "a Git object name is 40 or 64 lowercase hex digits")
+        if any(not 0x20 <= ord(ch) <= 0x7E for ch in b["metric_schema"]):
+            _fail("/ratchet/baseline/metric_schema", "printable ASCII")
+        if any(not 0x21 <= ord(ch) <= 0x7E for ch in b["tool_version"]):
+            _fail("/ratchet/baseline/tool_version", "each byte is ASCII 0x21 through 0x7e")
+        for m in METRICS:
+            if b["metrics"][m]["covered"] > b["metrics"][m]["total"]:
+                _fail(f"/ratchet/baseline/metrics/{m}", "covered is at most total")
+    for key, paths in (("baseline/sources", [] if b is None else b["sources"]), ("sources_added", t["sources_added"]),
+                       ("sources_removed", t["sources_removed"])):
+        for n, path in enumerate(paths):
+            try:
+                check_logical_path(path, f"/ratchet/{key}/{n}")
+            except LogicalValueError as exc:
+                _fail(f"/ratchet/{key}/{n}", exc.detail)
+        _shared(_ix._sorted_unique, [x.encode() for x in paths], f"/ratchet/{key}")
+    if set(t["sources_added"]) & set(t["sources_removed"]):
+        _fail("/ratchet/sources_added", "a source is not both added and removed")
+    metrics = [c["metric"] for c in t["comparisons"]]
+    if metrics not in ([], list(METRICS)):
+        _fail("/ratchet/comparisons", "none, or one for each metric in order")
+    for n, c in enumerate(t["comparisons"]):
+        _shared(_ix._sorted_unique, c["outcomes"], f"/ratchet/comparisons/{n}/outcomes")
+    usable = t["state"] in ("ok", "stale", "incompatible")
+    if (b is not None) != usable:
+        _fail("/ratchet/baseline", "a decoded baseline is present exactly for the ok, stale and incompatible states")
+    if (t["baseline_sha256"] is None) != (t["state"] == "missing"):
+        _fail("/ratchet/baseline_sha256", "a file digest is absent exactly for a missing baseline")
+    if t["state"] != "ok" and (t["comparisons"] or t["sources_added"] or t["sources_removed"]):
+        _fail("/ratchet/comparisons", "only a usable baseline is compared")
+    if t["state"] == "ok" and not t["comparisons"]:
+        _fail("/ratchet/comparisons", "a usable baseline is compared on every metric")
+    if t["state"] == "stale" and b["commit"] is None:
+        _fail("/ratchet/state", "only a baseline made at a commit can be stale")
 
 
 def _check_provenance(v: dict) -> None:
@@ -357,6 +403,10 @@ def _check_report(o: dict) -> None:
     _check_provenance(o["provenance"])
     if o["changes"] is not None:
         _check_changes(o["changes"])
+    if o["ratchet"] is not None:
+        _check_ratchet(o["ratchet"])
+    if (o["ratchet"] is None) != (o["resolved_configuration"]["coverage"]["ratchet"] is None):
+        _fail("/ratchet", "a ratchet record is present exactly when a ratchet policy is configured")
     if (o["changes"] is None) != (o["resolved_configuration"]["coverage"]["diff"] is None):
         _fail("/changes", "a changed-region capture is present exactly when a diff policy is configured")
     _check_configuration(o["resolved_configuration"], "/resolved_configuration")

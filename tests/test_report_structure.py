@@ -43,7 +43,7 @@ _spec.loader.exec_module(build)
 
 NAMES = ("empty", "passing", "all-kinds", "bounds")
 TOP = ["branches", "capabilities", "changes", "complete", "contexts", "contracts", "entities", "evidence_eligibility", "exclusions", "inputs", "lines",
-       "maps", "points", "policy", "provenance", "regions", "resolved_configuration", "saturation", "schema", "sources", "summary", "tool",
+       "maps", "points", "policy", "provenance", "ratchet", "regions", "resolved_configuration", "saturation", "schema", "sources", "summary", "tool",
        "version"]
 U64 = 2**64 - 1
 
@@ -73,7 +73,7 @@ class FixtureTest(unittest.TestCase):
                 obj = decode_report_structure(data)
                 self.assertEqual(encode(obj), data)
                 self.assertEqual(sorted(obj), TOP)
-                self.assertEqual(len(TOP), 23)
+                self.assertEqual(len(TOP), 24)
                 self.assertEqual(sorted(obj["resolved_configuration"]), ["coverage", "report", "schema", "version"])
                 self.assertEqual(len(obj["provenance"]), 13)
 
@@ -287,7 +287,7 @@ class BytesTest(unittest.TestCase):
         with mock.patch.dict(MAP_CEILINGS, {"standard": len(good) - 1, "large": len(good)}):
             self.assert_rejected(good, "COV6001")
             self.assert_rejected(b"x" * len(good), "COV6001")
-            self.assertEqual(len(decode_report_structure(good, tier="large")), 23)
+            self.assertEqual(len(decode_report_structure(good, tier="large")), 24)
 
 
 class RatioTest(unittest.TestCase):

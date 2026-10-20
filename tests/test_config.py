@@ -50,7 +50,7 @@ SPEC_CLI_ONLY = {
     "--output": {"merge", "report"},
     "--format": {"report"},
     "--quiet": {"run", "merge", "report", "check", "clean", "doctor"},
-    "--color": {"run", "merge", "report", "check", "doctor"},
+    "--color": {"run", "merge", "report", "check", "baseline", "doctor"},
     "--diagnostic-format": set(C.COMMANDS),
     "--json": {"doctor", "version"},
     "--toolchain-root": {"doctor"},

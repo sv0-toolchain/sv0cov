@@ -3,7 +3,8 @@
 """No-replace publication of output artifacts (CV-226; SPEC 20.2.2, 20.2.3;
 COV-SEC-007, BL-034).
 
-sv0cov never overwrites. An artifact is written to an unpredictable sibling
+sv0cov never overwrites, with one explicit exception: :func:`replace_file`,
+which only the ratchet-baseline update uses. An artifact is written to an unpredictable sibling
 temporary, synchronized, read back and validated, and then committed to its
 absent final name by one atomic operation that cannot replace anything. A
 check for an existing destination is made first, to fail early and say why,
@@ -330,6 +331,39 @@ def publish_file(final: str, data: bytes, *, anchor: str | None = None, validate
             if isinstance(exc, Exception):
                 raise _failure(exc, name) from None
             raise  # an interrupt: the temporary is gone, the destination untouched
+        _sync_dir(parent)
+    finally:
+        os.close(parent)
+
+
+def replace_file(final: str, data: bytes, *, anchor: str | None = None, validate: Validator | None = None) -> None:
+    """The one publication that may replace: a ratchet baseline, which an
+    explicit command updates (CV-313; SPEC 22.4). ``data`` is written,
+    synchronized, read back and validated in a sibling temporary exactly as
+    for :func:`publish_file`, then renamed over ``final`` in one atomic step,
+    so a reader sees the old file or the new one, never a mixture. What is
+    replaced must be a regular file: a symlink, a directory or anything else
+    there is ``unsafe`` and left alone. Raises :class:`PublishError`."""
+    parent, name = _open_parent(final, anchor)
+    temp = _temp_name()
+    try:
+        try:
+            st = os.lstat(name, dir_fd=parent)
+        except FileNotFoundError:
+            st = None
+        except OSError as exc:
+            raise PublishError("failed", f"the destination cannot be examined ({os.strerror(exc.errno)})") from None
+        if st is not None and not stat.S_ISREG(st.st_mode):
+            raise PublishError("unsafe", f"{name!r} exists and is not a regular file; it is not replaced")
+        try:
+            _write_file(parent, temp, data)
+            _read_back(parent, temp, data, validate)
+            os.rename(temp, name, src_dir_fd=parent, dst_dir_fd=parent)
+        except BaseException as exc:
+            _remove_file(parent, temp)
+            if isinstance(exc, Exception):
+                raise _failure(exc, name) from None
+            raise
         _sync_dir(parent)
     finally:
         os.close(parent)

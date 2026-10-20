@@ -10,6 +10,7 @@ runs:       1 (manifest)
 inputs:     1 accepted
 sources:    mismatch allowed
 contexts:   "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+ratchet:    incompatible baseline sha256 ffffffffffff; made at ffffffffffff
 
 Summary
 -------

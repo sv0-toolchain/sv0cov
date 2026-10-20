@@ -50,7 +50,7 @@ EXIT_REPORT = 6
 EXIT_UNSUPPORTED = 7
 EXIT_INTERNAL = 8
 
-PROJECT_COMMANDS = ("run", "merge", "report", "check", "clean")  # the ones that read sv0.toml
+PROJECT_COMMANDS = ("run", "merge", "report", "check", "baseline", "clean")  # the ones that read sv0.toml
 MANIFEST = "sv0.toml"
 FACT_BYTES = 4096
 
@@ -68,7 +68,7 @@ HANDLERS: dict[str, Handler] = {}
 
 
 def command(name: str) -> Callable[[Handler], Handler]:
-    """Register the handler of one of the seven commands."""
+    """Register the handler of one of the commands."""
     if name not in C.COMMANDS:
         raise ValueError(f"{name!r} is not an sv0cov command")
 
@@ -175,7 +175,7 @@ def main(argv: list[str] | None = None, *, stdout: TextIO | None = None, stderr:
     return status
 
 
-from sv0cov import cmd_check, cmd_clean, cmd_doctor, cmd_merge, cmd_report, cmd_run  # noqa: E402,F401 - register the command handlers
+from sv0cov import cmd_baseline, cmd_check, cmd_clean, cmd_doctor, cmd_merge, cmd_report, cmd_run  # noqa: E402,F401 - register the command handlers
 
 if __name__ == "__main__":
     sys.exit(main())

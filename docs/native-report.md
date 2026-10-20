@@ -15,7 +15,7 @@ This page covers the two closed schemas and their record-level rules
 
 | Schema | File | Top-level properties |
 |---|---|---|
-| `sv0cov.report` 1.0 | `schemas/sv0cov.report-1.0.schema.json` | 23: `branches`, `capabilities`, `changes`, `complete`, `contexts`, `contracts`, `entities`, `evidence_eligibility`, `exclusions`, `inputs`, `lines`, `maps`, `points`, `policy`, `provenance`, `regions`, `resolved_configuration`, `saturation`, `schema`, `sources`, `summary`, `tool`, `version` |
+| `sv0cov.report` 1.0 | `schemas/sv0cov.report-1.0.schema.json` | 24: `branches`, `capabilities`, `changes`, `complete`, `contexts`, `contracts`, `entities`, `evidence_eligibility`, `exclusions`, `inputs`, `lines`, `maps`, `points`, `policy`, `provenance`, `ratchet`, `regions`, `resolved_configuration`, `saturation`, `schema`, `sources`, `summary`, `tool`, `version` |
 | `sv0cov.resolved-configuration` 1.0 | `schemas/sv0cov.resolved-configuration-1.0.schema.json` | 4: `coverage`, `report`, `schema`, `version` |
 
 Both are closed: every object lists its exact properties, with no optional
@@ -73,6 +73,12 @@ The record-level rules:
   changed lines strictly increasing, an old path exactly for a rename, no
   changed line on an unchanged source, `clean` exactly when nothing is
   staged or unstaged.
+- **Ratchet.** Present exactly when a ratchet policy is configured; a
+  decoded baseline exactly for `ok`, `stale` and `incompatible`, a file
+  digest except for `missing`; comparisons for all five metrics in order
+  exactly for `ok`; sorted, logical, disjoint source lists; a stale
+  baseline names a commit. Only exclusion and ratchet evaluations count
+  `exclusion_records`.
 - **Eligibility.** `incomplete` exactly when `complete` is false; `passing`
   needs a passed policy and current sources.
 - **Resolved configuration.** An absent value is a default (or a
@@ -198,6 +204,10 @@ contexts and does not depend on whether contexts were collected.
   per line, region and branch over what meets a changed line; see
   [changed-region coverage](changed-region.md).
 
+- **Ratchets** (CV-313, SPEC 22.4). With a ratchet policy the report keeps
+  the baseline comparison as `ratchet` and has ratio, excluded-unit and
+  exclusion-record evaluations; see [ratchets](ratchets.md).
+
 ### Sources
 
 Each source's digest is compared with the bytes supplied. A file that
@@ -224,8 +234,7 @@ is not changed by it, the thresholds are still evaluated, and the report is
 
 It reports `COV5001` rather than guess:
 
-- ratchet and exclusion-cap assertions, which come with the rest of the
-  policy preview;
+- exclusion-cap assertions, which come with the rest of the policy preview;
 - two regions with the same source, span, kind and point set, which the
   report's ordering rule cannot tell apart.
 
@@ -246,7 +255,9 @@ and rejects any disagreement with `COV4002`:
 - the project evaluations from the configured thresholds, the scope,
   entity and diff evaluations from their configuration (and, for diff, the
   `changes` record, which must hold each user source once with its compiled
-  digest and needs current sources), and the integrity evaluation;
+  digest and needs current sources), the ratchet record's comparisons,
+  source changes and state, and the ratchet evaluations, and the integrity
+  evaluation;
 - for evaluations of other kinds, that the result follows from the two
   fractions and that every member exists;
 - `passed`, `complete` against the integrity findings, and eligibility.

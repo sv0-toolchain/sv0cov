@@ -38,8 +38,15 @@ source that is not the compiled bytes is ``COV4305`` with no result. One
 ``diff`` evaluation per line, region and branch counts what meets a changed
 current-side line. The reader re-derives them from ``changes``.
 
+Ratchets (CV-313; SPEC 22.4): with a ratchet policy the caller passes the
+baseline file's bytes (or none) and the Git facts that decide staleness. The
+report keeps what it compared as ``ratchet``: the baseline's counts, its
+state (``ok``, ``missing``, ``invalid``, ``incompatible``, ``stale``), the
+per-metric outcomes and the source-set change. The ratchet evaluations are
+re-derived from it.
+
 What this build cannot do yet, and refuses rather than guess (``COV5001``):
-ratchet and exclusion-cap assertions (R0.1). The reader accepts evaluations
+exclusion-cap assertions (R0.1). The reader accepts evaluations
 of those kinds when they are internally consistent, because it cannot
 re-select their members.
 
@@ -62,10 +69,12 @@ from __future__ import annotations
 
 import hashlib
 from bisect import bisect_left
+from math import gcd
 from typing import Mapping
 
 from sv0cov import capabilities, diagnostics
 from sv0cov.config_resolve import Resolved
+from sv0cov.formats.baseline import METRIC_SCHEMA, BaselineError, decode_baseline
 from sv0cov.formats.indexed import IndexedError
 from sv0cov.formats.report import METRICS, ReportError, decode_report_structure, ratio
 from sv0cov.gitignore import Matcher
@@ -84,6 +93,10 @@ STALE, SATURATED, LOSSY, OVERRIDE = "COV1004", "COV4020", "COV4021", "COV3002"
 #: A compiled source changed between the changed-region capture and publication (SPEC 22.3).
 CHANGED = "COV4305"
 DIFF_METRICS = ("branch", "line", "region")
+#: A ratchet comparison failed or could not be made (SPEC 22.4).
+RATCHET_FAILED = "COV4201"
+#: What a ratchet can find about one metric besides its verdict (SPEC 22.4).
+OUTCOMES = ("denominator_growth", "exclusion_growth", "numerator_regression")
 #: The lifecycle command failed or was ended by a signal (registry revision 2; SPEC 21.3.5).
 COMMAND_FAILED = "COV2130"
 REPORT_TIME = (STALE, SATURATED, LOSSY)
@@ -360,6 +373,171 @@ def _diff_evaluations(r: dict, detail: _Detail) -> list[dict]:
     return out
 
 
+# ── ratchets (CV-313; SPEC 22.4) ────────────────────────────────────────────
+
+
+def excluded_members(r: dict, metric: str) -> list[int]:
+    """The records of ``metric`` that an exclusion removed from its
+    denominator: excluded regions, lines, functions and runtime-checked
+    clauses, and branches with an excluded outcome."""
+    if metric == "region":
+        return [x["region_index"] for x in r["regions"] if x["classification"] == "excluded"]
+    if metric == "line":
+        return [x["line_index"] for x in r["lines"] if x["status"] == "excluded"]
+    if metric == "branch":
+        return [b["branch_index"] for b in r["branches"] if any(o["status"] == "excluded" for o in b["outcomes"])]
+    if metric == "function":
+        entry = {p["entity_index"]: p for p in r["points"] if p["kind"] == "function_entry"}
+        return [e["entity_index"] for e in r["entities"]
+                if e["kind"] == "function" and entry.get(e["entity_index"], {}).get("classification") == "excluded"]
+    off = {i for x in r["exclusions"] for i in x["affected"]["clause_indices"]}
+    return [c["clause_index"] for c in r["contracts"] if c["enforcement"] == "runtime_checked" and c["clause_index"] in off]
+
+
+def excluded_units(r: dict, metric: str) -> int:
+    """How many units of ``metric`` exclusions removed (a branch counts its excluded outcomes)."""
+    if metric == "branch":
+        return sum(o["status"] == "excluded" for b in r["branches"] for o in b["outcomes"])
+    return len(excluded_members(r, metric))
+
+
+def baseline_body(r: dict, *, commit: str | None) -> dict:
+    """The ``sv0cov.baseline`` 1.0 content of a report, without its pin
+    (:func:`sv0cov.formats.baseline.encode_baseline` adds it)."""
+    return {
+        "commit": commit,
+        "exclusion_records": len(r["exclusions"]),
+        "metric_schema": METRIC_SCHEMA,
+        "metrics": {m: {"covered": r["summary"][m]["covered"], "excluded": excluded_units(r, m), "total": r["summary"][m]["total"]}
+                    for m in METRICS},
+        "saturation_policy": r["saturation"]["policy"],
+        "schema": "sv0cov.baseline",
+        "sources": sorted(({"digest": s["digest"], "path": s["path"]} for s in r["sources"]), key=lambda s: s["path"].encode()),
+        "tool": {"name": "sv0cov", "version": r["tool"]["version"]},
+        "version": "1.0",
+    }
+
+
+def _ratchet_derived(r: dict, rec: dict) -> dict:
+    """The comparisons and the source-set difference a ratchet record holds
+    when its baseline is usable, and nothing otherwise."""
+    if rec["state"] != "ok":
+        return {"comparisons": [], "sources_added": [], "sources_removed": []}
+    b = rec["baseline"]
+    now = {s["path"] for s in r["sources"]}
+    comparisons = []
+    for m in METRICS:
+        old, cur = b["metrics"][m], r["summary"][m]
+        found = []
+        if cur["total"] > old["total"]:
+            found.append("denominator_growth")
+        if excluded_units(r, m) > old["excluded"]:
+            found.append("exclusion_growth")
+        if cur["covered"] < old["covered"]:
+            found.append("numerator_regression")
+        comparisons.append({"metric": m, "outcomes": found})
+    key = lambda p: p.encode()  # noqa: E731
+    return {"comparisons": comparisons, "sources_added": sorted(now - set(b["sources"]), key=key),
+            "sources_removed": sorted(set(b["sources"]) - now, key=key)}
+
+
+def ratchet_state(r: dict, baseline: dict | None, ancestor: bool | None) -> str:
+    """``incompatible`` for another metric schema or saturation policy,
+    ``stale`` for a baseline made at a commit that is not ``HEAD`` or one
+    of its ancestors, else ``ok`` (SPEC 14.2.1, 22.4)."""
+    if baseline["metric_schema"] != METRIC_SCHEMA or baseline["saturation_policy"] != r["saturation"]["policy"]:
+        return "incompatible"
+    if baseline["commit"] is not None and not ancestor:
+        return "stale"
+    return "ok"
+
+
+def ratchet_record(r: dict, data: bytes | None, *, head: str | None, ancestor: bool | None, tier: str = "standard") -> dict:
+    """The report's ``ratchet`` member from the baseline file's bytes
+    (``None``: there is none), ``HEAD`` now, and whether the baseline's
+    commit is ``HEAD`` or an ancestor of it."""
+    rec = {"baseline": None, "baseline_sha256": None if data is None else hashlib.sha256(data).hexdigest(), "head": head,
+           "state": "missing" if data is None else "invalid"}
+    if data is not None:
+        try:
+            b = decode_baseline(data, tier=tier)
+        except BaselineError:
+            b = None
+        if b is not None:
+            rec["baseline"] = {"commit": b["commit"], "exclusion_records": b["exclusion_records"], "metric_schema": b["metric_schema"],
+                               "metrics": b["metrics"], "saturation_policy": b["saturation_policy"],
+                               "sources": [s["path"] for s in b["sources"]], "tool_version": b["tool"]["version"]}
+            rec["state"] = ratchet_state(r, rec["baseline"], ancestor)
+    return {**rec, **_ratchet_derived(r, rec)}
+
+
+def _fraction(numerator: int, denominator: int) -> dict:
+    g = gcd(numerator, denominator) or 1
+    return {"denominator": denominator // g, "numerator": numerator // g}
+
+
+def ratchet_limit(old: dict, tolerance: int) -> dict:
+    """The least ratio that does not regress: the baseline's less the
+    tolerance in basis points, never below zero (an empty baseline: 0/1)."""
+    if old["total"] == 0:
+        return {"denominator": 1, "numerator": 0}
+    return _fraction(max(0, old["covered"] * 10000 - tolerance * old["total"]), old["total"] * 10000)
+
+
+def _ratchet_evaluations(r: dict, detail: _Detail) -> list[dict]:
+    """Per configured metric, the ratio (``at_least`` the baseline's less
+    the tolerance) and the excluded units (``at_most`` the baseline's), and
+    the exclusion-record count (``at_most``). A changed source set makes the
+    ratios ineligible; a missing, invalid, incompatible or stale baseline
+    makes every comparison ineligible (SPEC 22.4)."""
+    rec = r["ratchet"]
+    if rec is None:
+        return []
+    cfg = r["resolved_configuration"]["coverage"]["ratchet"]
+    metrics, tolerance = cfg["metrics"]["value"], cfg["tolerance_basis_points"]["value"]
+    sat, empty = r["saturation"], r["resolved_configuration"]["coverage"]["empty"]["value"]
+    contract_points = {p["point_id"] for p in r["points"] if p["kind"] in ("contract_true", "contract_false")}
+    out = []
+    for m in metrics:
+        cur = r["summary"][m]
+        actual = None if cur["total"] == 0 else {"denominator": cur["total"], "numerator": cur["covered"]}
+        members = {MEMBER_KEY[m]: detail.members(m)}
+        excluded = {MEMBER_KEY[m]: excluded_members(r, m)}
+        if rec["state"] != "ok":
+            out.append(_evaluation("ratchet", "ratchet", m, "none", "ineligible", actual=actual, codes=[RATCHET_FAILED], members=members))
+            continue
+        old = rec["baseline"]["metrics"][m]
+        base = dict(limit=ratchet_limit(old, tolerance), source="ratchet", members=members)
+        if sat["any"] and (sat["policy"] == "fail" or (m == "contract" and contract_points & set(sat["affected_point_ids"]))):
+            out.append(_evaluation("ratchet", "ratchet", m, "at_least", "ineligible", codes=[SATURATED], **base))
+        elif rec["sources_added"] or rec["sources_removed"]:
+            out.append(_evaluation("ratchet", "ratchet", m, "at_least", "ineligible", actual=actual, codes=[RATCHET_FAILED], **base))
+        elif actual is None:
+            passes = empty == "pass"
+            out.append(_evaluation("ratchet", "ratchet", m, "at_least", "pass" if passes else "fail",
+                                   codes=[] if passes else ["COV4102"], **base))
+        else:
+            passes = _holds("at_least", actual, base["limit"])
+            out.append(_evaluation("ratchet", "ratchet", m, "at_least", "pass" if passes else "fail", actual=actual,
+                                   codes=[] if passes else [RATCHET_FAILED], **base))
+        units = excluded_units(r, m)
+        grew = units > old["excluded"]
+        out.append(_evaluation("ratchet", "ratchet", m, "at_most", "fail" if grew else "pass", actual={"denominator": 1, "numerator": units},
+                               limit={"denominator": 1, "numerator": old["excluded"]}, source="ratchet",
+                               codes=[RATCHET_FAILED] if grew else [], members=excluded))
+    records = len(r["exclusions"])
+    if rec["state"] != "ok":
+        out.append(_evaluation("ratchet", "ratchet", "exclusion_records", "none", "ineligible",
+                               actual={"denominator": 1, "numerator": records}, codes=[RATCHET_FAILED]))
+    else:
+        old = rec["baseline"]["exclusion_records"]
+        grew = records > old
+        out.append(_evaluation("ratchet", "ratchet", "exclusion_records", "at_most", "fail" if grew else "pass",
+                               actual={"denominator": 1, "numerator": records}, limit={"denominator": 1, "numerator": old},
+                               source="ratchet", codes=[RATCHET_FAILED] if grew else []))
+    return out
+
+
 def _project_evaluations(r: dict, detail: _Detail) -> list[dict]:
     """One evaluation per configured project threshold (SPEC 22.1, 11.6)."""
     cov = r["resolved_configuration"]["coverage"]
@@ -437,7 +615,7 @@ def _ineligible_uses(r: dict, standard_export: bool) -> list[str]:
 
 
 def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes | None], *, standard_export: bool = False,
-                 tool_version: str | None = None, changes: dict | None = None) -> dict:
+                 tool_version: str | None = None, changes: dict | None = None, ratchet: dict | None = None) -> dict:
     """The ``sv0cov.report`` 1.0 object for canonical indexed bytes.
 
     ``sources`` gives the current bytes of each source path of the evidence
@@ -445,14 +623,17 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     says the report accompanies an LCOV or Cobertura export. ``changes``
     is the changed-region capture of the user sources
     (:meth:`sv0cov.gitdiff.Capture.record`), required exactly when a diff
-    policy is configured. Raises
+    policy is configured. ``ratchet`` is what a ratchet policy compares
+    with: ``{"data": <baseline bytes or None>, "head": <commit or None>,
+    "ancestor": <bool or None>}``, required exactly when one is configured.
+    Raises
     :class:`ReportError`, or ``IndexedError`` for invalid evidence."""
     tier = config.tier().name
     ix = _ix.read_indexed(indexed, tier=tier)
     sem = ix["semantic"]
     cov = config.coverage
-    if cov["ratchet"] is not None:
-        raise ReportError("COV5001", "this build of sv0cov cannot evaluate a [tool.sv0cov.ratchet] assertion yet")
+    if (cov["ratchet"] is None) != (ratchet is None):
+        raise ValueError("a ratchet input is given exactly when a ratchet policy is configured")
     if (cov["diff"] is None) != (changes is None):
         raise ValueError("a changed-region capture is given exactly when a diff policy is configured")
     if any(leaf.value not in (None, []) for leaf in cov["exclusions"].values()):
@@ -524,12 +705,14 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     r["summary"] = detail.group()
     r["sources"] = [{**s, "summary": detail.group(lambda rec, n=s["source_index"]: rec["source_index"] == n)} for s in report_sources]
     r["entities"] = [{**e, "summary": detail.entity(e)} for e in sem["entities"]]
+    r["ratchet"] = None if ratchet is None else ratchet_record(r, ratchet["data"], head=ratchet["head"], ancestor=ratchet["ancestor"],
+                                                                tier=tier)
 
     evidence = set(ix["diagnostics"]) | set(sem["diagnostics"])
     if not sem["complete"] and not evidence:
         evidence.add(OVERRIDE)  # incomplete only because rejected inputs were allowed: the reason must still be named
     evaluations = sorted([_integrity(r, evidence), *_project_evaluations(r, detail), *_assertion_evaluations(r, detail),
-                          *_diff_evaluations(r, detail)],
+                          *_diff_evaluations(r, detail), *_ratchet_evaluations(r, detail)],
                          key=_evaluation_key)
     r["policy"] = {"evaluations": evaluations, "passed": all(e["result"] in ("pass", "not_applicable") for e in evaluations)}
     r["evidence_eligibility"] = _eligibility(r)
@@ -660,6 +843,23 @@ def _cross_validate(r: dict, registry: diagnostics.Registry | None) -> None:
         if [c["source_index"] for c in r["changes"]["sources"]] != sorted(users) or \
                 any(c["sha256"] != users[c["source_index"]]["digest"] for c in r["changes"]["sources"]):
             _mismatch("changes/sources", "the capture holds each user source once, with the digest it was compiled from")
+    rt = r["ratchet"]
+    if (rt is None) != (r["resolved_configuration"]["coverage"]["ratchet"] is None):
+        _mismatch("ratchet", "a ratchet record is present exactly when a ratchet policy is configured")
+    if rt is not None:
+        if (rt["baseline"] is None) != (rt["state"] in ("missing", "invalid")) or (rt["baseline_sha256"] is None) != (rt["state"] == "missing"):
+            _mismatch("ratchet/state", "missing has no file, invalid no usable baseline, and every other state a decoded baseline")
+        if rt["baseline"] is not None:
+            want = ratchet_state(r, rt["baseline"], rt["state"] == "ok")
+            if want == "incompatible" or rt["state"] == "incompatible":
+                if want != rt["state"]:
+                    _mismatch("ratchet/state", "incompatible exactly for another metric schema or saturation policy")
+            elif rt["state"] == "stale" and rt["baseline"]["commit"] is None:
+                _mismatch("ratchet/state", "only a baseline made at a commit can be stale")
+        if {k: rt[k] for k in ("comparisons", "sources_added", "sources_removed")} != _ratchet_derived(r, rt):
+            _mismatch("ratchet", "the comparisons and source changes are not what the baseline and the report give")
+    if [e for e in evaluations if e["assertion_kind"] == "ratchet"] != sorted(_ratchet_evaluations(r, detail), key=_evaluation_key):
+        _mismatch("policy/evaluations", "the ratchet evaluations are not what the baseline, its configuration and the detail give")
     if [e for e in evaluations if e["assertion_kind"] == "diff"] != _diff_evaluations(r, detail):
         _mismatch("policy/evaluations", "the changed-region evaluations are not what the capture, its thresholds and the detail give")
     now = _report_time_codes(r)

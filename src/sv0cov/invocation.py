@@ -36,6 +36,7 @@ OPERANDS = {
     "merge": (1, None, "raw profile, map, or directory"),
     "report": (1, 1, "indexed profile"),
     "check": (1, 1, "indexed profile or native report"),
+    "baseline": (1, 1, "indexed profile"),
     "clean": (0, 0, ""),
     "doctor": (0, 0, ""),
     "version": (0, 0, ""),

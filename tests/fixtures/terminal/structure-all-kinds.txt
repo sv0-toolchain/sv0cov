@@ -11,6 +11,7 @@ inputs:     3 accepted, 1 incomplete, 1 rejected
 sources:    mismatch allowed
 contexts:   (default), "", "shard é"
 changes:    since bbbbbbbbbbbb (merge base of "merge-base:origin/main" and HEAD aaaaaaaaaaaa); 3 changed lines in 1 source; dirty, not reproducible from HEAD alone
+ratchet:    baseline sha256 3499fbbb9bee; made at dddddddddddd; sources 1 added, 0 removed; line denominator growth, line exclusion growth
 
 Summary
 -------

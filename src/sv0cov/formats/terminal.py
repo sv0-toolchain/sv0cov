@@ -107,6 +107,28 @@ def change_line(c: dict) -> str:
             f"{_plural(lines, 'changed line')} in {_plural(files, 'source')}; {state}")
 
 
+RATCHET_STATE = {"ok": "baseline", "missing": "no baseline", "invalid": "invalid baseline", "incompatible": "incompatible baseline",
+                 "stale": "stale baseline (its commit is not HEAD or an ancestor)"}
+
+
+def ratchet_line(t: dict) -> str:
+    """The ratchet's baseline in one line (SPEC 22.4): its state and digest,
+    the commit it was made at, the source-set change, and every metric
+    outcome."""
+    parts = [RATCHET_STATE[t["state"]]]
+    if t["baseline_sha256"] is not None:
+        parts[0] += f" sha256 {t['baseline_sha256'][:12]}"
+    b = t["baseline"]
+    if b is not None:
+        parts.append("made outside Git" if b["commit"] is None else f"made at {b['commit'][:12]}")
+    if t["sources_added"] or t["sources_removed"]:
+        parts.append(f"sources {len(t['sources_added'])} added, {len(t['sources_removed'])} removed")
+    found = [f"{c['metric']} {o.replace('_', ' ')}" for c in t["comparisons"] for o in c["outcomes"]]
+    if found:
+        parts.append(", ".join(found))
+    return "; ".join(parts)
+
+
 class _View:
     def __init__(self, report: dict, color: bool) -> None:
         self.r = report
@@ -178,6 +200,8 @@ class _View:
         ]
         if r["changes"] is not None:
             rows.append(["changes:", change_line(r["changes"])])
+        if r["ratchet"] is not None:
+            rows.append(["ratchet:", ratchet_line(r["ratchet"])])
         width = max(len(row[0]) for row in rows)
         for label, value in rows:
             if label in ("evidence:", "policy:"):

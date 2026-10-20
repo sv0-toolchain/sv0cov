@@ -96,7 +96,7 @@ def configuration(options=(), toml: str = "") -> dict:
 
 def from_indexed(doc: dict, *, eligibility: str, evaluations: list[dict], passed: bool, config: dict, summary: dict,
                  source_extra: list[dict], entity_summaries: list[dict], accuracy: str = "current", line_indices=None,
-                 tool_version: str = "0.1.0", changes: dict | None = None) -> dict:
+                 tool_version: str = "0.1.0", changes: dict | None = None, ratchet: dict | None = None) -> dict:
     """A report over an indexed structure fixture: the shared records as they
     are, plus what only a report has."""
     sem = doc["semantic"]
@@ -133,6 +133,7 @@ def from_indexed(doc: dict, *, eligibility: str, evaluations: list[dict], passed
             "semantic_projection_sha256": doc["semantic_projection_sha256"],
             "source_accuracy": accuracy,
         },
+        "ratchet": ratchet,
         "regions": [{**r, "point_ids": sorted({t["point_id"] for t in r["counter_expression"]["terms"]})} for r in sem["regions"]],
         "resolved_configuration": config,
         "saturation": sem["saturation"],
@@ -317,8 +318,23 @@ def all_kinds() -> dict:
         config=configuration([("--allow-lossy-saturated-export", None), ("--no-context", None), ("--threshold-branch", "75")], ALL_KINDS_TOML),
         source_extra=[{"observed_digest": d("src app, edited"), "source_state": "mismatch", "summary": big},
                       {"observed_digest": None, "source_state": "unavailable", "summary": dep}],
-        evaluations=evaluations, line_indices={0: [0], 1: [1, 2]}, changes=CHANGES)
+        evaluations=evaluations, line_indices={0: [0], 1: [1, 2]}, changes=CHANGES, ratchet=RATCHET)
 
+
+#: A ratchet against a baseline made at a commit, with a source added and the line metric regressed.
+RATCHET = {
+    "baseline": {"commit": "d" * 40, "exclusion_records": 1,
+                 "metric_schema": "sv0cov.report 1.0",
+                 "metrics": {m: {"covered": 1, "excluded": 0, "total": 2} for m in ("branch", "contract", "function", "line", "region")},
+                 "saturation_policy": "allow-ordinary", "sources": ["src/app.sv0"], "tool_version": "0.1.0"},
+    "baseline_sha256": d("baseline file"),
+    "comparisons": [{"metric": m, "outcomes": ["denominator_growth", "exclusion_growth"] if m == "line" else []}
+                    for m in ("branch", "contract", "function", "line", "region")],
+    "head": "e" * 40,
+    "sources_added": ["vendor/dep/hot.sv0"],
+    "sources_removed": [],
+    "state": "ok",
+}
 
 #: A dirty changed-region capture: the app source renamed and edited, staged and unstaged.
 CHANGES = {
@@ -350,6 +366,11 @@ def bounds() -> dict:
         doc, eligibility="incomplete", passed=False, summary=summary, entity_summaries=[summary], tool_version="~" * 128, config=cfg,
         source_extra=[{"observed_digest": "f" * 64, "source_state": "mismatch", "summary": summary}], accuracy="mismatch_allowed",
         line_indices={INDEX_MAX: far},
+        ratchet={"baseline": {"commit": "f" * 64, "exclusion_records": U64, "metric_schema": "~" * 64,
+                              "metrics": {m: {"covered": U64, "excluded": U64, "total": U64} for m in ("branch", "contract", "function", "line", "region")},
+                              "saturation_policy": "fail", "sources": ["d/" + "f" * 4094], "tool_version": "~" * 128},
+                 "baseline_sha256": "f" * 64, "comparisons": [], "head": "f" * 64, "sources_added": [], "sources_removed": [],
+                 "state": "incompatible"},
         evaluations=[integrity("fail", ["COV9999"]),
                      evaluation("scope", "n" * 128, "line", "at_least", "pass", actual=fraction(U64, U64), limit=fraction(U64, U64),
                                 source="assertion", branch_indices=far, clause_indices=far, entity_indices=far, line_indices=far,
@@ -432,6 +453,45 @@ def mutations() -> list[dict]:
     add("dirty with nothing staged or unstaged", A, [(f"{ch}/sources/0/staged", False), (f"{ch}/sources/0/unstaged", False)])
     add("capture sources repeated", A, [(f"{ch}/sources/-", CHANGES["sources"][0])])
     add("capture source state unknown", A, [(f"{ch}/sources/0/state", "copied")])
+
+    # The ratchet record.
+    rt = "/ratchet"
+    add("ratchet with a missing baseline", A, [(f"{rt}/state", "missing"), (f"{rt}/baseline", None), (f"{rt}/baseline_sha256", None),
+                                               (f"{rt}/comparisons", []), (f"{rt}/sources_added", [])], "valid")
+    add("ratchet with an invalid baseline", A, [(f"{rt}/state", "invalid"), (f"{rt}/baseline", None), (f"{rt}/comparisons", []),
+                                                (f"{rt}/sources_added", [])], "valid")
+    add("ratchet with a stale baseline", A, [(f"{rt}/state", "stale"), (f"{rt}/comparisons", []), (f"{rt}/sources_added", [])], "valid")
+    add("ratchet with an incompatible baseline", A, [(f"{rt}/state", "incompatible"), (f"{rt}/comparisons", []),
+                                                     (f"{rt}/sources_added", [])], "valid")
+    add("ratchet baseline made outside Git", A, [(f"{rt}/baseline/commit", None), (f"{rt}/head", None)], "valid")
+    add("ratchet removed source", A, [(f"{rt}/sources_added", []), (f"{rt}/sources_removed", ["old/gone.sv0"])], "valid")
+    add("ratchet numerator regression", A, [(f"{rt}/comparisons/0/outcomes", ["numerator_regression"])], "valid")
+    add("ratchet without a ratchet policy", P, [(rt, RATCHET)])
+    add("ratchet policy without a record", A, [(rt, None)])
+    add("ratchet state unknown", A, [(f"{rt}/state", "fresh")])
+    add("ratchet baseline missing but decoded", A, [(f"{rt}/state", "missing"), (f"{rt}/comparisons", []), (f"{rt}/sources_added", [])])
+    add("ratchet baseline invalid but decoded", A, [(f"{rt}/state", "invalid"), (f"{rt}/comparisons", []), (f"{rt}/sources_added", [])])
+    add("ratchet ok without a baseline", A, [(f"{rt}/baseline", None)])
+    add("ratchet missing with a file digest", A, [(f"{rt}/state", "missing"), (f"{rt}/baseline", None), (f"{rt}/comparisons", []),
+                                                  (f"{rt}/sources_added", [])])
+    add("ratchet compared on an unusable baseline", A, [(f"{rt}/state", "stale")])
+    add("ratchet ok without comparisons", A, [(f"{rt}/comparisons", [])])
+    add("ratchet stale without a commit", A, [(f"{rt}/state", "stale"), (f"{rt}/baseline/commit", None), (f"{rt}/comparisons", []),
+                                              (f"{rt}/sources_added", [])])
+    add("ratchet comparisons missing a metric", A, [(f"{rt}/comparisons/4",)])
+    add("ratchet comparisons reordered", A, [(f"{rt}/comparisons/0/metric", "contract"), (f"{rt}/comparisons/1/metric", "branch")])
+    add("ratchet outcomes unsorted", A, [(f"{rt}/comparisons/3/outcomes", ["exclusion_growth", "denominator_growth"])])
+    add("ratchet outcome unknown", A, [(f"{rt}/comparisons/3/outcomes", ["better"])])
+    add("ratchet head not a commit", A, [(f"{rt}/head", "g" * 40)])
+    add("ratchet baseline commit not a commit", A, [(f"{rt}/baseline/commit", "D" * 40)])
+    add("ratchet baseline digest not a digest", A, [(f"{rt}/baseline_sha256", "z" * 64)])
+    add("ratchet baseline covered over total", A, [(f"{rt}/baseline/metrics/line/covered", 3)])
+    add("ratchet metric schema with a control", A, [(f"{rt}/baseline/metric_schema", "x\ty")])
+    add("ratchet tool version with a space", A, [(f"{rt}/baseline/tool_version", "0.1 0")])
+    add("ratchet baseline sources unsorted", A, [(f"{rt}/baseline/sources", ["src/b.sv0", "src/a.sv0"])])
+    add("ratchet source path not logical", A, [(f"{rt}/sources_added", ["../up.sv0"])])
+    add("ratchet source both added and removed", A, [(f"{rt}/sources_removed", ["vendor/dep/hot.sv0"])])
+    add("ratchet exclusion records on a project evaluation", A, [(f"{ev}/9/metric", "exclusion_records")])
 
     # Top level.
     add("schema name", P, [("/schema", "sv0cov.indexed")])

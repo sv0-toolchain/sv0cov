@@ -47,8 +47,9 @@ from typing import Mapping
 
 from sv0cov.diagnostics import escape_text
 from sv0cov.formats.terminal import (COMPARISON, CONTRACT, ELIGIBILITY, MEMBERS, METRICS, RESULT, TITLE, _plural, change_line,
-                                     count_text, percent, ranges)
+                                     count_text, percent, ranges, ratchet_line)
 from sv0cov.model.context import context_view
+from sv0cov.model.report import excluded_units
 
 LINE_CODE = {"covered": "c", "partial": "p", "uncovered": "u", "non_executable": "n", "excluded": "x"}
 OUTCOME_CODE = {"covered": "c", "uncovered": "u", "excluded": "x", "statically_unreachable": "s"}
@@ -278,6 +279,7 @@ class _Page:
                f'<dt>sources</dt><dd>{esc(p["source_accuracy"].replace("_", " "))}</dd>\n',
                f'<dt>contexts</dt><dd>{esc(", ".join(_quoted(c["value"]) for c in r["contexts"]) or "none")}</dd>\n',
                "" if r["changes"] is None else f"<dt>changes</dt><dd>{esc(change_line(r['changes']))}</dd>\n",
+               "" if r["ratchet"] is None else f"<dt>ratchet</dt><dd>{esc(ratchet_line(r['ratchet']))}</dd>\n",
                "</dl>\n")
         if self.filtered:
             self.w('<p><label for="sv0cov-context">Show the counts of</label> <select id="sv0cov-context">\n',
@@ -507,6 +509,29 @@ class _Page:
                              "unstaged" if x["unstaged"] else "-", ranges(x["changed_lines"]) or "-", x["sha256"])
                     self.w("<tr>" + "".join(f"<td>{esc(v)}</td>" for v in cells) + "</tr>\n")
                 self.w("</tbody>\n</table>\n")
+        t = r["ratchet"]
+        if t is not None and t["baseline"] is not None:
+            b = t["baseline"]
+            self.w('<h3>Ratchet baseline</h3>\n<dl class="kv">\n',
+                   f'<dt>file sha256</dt><dd class="hash">{esc(t["baseline_sha256"])}</dd>\n',
+                   f'<dt>made at</dt><dd class="hash">{esc(b["commit"] or "outside Git")}</dd>\n',
+                   f'<dt>HEAD now</dt><dd class="hash">{esc(t["head"] or "outside Git")}</dd>\n',
+                   f"<dt>made by</dt><dd>sv0cov {esc(b['tool_version'])} ({esc(b['metric_schema'])}, "
+                   f"saturation {esc(b['saturation_policy'])})</dd>\n</dl>\n")
+            heads = ("metric", "baseline covered/total", "baseline excluded", "now covered/total", "now excluded", "outcomes")
+            self.w("<table>\n<thead><tr>" + "".join(f'<th scope="col">{h}</th>' for h in heads) + "</tr></thead>\n<tbody>\n")
+            outcomes = {c["metric"]: c["outcomes"] for c in t["comparisons"]}
+            for m in sorted(b["metrics"]):
+                old, now = b["metrics"][m], r["summary"][m]
+                cells = (m, f"{old['covered']}/{old['total']}", str(old["excluded"]), f"{now['covered']}/{now['total']}",
+                         str(excluded_units(r, m)),
+                         "-" if m not in outcomes else ", ".join(o.replace("_", " ") for o in outcomes[m]) or "none")
+                self.w("<tr>" + "".join(f"<td>{esc(v)}</td>" for v in cells) + "</tr>\n")
+            self.w("</tbody>\n</table>\n")
+            for label, paths in (("Sources added since the baseline", t["sources_added"]),
+                                 ("Sources removed since the baseline", t["sources_removed"])):
+                if paths:
+                    self.w(f"<h4>{label}</h4>\n<ul>\n" + "".join(f"<li>{esc(_quoted(x))}</li>\n" for x in paths) + "</ul>\n")
         self.w("<h3>Inputs</h3>\n")
         context = {c["context_index"]: c["value"] for c in r["contexts"]}
         if r["inputs"]:

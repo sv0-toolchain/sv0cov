@@ -34,10 +34,13 @@ BASE = {
     "merge": (["merge"], ["a.sv0profraw"]),
     "report": (["report", "--format", "json"], ["cov.json"]),
     "check": (["check"], ["cov.json"]),
+    "baseline": (["baseline"], ["cov.json"]),
     "clean": (["clean"], []),
     "doctor": (["doctor"], []),
     "version": (["version"], []),
 }
+# `baseline` is a usage error without a ratchet policy to write for; the matrix gives it one.
+BASELINE_TOML = {"baseline": {"sv0.toml": b'[tool.sv0cov]\nschema = "1.0"\n[tool.sv0cov.ratchet]\nbaseline = "b.json"\nmetrics = ["line"]\n'}}
 SAMPLE = {"--color": "never", "--diagnostic-format": "json-lines", "--run-id": RUN, "--expect-run": RUN, "--format": "html",
           "--output-dir": "o", "--report": "json", "--empty": "pass", "--context": "c", "--reproducible-epoch": "1",
           "--saturation-policy": "fail", "--raw-profile-tier": "large", "--ratchet-tolerance-basis-points": "1",
@@ -129,6 +132,8 @@ class SplitTest(unittest.TestCase):
             "report with two inputs": ["report", "--format", "json", "a", "b"],
             "check with two inputs": ["check", "a", "--", "b"],
             "check without input": ["check"],
+            "baseline with two inputs": ["baseline", "a", "--", "b"],
+            "baseline without input": ["baseline"],
             "clean with an operand": ["clean", "x"],
             "doctor with an operand": ["doctor", "x"],
             "version with an operand": ["version", "x"],
@@ -230,8 +235,8 @@ class UsageMatrixTest(unittest.TestCase):
 
     def test_every_base_invocation_is_accepted_by_the_usage_checks(self) -> None:
         for command in C.COMMANDS:
-            code, _, err = run(*argv(command))
-            self.assertEqual(code, {"version": 0, "merge": 5, "check": 5, "report": 5, "clean": 0, "doctor": 0}.get(command, 7), (command, err))
+            code, _, err = run(*argv(command), files=BASELINE_TOML.get(command))
+            self.assertEqual(code, {"version": 0, "merge": 5, "check": 5, "report": 5, "baseline": 5, "clean": 0, "doctor": 0}.get(command, 7), (command, err))
 
     def test_every_option_on_every_command(self) -> None:
         accepted = refused = 0
@@ -242,7 +247,7 @@ class UsageMatrixTest(unittest.TestCase):
                 with self.subTest(command=command, option=opt.name):
                     args = argv(command, *value_args(opt.name))
                     if command in opt.commands:
-                        code, _, err = run(*args)
+                        code, _, err = run(*args, files=BASELINE_TOML.get(command))
                         # Accepted by the usage layer: any failure left is a configuration relation, never COV0001.
                         self.assertNotIn("COV0001", err, args)
                         self.assertIn(code, (0, 2, 5, 7), args)

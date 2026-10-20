@@ -59,6 +59,21 @@ def _fraction(f: dict) -> str:
     return f"{f['numerator']}/{f['denominator']}"
 
 
+def ratchet_facts(t: dict, metric: str) -> list[tuple[str, str]]:
+    """Why a ratchet evaluation did not pass: the baseline's state, the
+    source-set change and what changed in this metric (SPEC 22.4)."""
+    facts = [("baseline", t["state"])]
+    if t["sources_added"] or t["sources_removed"]:
+        def some(paths: list[str], verb: str) -> str:
+            shown = ", ".join(paths[:5]) + (", ..." if len(paths) > 5 else "")
+            return f"{len(paths)} {verb}" + (f" ({shown})" if paths else "")
+        facts.append(("sources", cli.fact_text(f"{some(t['sources_added'], 'added')}, {some(t['sources_removed'], 'removed')}")))
+    found = [o for c in t["comparisons"] if c["metric"] == metric for o in c["outcomes"]]
+    if found:
+        facts.append(("outcomes", ", ".join(found)))
+    return facts
+
+
 def evaluation_diagnostics(report: dict) -> list[Diagnostic]:
     """One diagnostic for each code of each assertion that did not pass."""
     out = []
@@ -70,6 +85,9 @@ def evaluation_diagnostics(report: dict) -> list[Diagnostic]:
             facts.append(("actual", _fraction(e["actual"])))
         if e["limit"] is not None:
             facts.append(("required", f"{COMPARISON[e['comparison']]} {_fraction(e['limit'])}"))
+        if e["assertion_kind"] == "ratchet" and report["ratchet"] is not None:
+            facts += ratchet_facts(report["ratchet"], e["metric"])
+        facts.sort(key=lambda f: f[0].encode())
         out += [Diagnostic(code, "policy", facts=tuple(facts)) for code in e["diagnostics"]]
     return out
 

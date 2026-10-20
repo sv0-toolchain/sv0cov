@@ -108,7 +108,7 @@ class RoundTripTest(unittest.TestCase):
                 report, ix = fixture_report(name)
                 data = encode(report)
                 self.assertEqual(read_report(data), report)
-                self.assertEqual(len(report), 23)
+                self.assertEqual(len(report), 24)
                 self.assertEqual((report["complete"], report["evidence_eligibility"], report["policy"]["passed"]), (True, "passing", True))
                 self.assertEqual(report["policy"]["evaluations"], [evaluation(report, "evidence", "integrity")])
                 self.assertEqual(evaluation(report, "evidence", "integrity")["result"], "pass")
@@ -318,7 +318,6 @@ class ThresholdTest(unittest.TestCase):
     def test_assertions_this_build_cannot_evaluate_are_refused(self) -> None:
         ix = simple("f0")
         cases = {
-            "ratchet": '[tool.sv0cov.ratchet]\nbaseline = "b.json"\nmetrics = ["line"]\n',
             "exclusion cap": "[tool.sv0cov.exclusions]\nmax_records = 0\n",
         }
         for label, toml in cases.items():

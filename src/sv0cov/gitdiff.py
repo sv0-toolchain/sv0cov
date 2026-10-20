@@ -370,6 +370,29 @@ def capture(base: Base, compiled: Iterable[str], *, executable: str | None = Non
     return snapshot(base, compiled, executable=executable).restrict(compiled)
 
 
+def head_commit(project: Path, *, executable: str | None = None) -> str | None:
+    """``HEAD`` of the work tree ``project`` is in, or ``None`` outside Git,
+    without Git, or before the first commit (CV-313: the commit a ratchet
+    baseline is made at)."""
+    try:
+        git = Git.find(project, executable)
+        if git.run("rev-parse", "--is-inside-work-tree", ok=(0, 128)).returncode != 0:
+            return None
+        return _commit(git, "HEAD")
+    except GitDiffError:
+        return None
+
+
+def is_ancestor(project: Path, commit: str, head: str, *, executable: str | None = None) -> bool:
+    """Whether ``commit`` is ``head`` or one of its ancestors in the
+    repository of ``project``. An object Git does not have is not."""
+    try:
+        git = Git.find(project, executable)
+        return git.run("merge-base", "--is-ancestor", "--end-of-options", commit, head, ok=(0, 1, 128)).returncode == 0
+    except GitDiffError:
+        return False
+
+
 def stale_paths(snapshot: Capture, project: Path, current: Mapping[str, bytes] | None = None) -> list[str]:
     """Compiled sources whose bytes (from ``current``, else the disk) no
     longer match the capture; a missing file counts as changed."""
