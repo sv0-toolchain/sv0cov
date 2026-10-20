@@ -15,6 +15,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Native report 1.0](native-report.md): the report and resolved-configuration schemas, how a report is produced and counted, and what the reader re-derives.
 - [Terminal report](terminal-report.md): the plain-text view of a native report, its sections, its escaping and color rules, and its goldens.
 - [HTML report](html-report.md): the self-contained, offline HTML view of a native report, its navigation, context filter and safety rules.
+- [Changed-region coverage](changed-region.md): the Git model: explicit base, merge base, the capture taken before instrumentation, changed lines, staleness, and how Git is run.
 - [Run](run.md): what `sv0cov run` builds, how the test command is started, its environment and run directory.
 - [Report](report.md): formats, the destination matrix, and the exit statuses of `sv0cov report`.
 - [Check](check.md): what `sv0cov check` evaluates, its exit statuses, and its output.
