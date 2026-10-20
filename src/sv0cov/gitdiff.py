@@ -54,6 +54,8 @@ from typing import Iterable, Mapping
 
 MISSING, UNRESOLVED, AMBIGUOUS, UNTRACKED, STALE = "COV4301", "COV4302", "COV4303", "COV4304", "COV4305"
 
+#: ``merge-base:<ref>`` is the configuration's spelling of ``--diff-base <ref>`` (SPEC 18.2, 22.3).
+PREFIX = "merge-base:"
 #: The fixed diff options (SPEC 22.3): recorded with every capture.
 DIFF_OPTIONS = ("--no-ext-diff", "--no-textconv", "--no-color", "--unified=0", "--find-renames=50%",
                 "--diff-algorithm=myers", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/")
@@ -141,10 +143,12 @@ def _commit(git: Git, spelling: str) -> str | None:
 
 
 def resolve_base(project: Path, spelling: str | None, *, executable: str | None = None) -> Base:
-    """Exactly one merge base of the explicit ``spelling`` and ``HEAD``."""
-    if spelling is None or spelling == "":
+    """Exactly one merge base of the explicit ``spelling`` and ``HEAD``.
+    ``merge-base:<ref>`` and ``<ref>`` mean the same; the spelling is kept as given."""
+    if spelling is None or spelling == "" or spelling == PREFIX:
         raise GitDiffError(MISSING, "changed-region coverage needs an explicit base: --diff-base <ref> or "
                                     "[tool.sv0cov.diff].base; none is inferred")
+    ref = spelling[len(PREFIX):] if spelling.startswith(PREFIX) else spelling
     git = Git.find(project, executable)
     if git.run("rev-parse", "--is-inside-work-tree", ok=(0, 128)).returncode != 0:
         raise GitDiffError(UNRESOLVED, f"{project} is not inside a Git working tree")
@@ -156,7 +160,7 @@ def resolve_base(project: Path, spelling: str | None, *, executable: str | None 
     head = _commit(git, "HEAD")
     if head is None:
         raise GitDiffError(UNRESOLVED, "HEAD has no commit yet (an unborn branch)")
-    reference = _commit(git, spelling)
+    reference = _commit(git, ref)
     if reference is None:
         raise GitDiffError(UNRESOLVED, f"the base {spelling!r} does not name a commit in this repository "
                                        "(nothing is fetched or guessed)")
@@ -185,19 +189,44 @@ class SourceState:
 
 @dataclass(frozen=True)
 class Capture:
-    """Everything recorded before instrumentation (SPEC 22.3)."""
+    """Everything recorded before instrumentation (SPEC 22.3).
+
+    A snapshot (:func:`snapshot`) may hold candidates that cannot take part
+    (``problems``: untracked, ignored, conflicted or binary); :meth:`restrict`
+    keeps the compiled ones and fails on any of those."""
 
     base: Base
     git: dict
     sources: tuple[SourceState, ...]
     diff: bytes = field(repr=False)
     diff_sha256: str = ""
+    patches: Mapping[str, bytes] = field(default_factory=dict, repr=False)
+    problems: Mapping[str, tuple[str, str]] = field(default_factory=dict, repr=False)
+    executable: str | None = field(default=None, repr=False)
 
     @property
     def clean(self) -> bool:
         """No compiled source has a staged or unstaged change: the result is
         reproducible from ``HEAD`` alone."""
         return not any(s.staged or s.unstaged for s in self.sources)
+
+    def restrict(self, compiled: Iterable[str]) -> "Capture":
+        """The capture of exactly the ``compiled`` sources. One that is a
+        problem, or that the snapshot did not hold (it is not tracked), fails."""
+        paths = sorted(set(compiled), key=lambda p: p.encode("utf-8"))
+        held = {s.path: s for s in self.sources}
+        unknown = [p for p in paths if p not in held and p not in self.problems]
+        problems = dict(self.problems)
+        if unknown:  # not among the candidates: ask Git why
+            problems.update(snapshot(self.base, unknown, executable=self.executable).problems)
+        for p in paths:
+            if p in problems:
+                raise GitDiffError(*problems[p])
+            if p not in held:
+                raise GitDiffError(UNTRACKED, f"the compiled source {p} is not tracked by Git, so it has no tracked diff to cover")
+        diff = b"".join(self.patches.get(p, b"") for p in paths)
+        return Capture(self.base, self.git, tuple(held[p] for p in paths), diff, hashlib.sha256(diff).hexdigest(),
+                       {p: self.patches[p] for p in paths if p in self.patches}, {}, self.executable)
 
     def record(self) -> dict:
         """The capture as plain data, in a fixed order (provenance)."""
@@ -213,12 +242,14 @@ class Capture:
         }
 
 
-def _status(git: Git, repo_paths: list[str]) -> dict[str, tuple[str, str, str | None]]:
-    """Porcelain v2 status of the compiled paths: repo path -> (X, Y, old path).
-    Untracked, ignored and conflicted entries fail."""
+def _status(git: Git, repo_paths: list[str]) -> tuple[dict[str, tuple[str, str, str | None]], dict[str, tuple[str, str]]]:
+    """Porcelain v2 status of the compiled paths: repo path -> (X, Y, old
+    path), and repo path -> the failure of an untracked, ignored or
+    conflicted entry."""
     out = git.run("status", "--porcelain=v2", "-z", "--untracked-files=all", "--ignored=matching", "--", *repo_paths).stdout
     fields = out.split(b"\0")
     states: dict[str, tuple[str, str, str | None]] = {}
+    problems: dict[str, tuple[str, str]] = {}
     i = 0
     while i < len(fields):
         f = fields[i].decode("utf-8")
@@ -227,11 +258,12 @@ def _status(git: Git, repo_paths: list[str]) -> dict[str, tuple[str, str, str | 
             continue
         kind = f[0]
         if kind in "?!":
-            raise GitDiffError(UNTRACKED, f"the compiled source {f[2:]} is {'untracked' if kind == '?' else 'ignored'} by Git, "
+            problems[f[2:]] = (UNTRACKED, f"the compiled source {f[2:]} is {'untracked' if kind == '?' else 'ignored'} by Git, "
                                           "so it has no tracked diff to cover; add and commit or stage it")
-        if kind == "u":
-            raise GitDiffError(UNRESOLVED, f"the compiled source {f.split(' ', 10)[10]} has a merge conflict")
-        if kind == "1":
+        elif kind == "u":
+            path = f.split(" ", 10)[10]
+            problems[path] = (UNRESOLVED, f"the compiled source {path} has a merge conflict")
+        elif kind == "1":
             parts = f.split(" ", 8)
             states[parts[8]] = (parts[1][0], parts[1][1], None)
         elif kind == "2":
@@ -239,7 +271,7 @@ def _status(git: Git, repo_paths: list[str]) -> dict[str, tuple[str, str, str | 
             old = fields[i].decode("utf-8")
             i += 1
             states[parts[9]] = (parts[1][0], parts[1][1], old)
-    return states
+    return states, problems
 
 
 def _name_status(git: Git, merge_base: str) -> list[tuple[str, str, str | None]]:
@@ -269,37 +301,73 @@ def changed_lines(patch: bytes) -> tuple[int, ...]:
     return tuple(sorted(lines))
 
 
-def capture(base: Base, compiled: Iterable[str], *, executable: str | None = None) -> Capture:
-    """Capture the compiled sources (logical paths, relative to the project
-    directory ``base`` was resolved in) before instrumentation."""
-    project = base.toplevel / base.prefix if base.prefix else base.toplevel
+def _project(base: Base) -> Path:
+    return base.toplevel / base.prefix if base.prefix else base.toplevel
+
+
+def tracked_sources(base: Base, suffix: str = ".sv0", *, executable: str | None = None) -> list[str]:
+    """Logical paths of the files below the project directory that Git
+    tracks (in the index) and end in ``suffix``: the candidates ``run``
+    snapshots before it knows what the build compiles."""
+    git = Git.find(base.toplevel, executable)
+    out = git.run("ls-files", "-z", "--cached", "--", base.prefix or ".").stdout.split(b"\0")
+    found = {f.decode("utf-8") for f in out if f}
+    return sorted((f[len(base.prefix):] for f in found if f.endswith(suffix)), key=lambda p: p.encode("utf-8"))
+
+
+def snapshot(base: Base, candidates: Iterable[str], *, executable: str | None = None) -> Capture:
+    """Capture the ``candidates`` (logical paths, relative to the project
+    directory ``base`` was resolved in). A candidate that is untracked,
+    ignored, conflicted or binary is held as a problem, not raised: only
+    :meth:`Capture.restrict` decides whether it matters."""
+    project = _project(base)
     # Pathspecs are relative to Git's working directory: run at the top
     # level and name repository paths.
     git = Git.find(base.toplevel, executable)
-    paths = sorted(set(compiled), key=lambda p: p.encode("utf-8"))
+    paths = sorted(set(candidates), key=lambda p: p.encode("utf-8"))
     repo = {p: base.prefix + p for p in paths}
-    states = _status(git, [repo[p] for p in paths]) if paths else {}
-    wanted = set(repo.values())
-    entries = {new: (letter, old) for letter, new, old in _name_status(git, base.merge_base) if new in wanted}
-    diff = bytearray()
-    sources = []
+    states, bad = _status(git, [repo[p] for p in paths]) if paths else ({}, {})
+    problems = {}
     for p in paths:
+        # Status names a wholly untracked or ignored directory once, as "dir/".
+        hit = repo[p] if repo[p] in bad else next((k for k in bad if k.endswith("/") and repo[p].startswith(k)), None)
+        if hit is not None:
+            code, detail = bad[hit]
+            problems[p] = (code, detail.replace(f" {hit} ", f" {repo[p]} ", 1))
+    wanted = {repo[p] for p in paths if p not in problems}
+    entries = {new: (letter, old) for letter, new, old in _name_status(git, base.merge_base) if new in wanted} if wanted else {}
+    sources, patches = [], {}
+    for p in paths:
+        if p in problems:
+            continue
         rp = repo[p]
-        data = (project / p).read_bytes()
+        try:
+            data = (project / p).read_bytes()
+        except OSError as exc:  # a tracked candidate deleted from the working tree
+            problems[p] = (STALE, f"the compiled source {p} cannot be read ({type(exc).__name__}): it changed after it was compiled")
+            continue
         letter, old = entries.get(rp, (None, None))
         patch = b""
         if letter is not None:
             spec = [rp] if old is None else [old, rp]
             patch = git.run("diff", *DIFF_OPTIONS, base.merge_base, "--", *spec).stdout
             if b"\nBinary files " in b"\n" + patch or b"GIT binary patch" in patch:
-                raise GitDiffError(UNRESOLVED, f"Git diffs the compiled source {p} as binary")
-            diff += patch
+                problems[p] = (UNRESOLVED, f"Git diffs the compiled source {p} as binary")
+                continue
+            patches[p] = patch
         x, y, _ = states.get(rp, (".", ".", None))
         state = {"A": "added", "R": "renamed", "C": "added"}.get(letter or "", "modified" if letter else "unchanged")
         sources.append(SourceState(p, rp, state, x != ".", y != ".", old if letter == "R" else None,
                                    hashlib.sha256(data).hexdigest(), changed_lines(patch)))
-    data = bytes(diff)
-    return Capture(base, git.identity(), tuple(sources), data, hashlib.sha256(data).hexdigest())
+    diff = b"".join(patches[s.path] for s in sources if s.path in patches)
+    return Capture(base, git.identity(), tuple(sources), diff, hashlib.sha256(diff).hexdigest(), patches, problems, executable)
+
+
+def capture(base: Base, compiled: Iterable[str], *, executable: str | None = None) -> Capture:
+    """Capture the compiled sources (logical paths, relative to the project
+    directory ``base`` was resolved in) before instrumentation."""
+    compiled = list(compiled)
+    return snapshot(base, compiled, executable=executable).restrict(compiled)
 
 
 def stale_paths(snapshot: Capture, project: Path, current: Mapping[str, bytes] | None = None) -> list[str]:

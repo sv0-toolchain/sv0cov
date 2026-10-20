@@ -7,8 +7,10 @@ COV-CLI-002, COV-POL-001, COV-MET-012, AC-014, AC-015)::
 
 It reads one indexed profile, compares the current source files with the
 ones the evidence was collected from, and evaluates the resolved policy:
-the integrity of the evidence and every configured project threshold. It
-writes nothing to disk.
+the integrity of the evidence, every configured threshold, scope and entity
+assertion and, with a diff policy, changed-region coverage against a Git base
+(:mod:`sv0cov.gitdiff`, captured now and bound to the evidence by source
+digest). It writes nothing to disk.
 
 The evaluation itself is the native report's (:mod:`sv0cov.evidence`), so
 ``check`` and a report of the same evidence under the same configuration
@@ -28,9 +30,13 @@ exit meaning
 1    The evidence is sound and an assertion did not pass: a threshold
      failed, a selected metric was empty, or saturation made a check
      ineligible.
-2    The configuration conflicts with the evidence (its saturation policy).
+2    The configuration conflicts with the evidence (its saturation policy),
+     or the changed-region base is missing, cannot be resolved or is
+     ambiguous (COV4301..COV4303).
 5    The evidence cannot be relied on: it cannot be read, is invalid, is
-     incomplete, or a source file is missing or changed.
+     incomplete, or a source file is missing or changed; or, with a diff
+     policy, a compiled source is not tracked by Git (COV4304) or is not
+     the bytes compiled (COV4305).
 7    The policy needs something this build cannot evaluate, or the operand
      is a native report.
 ==== ==========================================================

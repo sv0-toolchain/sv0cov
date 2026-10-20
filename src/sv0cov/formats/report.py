@@ -59,6 +59,7 @@ from sv0cov.model.logical import LogicalValueError, check_logical_string
 
 METRICS = ("branch", "contract", "function", "line", "region")
 RE_RATIO = re.compile(r"0\.[0-9]{6}|1\.000000")
+RE_COMMIT = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 RE_ASSERTION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 SINGLETONS = {"diff": "diff", "exclusion": "exclusions", "integrity": "integrity", "project": "project", "ratchet": "ratchet"}
 FILE_ONLY = ("scopes", "entities", "exclusions")
@@ -252,6 +253,39 @@ def _check_policy(p: dict) -> None:
         _fail("/policy/passed", "a failed or ineligible evaluation cannot pass")
 
 
+def _check_changes(c: dict) -> None:
+    """The changed-region capture (SPEC 22.3) as far as it decides itself."""
+    for key in ("head", "merge_base", "reference"):
+        if not RE_COMMIT.fullmatch(c["base"][key]):
+            _fail(f"/changes/base/{key}", "a Git object name is 40 or 64 lowercase hex digits")
+    if any(not 0x20 <= ord(ch) <= 0x7E for ch in c["git"]["version"]):
+        _fail("/changes/git/version", "printable ASCII")
+    try:
+        check_logical_string(c["base"]["spelling"], "spelling", min_bytes=1, max_bytes=4096)
+    except LogicalValueError as exc:
+        _fail("/changes/base/spelling", exc.detail)
+    for key in ("diff_sha256",):
+        _shared(_ix._digest, c[key], f"/changes/{key}")
+    _shared(_ix._digest, c["git"]["executable_sha256"], "/changes/git/executable_sha256")
+    _shared(_ix._sorted_unique, [s["source_index"] for s in c["sources"]], "/changes/sources")
+    for n, s in enumerate(c["sources"]):
+        w = f"/changes/sources/{n}"
+        _shared(_ix._digest, s["sha256"], f"{w}/sha256")
+        _shared(_ix._sorted_unique, s["changed_lines"], f"{w}/changed_lines")
+        for key in ("repo_path", "old_path"):
+            if s[key] is not None:
+                try:
+                    check_logical_string(s[key], key, min_bytes=1, max_bytes=4096)
+                except LogicalValueError as exc:
+                    _fail(f"{w}/{key}", exc.detail)
+        if (s["old_path"] is not None) != (s["state"] == "renamed"):
+            _fail(f"{w}/old_path", "an old path is present exactly for a renamed source")
+        if s["state"] == "unchanged" and s["changed_lines"]:
+            _fail(f"{w}/changed_lines", "an unchanged source has no changed line")
+    if c["clean"] != (not any(s["staged"] or s["unstaged"] for s in c["sources"])):
+        _fail("/changes/clean", "clean exactly when no source has a staged or unstaged change")
+
+
 def _check_provenance(v: dict) -> None:
     for key in ("indexed_diagnostic_registry_sha256", "indexed_input_sha256", "semantic_projection_sha256"):
         _shared(_ix._digest, v[key], f"/provenance/{key}")
@@ -321,6 +355,10 @@ def _check_report(o: dict) -> None:
 
     _check_policy(o["policy"])
     _check_provenance(o["provenance"])
+    if o["changes"] is not None:
+        _check_changes(o["changes"])
+    if (o["changes"] is None) != (o["resolved_configuration"]["coverage"]["diff"] is None):
+        _fail("/changes", "a changed-region capture is present exactly when a diff policy is configured")
     _check_configuration(o["resolved_configuration"], "/resolved_configuration")
 
     if (o["evidence_eligibility"] == "incomplete") != (not o["complete"]):

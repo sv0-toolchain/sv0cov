@@ -96,6 +96,17 @@ def _sgr(word: str) -> str:
     return SGR_GOOD if word in GOOD_WORDS else SGR_BAD if word in BAD_WORDS else SGR_WARN
 
 
+def change_line(c: dict) -> str:
+    """The changed-region base in one line (SPEC 22.3): the merge base, how
+    it was named, and whether ``HEAD`` alone reproduces the result."""
+    b = c["base"]
+    lines = sum(len(x["changed_lines"]) for x in c["sources"])
+    files = sum(1 for x in c["sources"] if x["changed_lines"])
+    state = "clean" if c["clean"] else "dirty, not reproducible from HEAD alone"
+    return (f"since {b['merge_base'][:12]} (merge base of {_quoted(b['spelling'])} and HEAD {b['head'][:12]}); "
+            f"{_plural(lines, 'changed line')} in {_plural(files, 'source')}; {state}")
+
+
 class _View:
     def __init__(self, report: dict, color: bool) -> None:
         self.r = report
@@ -165,6 +176,8 @@ class _View:
             ["sources:", p["source_accuracy"].replace("_", " ")],
             ["contexts:", ", ".join(self.context_name(c["context_index"]) for c in r["contexts"]) or "none"],
         ]
+        if r["changes"] is not None:
+            rows.append(["changes:", change_line(r["changes"])])
         width = max(len(row[0]) for row in rows)
         for label, value in rows:
             if label in ("evidence:", "policy:"):

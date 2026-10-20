@@ -12,6 +12,9 @@ What happens, in order:
    name) must be a plain file name; the test command must be findable; the
    selected report formats must be ones this build produces; the toolchain
    driver must exist. Nothing is created before these pass.
+   With a diff policy the changed-region base is resolved here too
+   (SPEC 22.3): no base, an unresolvable or an ambiguous one stops the run
+   with 2 before anything is built.
 2. **Run ID.** ``--run-id`` if given, else 16 bytes from the operating
    system's secure source as 32 lowercase hex. An all-zero value or an
    entropy failure aborts. Nothing in the caller's environment selects it.
@@ -19,7 +22,10 @@ What happens, in order:
    with mode ``0700``, with ``bin/``, ``maps/`` and ``profiles/`` inside. A
    run directory that already exists is a collision, also for an explicit
    run ID.
-4. **Build.** The project in the working directory is built for the
+4. **Capture and build.** With a diff policy, every ``.sv0`` file Git
+   tracks below the project is captured first: its state, digest and
+   changed lines against the base (:func:`sv0cov.gitdiff.snapshot`). Then
+   the project in the working directory is built for the
    generated-C backend with coverage instrumentation, through the toolchain
    driver this checkout belongs to::
 
@@ -49,7 +55,10 @@ What happens, in order:
 7. **Publication.** Complete evidence becomes
    ``<run>/coverage.sv0covdata.json``. The selected nonterminal reports
    become the bundle ``<run>/reports``. A selected terminal report goes to
-   stdout unless ``--quiet``.
+   stdout unless ``--quiet``. With a diff policy, a compiled user source
+   that is untracked or ignored (``COV4304``), or whose bytes differ from
+   the capture at any point up to publication (``COV4305``), stops it: no
+   report is made or published.
 8. **Check.** Every assertion that did not pass is a diagnostic, as in
    ``check``. A failed or signalled command fails the integrity evaluation
    with ``COV2130`` and the coverage policy is still evaluated and reported
@@ -77,7 +86,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Mapping
 
-from sv0cov import cli, evidence
+from sv0cov import cli, evidence, gitdiff
 from sv0cov.cmd_check import coverage_failed, evaluation_diagnostics, exit_status
 from sv0cov.cmd_merge import INDEXED_NAME, collect
 from sv0cov.cmd_report import FILENAMES, IMPLEMENTED, REPORTS_DIR
@@ -314,9 +323,11 @@ def final_status(status: int, stage: int, coverage_failed: bool, prefer_coverage
     return 128 - status if status < 0 else cli.EXIT_TEST
 
 
-def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int) -> tuple[int, bool]:
+def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int,
+           snap: gitdiff.Capture | None = None) -> tuple[int, bool]:
     """Collect, merge, report and check what the run left. Returns sv0cov's
-    own stage status and whether the coverage policy failed."""
+    own stage status and whether the coverage policy failed. ``snap`` is the
+    changed-region snapshot taken before the build."""
     console, config = ctx.console, ctx.config
     tier = config.tier()
     formats = [f for f in FILENAMES if f in config.value("reports")]
@@ -343,7 +354,13 @@ def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int
         raise _Stop(cli.EXIT_EVIDENCE, exc.code, "publication", artifact="indexed-profile", detail=exc.detail) from None
     try:
         sources: dict[str, bytes | None] = {}
-        report, encoded = report_of(ctx, result.data, sources_out=sources)
+        report, encoded = report_of(ctx, result.data, sources_out=sources, capture=snap)
+        if snap is not None:
+            # The last look before publication: the bytes are still the captured, compiled ones (SPEC 22.3).
+            stale = gitdiff.stale_paths(snap.restrict([s["path"] for s in report["sources"] if s["ownership"] == "user"]), ctx.cwd)
+            if stale:
+                raise evidence.Stop(gitdiff.STALE, "policy", f"source {stale[0]} changed during the coverage run; "
+                                                            "no changed-region result is published", cli.EXIT_EVIDENCE)
     except evidence.Stop as stop:
         console.report(stop.diagnostic)
         return stop.status, False
@@ -389,6 +406,11 @@ def cmd_run(ctx: cli.Context) -> int:
                 raise _Stop(cli.EXIT_USAGE, "COV0001", "invocation", subject="--run-id", detail="is not a run ID") from None
         else:
             run_id = new_run_id()
+        try:
+            base = evidence.diff_base(ctx)
+            snap = None if base is None else gitdiff.snapshot(base, gitdiff.tracked_sources(base))
+        except gitdiff.GitDiffError as exc:
+            raise evidence.git_stop(exc) from None
         output_dir = config.value("output_dir")
         run_dir = reserve(ctx.cwd, output_dir, run_id)
         shown = f"{output_dir}/{RUNS_DIR}/{run_id}"
@@ -400,14 +422,14 @@ def cmd_run(ctx: cli.Context) -> int:
             raise _Stop(cli.EXIT_USAGE, "COV0001", "invocation", subject="run", detail="the test command was not found or is not executable")
         console.say(f"run {run_id}: built {name}; running the test command")
         status = execute(argv, program, ctx.cwd, env, console)
-    except _Stop as stop:
+    except (_Stop, evidence.Stop) as stop:
         console.report(stop.diagnostic)
         return stop.status
     if status != 0:
         how = f"was ended by signal {-status}" if status < 0 else f"exited with status {status}"
         console.say(f"run {run_id}: the test command {how}")
     try:
-        stage, failed = finish(ctx, run_dir, shown, run_id, status)
+        stage, failed = finish(ctx, run_dir, shown, run_id, status, snap)
     except _Stop as stop:
         console.report(stop.diagnostic)
         stage, failed = stop.status, False

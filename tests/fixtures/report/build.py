@@ -96,7 +96,7 @@ def configuration(options=(), toml: str = "") -> dict:
 
 def from_indexed(doc: dict, *, eligibility: str, evaluations: list[dict], passed: bool, config: dict, summary: dict,
                  source_extra: list[dict], entity_summaries: list[dict], accuracy: str = "current", line_indices=None,
-                 tool_version: str = "0.1.0") -> dict:
+                 tool_version: str = "0.1.0", changes: dict | None = None) -> dict:
     """A report over an indexed structure fixture: the shared records as they
     are, plus what only a report has."""
     sem = doc["semantic"]
@@ -105,6 +105,7 @@ def from_indexed(doc: dict, *, eligibility: str, evaluations: list[dict], passed
     return {
         "branches": sem["branches"],
         "capabilities": list(CAPABILITIES),
+        "changes": changes,
         "complete": sem["complete"],
         "contexts": sem["contexts"],
         "contracts": sem["contracts"],
@@ -316,7 +317,20 @@ def all_kinds() -> dict:
         config=configuration([("--allow-lossy-saturated-export", None), ("--no-context", None), ("--threshold-branch", "75")], ALL_KINDS_TOML),
         source_extra=[{"observed_digest": d("src app, edited"), "source_state": "mismatch", "summary": big},
                       {"observed_digest": None, "source_state": "unavailable", "summary": dep}],
-        evaluations=evaluations, line_indices={0: [0], 1: [1, 2]})
+        evaluations=evaluations, line_indices={0: [0], 1: [1, 2]}, changes=CHANGES)
+
+
+#: A dirty changed-region capture: the app source renamed and edited, staged and unstaged.
+CHANGES = {
+    "base": {"head": "a" * 40, "merge_base": "b" * 40, "reference": "c" * 40, "spelling": "merge-base:origin/main"},
+    "clean": False,
+    "diff_options": ["--no-ext-diff", "--no-textconv", "--no-color", "--unified=0", "--find-renames=50%", "--diff-algorithm=myers",
+                     "--no-relative", "--src-prefix=a/", "--dst-prefix=b/"],
+    "diff_sha256": d("diff"),
+    "git": {"executable_sha256": d("git"), "version": "git version 2.55.0"},
+    "sources": [{"changed_lines": [2, 3, 9], "old_path": "app/old.sv0", "repo_path": "app/src/app.sv0", "sha256": d("src app"),
+                 "source_index": 0, "staged": True, "state": "renamed", "unstaged": True}],
+}
 
 
 def bounds() -> dict:
@@ -384,6 +398,40 @@ def mutations() -> list[dict]:
     add("package on a root source", P, [(f"{src}/package", "app")], "valid")
     add("large tier from the command line", P, [("/resolved_configuration/coverage/limits/raw_profile/tier", {"source": "cli", "value": "large"})],
         "valid")
+
+    # The changed-region capture.
+    ch = "/changes"
+    add("capture of a clean SHA-256 repository", A, [(f"{ch}/base/head", "e" * 64), (f"{ch}/sources/0/staged", False),
+                                                     (f"{ch}/sources/0/unstaged", False), (f"{ch}/clean", True)], "valid")
+    add("capture of an unchanged source", A, [(f"{ch}/sources/0/state", "unchanged"), (f"{ch}/sources/0/old_path", None),
+                                             (f"{ch}/sources/0/changed_lines", [])], "valid")
+    add("capture of a modified source", A, [(f"{ch}/sources/0/state", "modified"), (f"{ch}/sources/0/old_path", None)], "valid")
+    add("repo path with a line feed", A, [(f"{ch}/sources/0/repo_path", "app/src/app.sv0\n")])
+    add("old path with a line feed", A, [(f"{ch}/sources/0/old_path", "app/old\n.sv0")])
+    add("capture of an added source", A, [(f"{ch}/sources/0/state", "added"), (f"{ch}/sources/0/old_path", None)], "valid")
+    add("capture without sources", A, [(f"{ch}/sources", []), (f"{ch}/clean", True)], "valid")
+    add("capture without a diff policy", P, [(ch, CHANGES)])
+    add("diff policy without a capture", A, [(ch, None)])
+    add("commit of 39 digits", A, [(f"{ch}/base/merge_base", "b" * 39)])
+    add("commit of 41 digits", A, [(f"{ch}/base/merge_base", "b" * 41)])
+    add("commit in upper case", A, [(f"{ch}/base/reference", "C" * 40)])
+    add("commit not hex", A, [(f"{ch}/base/head", "g" * 40)])
+    add("spelling with a line feed", A, [(f"{ch}/base/spelling", "main\n")])
+    add("spelling empty", A, [(f"{ch}/base/spelling", "")])
+    add("diff options reordered", A, [(f"{ch}/diff_options/0", "--no-color"), (f"{ch}/diff_options/2", "--no-ext-diff")])
+    add("diff option missing", A, [(f"{ch}/diff_options/8",)])
+    add("diff digest not a digest", A, [(f"{ch}/diff_sha256", "x")])
+    add("git version with a control", A, [(f"{ch}/git/version", "git\tversion")])
+    add("changed lines unsorted", A, [(f"{ch}/sources/0/changed_lines", [3, 2])])
+    add("changed lines repeated", A, [(f"{ch}/sources/0/changed_lines", [2, 2])])
+    add("changed line zero", A, [(f"{ch}/sources/0/changed_lines", [0])])
+    add("old path without a rename", A, [(f"{ch}/sources/0/state", "modified")])
+    add("rename without an old path", A, [(f"{ch}/sources/0/old_path", None)])
+    add("unchanged source with changed lines", A, [(f"{ch}/sources/0/state", "unchanged"), (f"{ch}/sources/0/old_path", None)])
+    add("clean with a staged change", A, [(f"{ch}/clean", True)])
+    add("dirty with nothing staged or unstaged", A, [(f"{ch}/sources/0/staged", False), (f"{ch}/sources/0/unstaged", False)])
+    add("capture sources repeated", A, [(f"{ch}/sources/-", CHANGES["sources"][0])])
+    add("capture source state unknown", A, [(f"{ch}/sources/0/state", "copied")])
 
     # Top level.
     add("schema name", P, [("/schema", "sv0cov.indexed")])

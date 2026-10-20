@@ -31,10 +31,17 @@ and contract results, exclusions, the saturation inventory; every summary;
 provenance against inputs and maps; the project evaluations and the
 integrity evaluation; ``passed``; and the eligibility precedence.
 
+Changed-region coverage (CV-312; SPEC 22.3): with a diff policy the caller
+passes the Git capture of the user sources (:mod:`sv0cov.gitdiff`); it is
+kept as ``changes`` and bound to the evidence by source digest, and any
+source that is not the compiled bytes is ``COV4305`` with no result. One
+``diff`` evaluation per line, region and branch counts what meets a changed
+current-side line. The reader re-derives them from ``changes``.
+
 What this build cannot do yet, and refuses rather than guess (``COV5001``):
-scope, entity, diff, ratchet and exclusion assertions (R0.1). The reader
-accepts evaluations of those kinds when they are internally consistent,
-because it cannot re-select their members.
+ratchet and exclusion-cap assertions (R0.1). The reader accepts evaluations
+of those kinds when they are internally consistent, because it cannot
+re-select their members.
 
 A lifecycle command that failed or was ended by a signal makes the integrity
 evaluation fail with ``COV2130``, whatever the coverage says (SPEC 21.3.5,
@@ -54,6 +61,7 @@ does not have), ``COV5001`` something this build cannot evaluate.
 from __future__ import annotations
 
 import hashlib
+from bisect import bisect_left
 from typing import Mapping
 
 from sv0cov import capabilities, diagnostics
@@ -73,6 +81,9 @@ MEMBER_KEY = {"branch": "branch_indices", "contract": "clause_indices", "functio
               "region": "region_indices"}
 APPLICABLE = {"function": METRICS, "contract": ("contract",)}
 STALE, SATURATED, LOSSY, OVERRIDE = "COV1004", "COV4020", "COV4021", "COV3002"
+#: A compiled source changed between the changed-region capture and publication (SPEC 22.3).
+CHANGED = "COV4305"
+DIFF_METRICS = ("branch", "line", "region")
 #: The lifecycle command failed or was ended by a signal (registry revision 2; SPEC 21.3.5).
 COMMAND_FAILED = "COV2130"
 REPORT_TIME = (STALE, SATURATED, LOSSY)
@@ -298,6 +309,57 @@ def _assertion_evaluations(r: dict, detail: _Detail) -> list[dict]:
     return out
 
 
+def change_record(sources: list[dict], capture: dict) -> dict:
+    """The report's ``changes`` member from a capture record
+    (:meth:`sv0cov.gitdiff.Capture.record`) of exactly the user sources.
+    A source whose captured bytes are not the ones compiled is ``COV4305``."""
+    users = {s["path"]: s for s in sources if s["ownership"] == "user"}
+    held = {c["path"]: c for c in capture["sources"]}
+    if set(held) != set(users):
+        raise ValueError("the changed-region capture must hold exactly the user sources of the evidence")
+    out = []
+    for path, c in held.items():
+        if c["sha256"] != users[path]["digest"]:
+            raise ReportError(CHANGED, f"source {path} is not what was compiled: it changed between the changed-region capture "
+                                       "and the build")
+        out.append({"changed_lines": c["changed_lines"], "old_path": c["old_path"], "repo_path": c["repo_path"], "sha256": c["sha256"],
+                    "source_index": users[path]["source_index"], "staged": c["staged"], "state": c["state"], "unstaged": c["unstaged"]})
+    return {"base": dict(capture["base"]), "clean": capture["clean"], "diff_options": list(capture["diff_options"]),
+            "diff_sha256": capture["diff_sha256"], "git": dict(capture["git"]), "sources": sorted(out, key=lambda c: c["source_index"])}
+
+
+def _diff_evaluations(r: dict, detail: _Detail) -> list[dict]:
+    """The changed-region assertion (SPEC 22.3): a region or a branch is
+    changed when its span meets a changed current-side line, a line when it
+    is one. Deleted lines have no current line and never count. Each metric
+    is its own evaluation; one without a diff threshold reports its fraction
+    and checks nothing. No project threshold is inherited."""
+    if r["changes"] is None:
+        return []
+    diff = r["resolved_configuration"]["coverage"]["diff"]
+    changed = {c["source_index"]: c["changed_lines"] for c in r["changes"]["sources"] if c["changed_lines"]}
+    sets = {i: set(v) for i, v in changed.items()}
+
+    def meets(rec: dict) -> bool:
+        lines = changed.get(rec["source_index"])
+        if not lines:
+            return False
+        i = bisect_left(lines, rec["span"]["start_line"])
+        return i < len(lines) and lines[i] <= rec["span"]["end_line"]
+
+    def on(rec: dict) -> bool:
+        return rec["line"] in sets.get(rec["source_index"], ())
+
+    keep = {"branch": meets, "line": on, "region": meets}
+    measured = {"branch": detail._branches(meets), "line": detail._lines(on), "region": detail._regions(meets)}
+    out = []
+    for metric in DIFF_METRICS:
+        limit = diff[metric]["value"]
+        members = {"source_indices": sorted(changed), MEMBER_KEY[metric]: detail.members(metric, keep[metric])}
+        out.append(_threshold_evaluation(r, "diff", "diff", metric, measured[metric], limit, None if limit is None else "diff", members))
+    return out
+
+
 def _project_evaluations(r: dict, detail: _Detail) -> list[dict]:
     """One evaluation per configured project threshold (SPEC 22.1, 11.6)."""
     cov = r["resolved_configuration"]["coverage"]
@@ -375,20 +437,24 @@ def _ineligible_uses(r: dict, standard_export: bool) -> list[str]:
 
 
 def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes | None], *, standard_export: bool = False,
-                 tool_version: str | None = None) -> dict:
+                 tool_version: str | None = None, changes: dict | None = None) -> dict:
     """The ``sv0cov.report`` 1.0 object for canonical indexed bytes.
 
     ``sources`` gives the current bytes of each source path of the evidence
     (``None`` or a missing key: the file is unavailable). ``standard_export``
-    says the report accompanies an LCOV or Cobertura export. Raises
+    says the report accompanies an LCOV or Cobertura export. ``changes``
+    is the changed-region capture of the user sources
+    (:meth:`sv0cov.gitdiff.Capture.record`), required exactly when a diff
+    policy is configured. Raises
     :class:`ReportError`, or ``IndexedError`` for invalid evidence."""
     tier = config.tier().name
     ix = _ix.read_indexed(indexed, tier=tier)
     sem = ix["semantic"]
     cov = config.coverage
-    for table in ("diff", "ratchet"):
-        if cov[table] is not None:
-            raise ReportError("COV5001", f"this build of sv0cov cannot evaluate a [tool.sv0cov.{table}] assertion yet")
+    if cov["ratchet"] is not None:
+        raise ReportError("COV5001", "this build of sv0cov cannot evaluate a [tool.sv0cov.ratchet] assertion yet")
+    if (cov["diff"] is None) != (changes is None):
+        raise ValueError("a changed-region capture is given exactly when a diff policy is configured")
     if any(leaf.value not in (None, []) for leaf in cov["exclusions"].values()):
         raise ReportError("COV5001", "this build of sv0cov cannot evaluate [tool.sv0cov.exclusions] caps yet")
     policy = config.value("integrity.saturation")
@@ -402,6 +468,9 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
         data = sources.get(s["path"])
         observed = None if data is None else hashlib.sha256(data).hexdigest()
         state = "unavailable" if observed is None else "current" if observed == s["digest"] else "mismatch"
+        if state != "current" and cov["diff"] is not None:
+            # No changed-region result for bytes that are not the ones compiled (SPEC 22.3, AC-049).
+            raise ReportError(CHANGED, f"source {s['path']} changed after it was compiled; no changed-region result is published")
         if state != "current" and not allow_stale:
             what = "is missing or unreadable" if state == "unavailable" else "has changed since coverage was collected"
             raise ReportError(STALE, f"source {s['path']} {what}")
@@ -412,6 +481,7 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     r: dict = {
         "branches": sem["branches"],
         "capabilities": list(CAPABILITIES),
+        "changes": None if changes is None else change_record(report_sources, changes),
         "complete": sem["complete"],
         "contexts": sem["contexts"],
         "contracts": sem["contracts"],
@@ -458,7 +528,8 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     evidence = set(ix["diagnostics"]) | set(sem["diagnostics"])
     if not sem["complete"] and not evidence:
         evidence.add(OVERRIDE)  # incomplete only because rejected inputs were allowed: the reason must still be named
-    evaluations = sorted([_integrity(r, evidence), *_project_evaluations(r, detail), *_assertion_evaluations(r, detail)],
+    evaluations = sorted([_integrity(r, evidence), *_project_evaluations(r, detail), *_assertion_evaluations(r, detail),
+                          *_diff_evaluations(r, detail)],
                          key=_evaluation_key)
     r["policy"] = {"evaluations": evaluations, "passed": all(e["result"] in ("pass", "not_applicable") for e in evaluations)}
     r["evidence_eligibility"] = _eligibility(r)
@@ -582,6 +653,15 @@ def _cross_validate(r: dict, registry: diagnostics.Registry | None) -> None:
         _mismatch("policy/evaluations", f"the configured assertions do not resolve against the report: {exc.detail}")
     if [e for e in evaluations if e["assertion_kind"] in ("entity", "scope")] != derived:
         _mismatch("policy/evaluations", "the scope and entity evaluations are not what their configuration and the detail give")
+    if r["changes"] is not None:
+        if prov["source_accuracy"] != "current":
+            _mismatch("changes", "a changed-region result is made only from current sources")
+        users = {s["source_index"]: s for s in r["sources"] if s["ownership"] == "user"}
+        if [c["source_index"] for c in r["changes"]["sources"]] != sorted(users) or \
+                any(c["sha256"] != users[c["source_index"]]["digest"] for c in r["changes"]["sources"]):
+            _mismatch("changes/sources", "the capture holds each user source once, with the digest it was compiled from")
+    if [e for e in evaluations if e["assertion_kind"] == "diff"] != _diff_evaluations(r, detail):
+        _mismatch("policy/evaluations", "the changed-region evaluations are not what the capture, its thresholds and the detail give")
     now = _report_time_codes(r)
     evidence = set(integrity["diagnostics"]) - now - {COMMAND_FAILED}
     if not now <= set(integrity["diagnostics"]) or integrity != _integrity(r, evidence):

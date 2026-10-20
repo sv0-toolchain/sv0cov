@@ -19,13 +19,22 @@ exit status of SPEC 20.3:
 - 7: the policy needs an assertion this build cannot evaluate, or the
   operand is a native report.
 
+With a diff policy (``[tool.sv0cov.diff]`` or ``--diff-base``) the Git side
+of changed-region coverage comes first (:mod:`sv0cov.gitdiff`, SPEC 22.3):
+the base is resolved and the user sources of the evidence are captured,
+unless the caller (``run``) captured them before the build. A base that is
+missing, cannot be resolved or is ambiguous (``COV4301``..``COV4303``) is a
+configuration error, 2. A compiled source that is untracked or ignored
+(``COV4304``), or that is not the bytes compiled (``COV4305``), is a
+source-integrity failure, 5. None of them produces a changed-region number.
+
 A report the reader rejects is not a :class:`Stop`: it propagates and ends
 as an internal failure.
 """
 
 from __future__ import annotations
 
-from sv0cov import cli
+from sv0cov import cli, gitdiff
 from sv0cov.cmd_merge import _read
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.formats.canonical_json import encode
@@ -38,6 +47,9 @@ from sv0cov.model.report import build_report, read_report
 #: What a refusal to evaluate means for the exit status.
 REFUSAL_EXIT = {"COV0013": cli.EXIT_USAGE, "COV5001": cli.EXIT_UNSUPPORTED}
 REFUSAL_PHASE = {"COV0013": "configuration", "COV5001": "policy"}
+#: Exit status of a changed-region failure (SPEC 20.3, 22.3).
+GIT_EXIT = {gitdiff.MISSING: cli.EXIT_USAGE, gitdiff.UNRESOLVED: cli.EXIT_USAGE, gitdiff.AMBIGUOUS: cli.EXIT_USAGE,
+            gitdiff.UNTRACKED: cli.EXIT_EVIDENCE, gitdiff.STALE: cli.EXIT_EVIDENCE}
 NATIVE_REPORT = b'"schema":"sv0cov.report"'
 
 
@@ -63,12 +75,30 @@ def load_report(ctx: cli.Context, *, standard_export: bool = False,
     return report_of(ctx, data, standard_export=standard_export, sources_out=sources_out)
 
 
+def git_stop(exc: gitdiff.GitDiffError) -> Stop:
+    """The :class:`Stop` of a changed-region failure."""
+    return Stop(exc.code, "policy", exc.detail, GIT_EXIT[exc.code])
+
+
+def diff_base(ctx: cli.Context) -> gitdiff.Base | None:
+    """The resolved changed-region base, or ``None`` without a diff policy."""
+    diff = ctx.config.coverage["diff"]
+    if diff is None:
+        return None
+    try:
+        return gitdiff.resolve_base(ctx.cwd, diff["base"].value)
+    except gitdiff.GitDiffError as exc:
+        raise git_stop(exc) from None
+
+
 def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
-              sources_out: dict[str, bytes | None] | None = None) -> tuple[dict, bytes]:
+              sources_out: dict[str, bytes | None] | None = None, capture: gitdiff.Capture | None = None) -> tuple[dict, bytes]:
     """The native report of indexed-profile bytes under the command's
     configuration, read back through the reader, and its canonical bytes.
     ``sources_out``, when given, receives the source bytes that were read
-    (``None`` for a file that could not be), for the HTML report."""
+    (``None`` for a file that could not be), for the HTML report.
+    ``capture`` is a changed-region snapshot taken before the build; without
+    one, a diff policy captures the sources now."""
     config = ctx.config
     tier = config.tier().name
     limit = map_limits(tier).max_bytes
@@ -95,8 +125,17 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
         sources[s["path"]], _ = _read(path, limit, follow=True)
     if sources_out is not None:
         sources_out.update(sources)
+    changes = None
+    if config.coverage["diff"] is not None:
+        users = [s["path"] for s in indexed["semantic"]["sources"] if s["ownership"] == "user"]
+        try:
+            if capture is None:
+                capture = gitdiff.snapshot(diff_base(ctx), users)
+            changes = capture.restrict(users).record()
+        except gitdiff.GitDiffError as exc:
+            raise git_stop(exc) from None
     try:
-        encoded = encode(build_report(data, config, sources, standard_export=standard_export))
+        encoded = encode(build_report(data, config, sources, standard_export=standard_export, changes=changes))
         return read_report(encoded, tier=tier), encoded
     except ReportError as exc:
         if exc.code in REFUSAL_EXIT:

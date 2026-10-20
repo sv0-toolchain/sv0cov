@@ -46,8 +46,8 @@ from html.parser import HTMLParser
 from typing import Mapping
 
 from sv0cov.diagnostics import escape_text
-from sv0cov.formats.terminal import (COMPARISON, CONTRACT, ELIGIBILITY, MEMBERS, METRICS, RESULT, TITLE, _plural, count_text,
-                                     percent)
+from sv0cov.formats.terminal import (COMPARISON, CONTRACT, ELIGIBILITY, MEMBERS, METRICS, RESULT, TITLE, _plural, change_line,
+                                     count_text, percent, ranges)
 from sv0cov.model.context import context_view
 
 LINE_CODE = {"covered": "c", "partial": "p", "uncovered": "u", "non_executable": "n", "excluded": "x"}
@@ -277,6 +277,7 @@ class _Page:
                f'<dt>backends</dt><dd>{esc(", ".join(p["backends"]) or "none")}</dd>\n',
                f'<dt>sources</dt><dd>{esc(p["source_accuracy"].replace("_", " "))}</dd>\n',
                f'<dt>contexts</dt><dd>{esc(", ".join(_quoted(c["value"]) for c in r["contexts"]) or "none")}</dd>\n',
+               "" if r["changes"] is None else f"<dt>changes</dt><dd>{esc(change_line(r['changes']))}</dd>\n",
                "</dl>\n")
         if self.filtered:
             self.w('<p><label for="sv0cov-context">Show the counts of</label> <select id="sv0cov-context">\n',
@@ -483,7 +484,30 @@ class _Page:
                f'<dt>maps</dt><dd class="hash">{esc(", ".join(p["map_ids"]) or "none")}</dd>\n')
         for label, value in hashes:
             self.w(f'<dt>{label} sha256</dt><dd class="hash">{esc(value or "none")}</dd>\n')
-        self.w("</dl>\n<h3>Inputs</h3>\n")
+        self.w("</dl>\n")
+        c = r["changes"]
+        if c is not None:
+            b, path = c["base"], {s["source_index"]: s["path"] for s in r["sources"]}
+            self.w('<h3>Changed-region capture</h3>\n<dl class="kv">\n',
+                   f"<dt>base</dt><dd>{esc(_quoted(b['spelling']))}</dd>\n",
+                   *(f'<dt>{label}</dt><dd class="hash">{esc(b[key])}</dd>\n'
+                     for label, key in (("reference", "reference"), ("HEAD", "head"), ("merge base", "merge_base"))),
+                   f"<dt>working tree</dt><dd>{'clean' if c['clean'] else 'dirty: not reproducible from HEAD alone'}</dd>\n",
+                   f'<dt>diff sha256</dt><dd class="hash">{esc(c["diff_sha256"])}</dd>\n',
+                   f"<dt>diff options</dt><dd>{esc(' '.join(c['diff_options']))}</dd>\n",
+                   f"<dt>git</dt><dd>{esc(c['git']['version'])}</dd>\n",
+                   f'<dt>git sha256</dt><dd class="hash">{esc(c["git"]["executable_sha256"])}</dd>\n',
+                   "</dl>\n")
+            if c["sources"]:
+                heads = ("source", "state", "index", "work tree", "changed lines", "sha256")
+                self.w("<table>\n<thead><tr>" + "".join(f'<th scope="col">{h}</th>' for h in heads) + "</tr></thead>\n<tbody>\n")
+                for x in c["sources"]:
+                    state = x["state"] if x["old_path"] is None else f"renamed from {_quoted(x['old_path'])}"
+                    cells = (_quoted(path[x["source_index"]]), state, "staged" if x["staged"] else "-",
+                             "unstaged" if x["unstaged"] else "-", ranges(x["changed_lines"]) or "-", x["sha256"])
+                    self.w("<tr>" + "".join(f"<td>{esc(v)}</td>" for v in cells) + "</tr>\n")
+                self.w("</tbody>\n</table>\n")
+        self.w("<h3>Inputs</h3>\n")
         context = {c["context_index"]: c["value"] for c in r["contexts"]}
         if r["inputs"]:
             heads = ("name", "status", "backend", "context", "run", "profile", "sha256", "diagnostics")

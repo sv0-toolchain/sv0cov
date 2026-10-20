@@ -15,7 +15,7 @@ This page covers the two closed schemas and their record-level rules
 
 | Schema | File | Top-level properties |
 |---|---|---|
-| `sv0cov.report` 1.0 | `schemas/sv0cov.report-1.0.schema.json` | 22: `branches`, `capabilities`, `complete`, `contexts`, `contracts`, `entities`, `evidence_eligibility`, `exclusions`, `inputs`, `lines`, `maps`, `points`, `policy`, `provenance`, `regions`, `resolved_configuration`, `saturation`, `schema`, `sources`, `summary`, `tool`, `version` |
+| `sv0cov.report` 1.0 | `schemas/sv0cov.report-1.0.schema.json` | 23: `branches`, `capabilities`, `changes`, `complete`, `contexts`, `contracts`, `entities`, `evidence_eligibility`, `exclusions`, `inputs`, `lines`, `maps`, `points`, `policy`, `provenance`, `regions`, `resolved_configuration`, `saturation`, `schema`, `sources`, `summary`, `tool`, `version` |
 | `sv0cov.resolved-configuration` 1.0 | `schemas/sv0cov.resolved-configuration-1.0.schema.json` | 4: `coverage`, `report`, `schema`, `version` |
 
 Both are closed: every object lists its exact properties, with no optional
@@ -68,6 +68,11 @@ The record-level rules:
 - **Provenance.** The execution status fixes which of the exit code and
   signal are null; a manifest digest is present exactly for manifest
   selection.
+- **Changes.** Present exactly when a diff policy is configured; commits
+  are 40 or 64 lowercase hex digits; sources strictly ordered by index,
+  changed lines strictly increasing, an old path exactly for a rename, no
+  changed line on an unchanged source, `clean` exactly when nothing is
+  staged or unstaged.
 - **Eligibility.** `incomplete` exactly when `complete` is false; `passing`
   needs a passed policy and current sources.
 - **Resolved configuration.** An absent value is a default (or a
@@ -188,6 +193,11 @@ contexts and does not depend on whether contexts were collected.
   branch are evaluated; a contract threshold is `ineligible` when one of its
   points saturated.
 
+- **Changed regions** (CV-312, SPEC 22.3). With a diff policy the
+  report keeps the Git capture as `changes` and has one `diff` evaluation
+  per line, region and branch over what meets a changed line; see
+  [changed-region coverage](changed-region.md).
+
 ### Sources
 
 Each source's digest is compared with the bytes supplied. A file that
@@ -214,8 +224,8 @@ is not changed by it, the thresholds are still evaluated, and the report is
 
 It reports `COV5001` rather than guess:
 
-- diff, ratchet and exclusion-cap assertions, which come with the rest of
-  the policy preview;
+- ratchet and exclusion-cap assertions, which come with the rest of the
+  policy preview;
 - two regions with the same source, span, kind and point set, which the
   report's ordering rule cannot tell apart.
 
@@ -233,8 +243,10 @@ and rejects any disagreement with `COV4002`:
 - maps, inputs and contexts against each other, and the provenance sets
   against them;
 - every summary: project, source and entity;
-- the project evaluations from the configured thresholds, and the integrity
-  evaluation;
+- the project evaluations from the configured thresholds, the scope,
+  entity and diff evaluations from their configuration (and, for diff, the
+  `changes` record, which must hold each user source once with its compiled
+  digest and needs current sources), and the integrity evaluation;
 - for evaluations of other kinds, that the result follows from the two
   fractions and that every member exists;
 - `passed`, `complete` against the integrity findings, and eligibility.

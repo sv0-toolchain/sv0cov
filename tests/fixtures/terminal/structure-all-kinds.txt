@@ -10,6 +10,7 @@ runs:       2 (explicit-list)
 inputs:     3 accepted, 1 incomplete, 1 rejected
 sources:    mismatch allowed
 contexts:   (default), "", "shard é"
+changes:    since bbbbbbbbbbbb (merge base of "merge-base:origin/main" and HEAD aaaaaaaaaaaa); 3 changed lines in 1 source; dirty, not reproducible from HEAD alone
 
 Summary
 -------

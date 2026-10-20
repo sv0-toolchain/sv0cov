@@ -14,7 +14,7 @@ SCHEMAS = {
     'sv0cov_indexed_semantic_1_0': ('sv0cov.indexed-semantic-1.0.schema.json', 'b387f30c628fd2769c4a80fc80f2d94709c2d23ba099226ee07473ec26a51f75'),
     'sv0cov_map_1_0': ('sv0cov.map-1.0.schema.json', 'b77082e414db15bee9a3b8b5fc114540e7e9e49199bb8b6f3994e46a6ec224c8'),
     'sv0cov_release_manifest_1_0': ('sv0cov.release-manifest-1.0.schema.json', 'a78bda572fea2095538191fb0a62d9c35d3fe3716be1cea5b1a8230588e6454c'),
-    'sv0cov_report_1_0': ('sv0cov.report-1.0.schema.json', 'b97cf82d2232ffff7e111129b3c31fc0a2f52dce829a2eb933b4a6430a485d5e'),
+    'sv0cov_report_1_0': ('sv0cov.report-1.0.schema.json', '1943dcd33005607dddb94bd0af9c81b5a8e15fc69871e46f07a118d4687a5bf5'),
     'sv0cov_resolved_configuration_1_0': ('sv0cov.resolved-configuration-1.0.schema.json', '4aab6d7ed16e9b02a4cacd0ff4d43692f0bfc2fde8281f531db3140ae7923cab'),
     'sv0cov_run_set_1_0': ('sv0cov.run-set-1.0.schema.json', '05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2'),
     'sv0cov_version_1_0': ('sv0cov.version-1.0.schema.json', 'bd763071b96e95f298462744e5b113aa9888455ab698a20d600f45820ce5eee5'),

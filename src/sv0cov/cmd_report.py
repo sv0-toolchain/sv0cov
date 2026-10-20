@@ -33,9 +33,11 @@ written to a file is always colorless; on stdout it follows ``--color``.
 
 **Result.** 0 when the selected formats are published, whatever the policy
 says: a report of failing or incomplete evidence is still a report, and
-says so. 2 for invalid usage or a saturation-policy conflict; 5 when the
-evidence or a source cannot be relied on (``--allow-source-mismatch`` lets
-a stale source through as diagnostic-only); 6 when the destination exists
+says so. 2 for invalid usage, a saturation-policy conflict or a
+changed-region base that cannot be used; 5 when the evidence or a source
+cannot be relied on (``--allow-source-mismatch`` lets a stale source
+through as diagnostic-only, except under a diff policy, where it is
+``COV4305``); 6 when the destination exists
 or publication fails; 7 for a format or assertion this build lacks.
 """
 

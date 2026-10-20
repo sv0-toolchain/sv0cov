@@ -83,6 +83,8 @@ for step in os.environ.get("FAKE_PROFILES", "ok").split(","):
     elif step == "cut": put(3, cut=9)
     elif step == "temp": put(4, temp=True)
     elif step == "foreign": put(5, run_id="f" * 32)
+if os.environ.get("FAKE_MUTATE"):  # a test that edits a compiled source while it runs
+    open(os.environ["FAKE_MUTATE"], "ab").write(b"// edited during the run\\n")
 if os.environ.get("FAKE_SIGNAL"):
     os.kill(os.getpid(), int(os.environ["FAKE_SIGNAL"]))
 sys.exit(int(os.environ.get("FAKE_EXIT", "0")))
