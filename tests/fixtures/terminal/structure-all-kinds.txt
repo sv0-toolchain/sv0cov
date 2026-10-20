@@ -64,8 +64,11 @@ Exclusions
 excluded: 0 functions, 1 region, 3 lines, 1 branch, 1 contract
 statically unreachable: 1 branch outcome
 #0 src/app.sv0:11:1 branch_off (comment): "generated dispatch table"
+    removes 0 functions, 0 regions, 1 line, 1 branch, 0 contracts; ran: 0 of 0 regions
 #1 src/app.sv0:13:1 off (attribute): "platform-specific arm, tested elsewhere"
+    removes 0 functions, 1 region, 2 lines, 0 branches, 0 contracts; ran: 0 of 1 region
 #2 src/app.sv0:25:1 contract_off (comment): "checked by the caller: see app::main"
+    removes 0 functions, 0 regions, 0 lines, 0 branches, 1 contract; ran: 0 of 0 regions
 
 Warnings
 --------

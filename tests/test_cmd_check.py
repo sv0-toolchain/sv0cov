@@ -251,11 +251,13 @@ class EvidenceTest(Base):
         self.project(evidence=self.saturated("fail"))
         self.assertEqual(self.check("--saturation-policy", "allow-ordinary")[0], 2)
 
-    def test_what_this_build_cannot_evaluate_is_refused(self) -> None:
+    def test_an_exclusion_cap_is_checked(self) -> None:
+        """CV-314: exclusion caps are evaluated (no longer refused); f0 has no exclusion, so a zero record cap passes."""
         self.project()
-        self.put("sv0.toml", (HEAD + '[tool.sv0cov.exclusions]\nmax_records = 0\n').encode())
+        self.put("sv0.toml", (HEAD + '[tool.sv0cov.exclusions]\nmax_records = 0\nline_basis_points = 0\n').encode())
         code, out, err = self.check()
-        self.assertEqual((code, out, self.codes(err)), (7, "", ["COV5001"]))
+        self.assertEqual((code, self.codes(err)), (0, []))
+        self.assertIn('exclusion "exclusions"', out)
 
     def test_a_scope_is_checked_and_an_unknown_source_is_a_configuration_error(self) -> None:
         """CV-310: a named scope is its own assertion; a source it names must exist."""

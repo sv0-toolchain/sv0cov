@@ -21,7 +21,8 @@ bytes of the sources, and computes no coverage fact of its own.
 - **Uncovered:** every uncovered or partial line and every line with an
   outcome not taken, in file and line order.
 - **Contracts, Exclusions, Warnings, Policy, Saturation:** as in the
-  terminal report, with exclusion reasons and contract dispositions.
+  terminal report, with exclusion reasons and contract dispositions; each
+  exclusion row also says what it removes and the evidence its code left.
 - **Provenance:** tool, runs, maps, the indexed input, semantic projection
   and run manifest digests, every input, and each source's evidence and
   observed digest.

@@ -323,10 +323,12 @@ class DetailTest(unittest.TestCase):
                     seen["contract"] |= set(a["clause_indices"])
                 got = dict(zip(seen, map(int, re.findall(r"(\d+) [a-z]+", body[0]))))
                 self.assertEqual(got, {k: len(v) for k, v in seen.items()})
-                self.assertEqual(len(body), 2 + len(report["exclusions"]))
-                for x, row in zip(report["exclusions"], body[2:]):
+                self.assertEqual(len(body), 2 + 2 * len(report["exclusions"]))  # each record, then what it removes (COV-EXC-025)
+                for x, row, audit in zip(report["exclusions"], body[2::2], body[3::2]):
                     self.assertTrue(row.startswith(f"#{x['exclusion_index']} "))
                     self.assertIn(f" {x['mode']} ({x['origin']}): \"{escape_text(x['reason'])}\"", row)
+                    self.assertTrue(audit.startswith("    removes "), audit)
+                    self.assertIn(f"{len(x['affected']['line_indices'])} line", audit)
         self.assertIn("excluded: 0 functions, 1 region, 3 lines, 1 branch, 1 contract",
                       sections(render_terminal(REPORTS["structure-all-kinds"]))["Exclusions"])
 

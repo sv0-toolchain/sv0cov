@@ -47,7 +47,7 @@ from typing import Mapping
 
 from sv0cov.diagnostics import escape_text
 from sv0cov.formats.terminal import (COMPARISON, CONTRACT, ELIGIBILITY, MEMBERS, METRICS, RESULT, TITLE, _plural, change_line,
-                                     count_text, percent, ranges, ratchet_line)
+                                     count_text, exclusion_audit, percent, ranges, ratchet_line)
 from sv0cov.model.context import context_view
 from sv0cov.model.report import excluded_units
 
@@ -398,10 +398,11 @@ class _Page:
                f"statically unreachable: {_plural(unreachable, 'branch outcome')}</p>\n")
         if records:
             self.w("<table>\n<thead><tr><th scope=\"col\">#</th><th scope=\"col\">location</th><th scope=\"col\">mode</th>"
-                   "<th scope=\"col\">origin</th><th scope=\"col\">reason</th></tr></thead>\n<tbody>\n")
+                   "<th scope=\"col\">origin</th><th scope=\"col\">reason</th><th scope=\"col\">removes and evidence</th>"
+                   "</tr></thead>\n<tbody>\n")
             for x in records:
                 self.w(f"<tr><td class=\"n\">{x['exclusion_index']}</td><td>{self.link(x)}</td><td>{x['mode']}</td>"
-                       f"<td>{x['origin']}</td><td>{esc(_quoted(x['reason']))}</td></tr>\n")
+                       f"<td>{x['origin']}</td><td>{esc(_quoted(x['reason']))}</td><td>{esc(exclusion_audit(self.r, x))}</td></tr>\n")
             self.w("</tbody>\n</table>\n")
         self.w("</section>\n")
 

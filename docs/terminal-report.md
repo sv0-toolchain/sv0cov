@@ -32,7 +32,7 @@ The sections always appear, in this order. An empty one says `(none)`.
 | Partial lines, Uncovered lines | Per file, as ranges: `3, 5-7, 9`. A range joins adjacent line numbers only. |
 | Uncovered branch outcomes | One row per branch with an outcome that was never taken: location, branch kind, the outcome names. |
 | Contracts | One row per clause: location, clause name, enforcement, runtime result, true and false counts. |
-| Exclusions | Counts of excluded functions, regions, lines, branches and contracts; statically unreachable outcomes; then every exclusion with its mode, origin and reason. |
+| Exclusions | Counts of excluded functions, regions, lines, branches and contracts; statically unreachable outcomes; then every exclusion with its mode, origin and reason, followed by what it removes, how many of its regions ran, and each excluded contract clause's outcome counts with its owner (CV-314, COV-EXC-025). |
 | Warnings | Incomplete evidence, every input that was not accepted (with its codes), every source that is stale or missing. |
 | Policy | Every assertion in report order: result word, kind and name, metric, required fraction, actual fraction, threshold source, member counts, diagnostic codes. |
 | Saturation | The resolved policy, and every count that is not exact. |

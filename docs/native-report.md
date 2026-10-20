@@ -204,6 +204,18 @@ contexts and does not depend on whether contexts were collected.
   per line, region and branch over what meets a changed line; see
   [changed-region coverage](changed-region.md).
 
+- **Exclusion policy** (CV-314, SPEC 18.2.2, 19.5; COV-POL-025). Under
+  the reserved name `exclusions`: `max_records` compares the canonical
+  record count `at_most` the cap (a record counts once, however much it
+  removes); `<metric>_basis_points` compares the units exclusions removed
+  with the metric's pre-exclusion total (what remains plus what was
+  removed) `at_most` cap/10000 by cross multiplication, its members the
+  removed units (a zero pre-exclusion total has no fraction and passes);
+  `forbidden_reasons` (exact match) and `forbidden_sources` (Section 18.3
+  patterns over the record's source) give one `exclusion_records`
+  evaluation, `equal` to no offending record, whose members are the
+  offending records' sources and what they remove. A failure is `COV4101`
+  (owner's choice: a cap is a threshold). Only configured caps appear.
 - **Ratchets** (CV-313, SPEC 22.4). With a ratchet policy the report keeps
   the baseline comparison as `ratchet` and has ratio, excluded-unit and
   exclusion-record evaluations; see [ratchets](ratchets.md).
@@ -232,11 +244,9 @@ is not changed by it, the thresholds are still evaluated, and the report is
 
 ### What this build refuses
 
-It reports `COV5001` rather than guess:
-
-- exclusion-cap assertions, which come with the rest of the policy preview;
-- two regions with the same source, span, kind and point set, which the
-  report's ordering rule cannot tell apart.
+It reports `COV5001` rather than guess for two regions with the same
+source, span, kind and point set, which the report's ordering rule cannot
+tell apart. Every policy assertion of SPEC 22 is evaluated.
 
 ## Reading a report
 

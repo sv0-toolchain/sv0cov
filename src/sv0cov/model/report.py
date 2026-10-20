@@ -45,8 +45,12 @@ state (``ok``, ``missing``, ``invalid``, ``incompatible``, ``stale``), the
 per-metric outcomes and the source-set change. The ratchet evaluations are
 re-derived from it.
 
+Exclusion policy (CV-314; SPEC 19.5): record and per-metric basis-point caps
+and forbidden reasons and sources are evaluated from the exclusion inventory
+and re-derived by the reader.
+
 What this build cannot do yet, and refuses rather than guess (``COV5001``):
-exclusion-cap assertions (R0.1). The reader accepts evaluations
+two regions the report's ordering rule cannot tell apart. The reader accepts evaluations
 of those kinds when they are internally consistent, because it cannot
 re-select their members.
 
@@ -95,6 +99,7 @@ CHANGED = "COV4305"
 DIFF_METRICS = ("branch", "line", "region")
 #: A ratchet comparison failed or could not be made (SPEC 22.4).
 RATCHET_FAILED = "COV4201"
+THRESHOLD_FAILED = "COV4101"
 #: What a ratchet can find about one metric besides its verdict (SPEC 22.4).
 OUTCOMES = ("denominator_growth", "exclusion_growth", "numerator_regression")
 #: The lifecycle command failed or was ended by a signal (registry revision 2; SPEC 21.3.5).
@@ -538,6 +543,72 @@ def _ratchet_evaluations(r: dict, detail: _Detail) -> list[dict]:
     return out
 
 
+# ── exclusion caps and forbidden rules (CV-314; SPEC 18.2.2, 19.5) ──────────
+
+
+def forbidden_records(r: dict) -> list[dict]:
+    """The exclusion records a forbidden rule names: those whose reason is
+    exactly a forbidden reason, or whose source a forbidden pattern selects
+    (SPEC 18.3 matching)."""
+    ex = r["resolved_configuration"]["coverage"]["exclusions"]
+    reasons = set(ex["forbidden_reasons"]["value"] or [])
+    patterns = ex["forbidden_sources"]["value"] or []
+    matcher = Matcher(patterns) if patterns else None
+    path = {s["source_index"]: s["path"] for s in r["sources"]}
+    return [x for x in r["exclusions"]
+            if x["reason"] in reasons or (matcher is not None and matcher.selects(path[x["source_index"]]))]
+
+
+def _exclusion_evaluations(r: dict) -> list[dict]:
+    """The exclusion policy (SPEC 18.2.2, 19.5; COV-POL-025):
+
+    - ``max_records``: the canonical exclusion records, ``at_most`` the cap
+      (one record counts once, whatever it removes);
+    - ``<metric>_basis_points``: the units exclusions removed over the
+      metric's pre-exclusion total (covered-or-not total plus removed),
+      ``at_most`` cap/10000 by cross multiplication; a zero pre-exclusion
+      total has no fraction and passes (it can remove nothing);
+    - ``forbidden_reasons`` / ``forbidden_sources``: the records they name,
+      ``equal`` to none; the members are those records' sources and what
+      they remove.
+
+    A failure is ``COV4101`` (owner's choice: a cap is a threshold)."""
+    ex = r["resolved_configuration"]["coverage"]["exclusions"]
+    out = []
+    one = {"denominator": 1}
+    cap = ex["max_records"]["value"]
+    if cap is not None:
+        n = len(r["exclusions"])
+        ok = n <= cap
+        out.append(_evaluation("exclusion", "exclusions", "exclusion_records", "at_most", "pass" if ok else "fail",
+                               actual={**one, "numerator": n}, limit={**one, "numerator": cap}, source="exclusion",
+                               codes=[] if ok else [THRESHOLD_FAILED]))
+    for m in METRICS:
+        cap = ex[f"{m}_basis_points"]["value"]
+        if cap is None:
+            continue
+        units = excluded_units(r, m)
+        pre = r["summary"][m]["total"] + units
+        members = {MEMBER_KEY[m]: excluded_members(r, m)}
+        limit = {"denominator": 10000, "numerator": cap}
+        if pre == 0:
+            out.append(_evaluation("exclusion", "exclusions", m, "at_most", "pass", limit=limit, source="exclusion", members=members))
+            continue
+        ok = units * 10000 <= pre * cap
+        out.append(_evaluation("exclusion", "exclusions", m, "at_most", "pass" if ok else "fail",
+                               actual={"denominator": pre, "numerator": units}, limit=limit, source="exclusion", members=members,
+                               codes=[] if ok else [THRESHOLD_FAILED]))
+    if ex["forbidden_reasons"]["value"] or ex["forbidden_sources"]["value"]:
+        bad = forbidden_records(r)
+        members = {"source_indices": sorted({x["source_index"] for x in bad})}
+        for key in ("branch_indices", "clause_indices", "entity_indices", "line_indices", "region_indices"):
+            members[key] = sorted({i for x in bad for i in x["affected"][key]})
+        out.append(_evaluation("exclusion", "exclusions", "exclusion_records", "equal", "fail" if bad else "pass",
+                               actual={**one, "numerator": len(bad)}, limit={**one, "numerator": 0}, source="exclusion", members=members,
+                               codes=[THRESHOLD_FAILED] if bad else []))
+    return out
+
+
 def _project_evaluations(r: dict, detail: _Detail) -> list[dict]:
     """One evaluation per configured project threshold (SPEC 22.1, 11.6)."""
     cov = r["resolved_configuration"]["coverage"]
@@ -636,8 +707,6 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
         raise ValueError("a ratchet input is given exactly when a ratchet policy is configured")
     if (cov["diff"] is None) != (changes is None):
         raise ValueError("a changed-region capture is given exactly when a diff policy is configured")
-    if any(leaf.value not in (None, []) for leaf in cov["exclusions"].values()):
-        raise ReportError("COV5001", "this build of sv0cov cannot evaluate [tool.sv0cov.exclusions] caps yet")
     policy = config.value("integrity.saturation")
     if sem["saturation"]["policy"] != policy:
         raise ReportError("COV0013", f"the evidence was merged under saturation policy {sem['saturation']['policy']}, "
@@ -712,7 +781,8 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     if not sem["complete"] and not evidence:
         evidence.add(OVERRIDE)  # incomplete only because rejected inputs were allowed: the reason must still be named
     evaluations = sorted([_integrity(r, evidence), *_project_evaluations(r, detail), *_assertion_evaluations(r, detail),
-                          *_diff_evaluations(r, detail), *_ratchet_evaluations(r, detail)],
+                          *_diff_evaluations(r, detail), *_ratchet_evaluations(r, detail),
+                          *_exclusion_evaluations(r)],
                          key=_evaluation_key)
     r["policy"] = {"evaluations": evaluations, "passed": all(e["result"] in ("pass", "not_applicable") for e in evaluations)}
     r["evidence_eligibility"] = _eligibility(r)
@@ -843,6 +913,8 @@ def _cross_validate(r: dict, registry: diagnostics.Registry | None) -> None:
         if [c["source_index"] for c in r["changes"]["sources"]] != sorted(users) or \
                 any(c["sha256"] != users[c["source_index"]]["digest"] for c in r["changes"]["sources"]):
             _mismatch("changes/sources", "the capture holds each user source once, with the digest it was compiled from")
+    if [e for e in evaluations if e["assertion_kind"] == "exclusion"] != sorted(_exclusion_evaluations(r), key=_evaluation_key):
+        _mismatch("policy/evaluations", "the exclusion evaluations are not what the exclusion policy and the inventory give")
     rt = r["ratchet"]
     if (rt is None) != (r["resolved_configuration"]["coverage"]["ratchet"] is None):
         _mismatch("ratchet", "a ratchet record is present exactly when a ratchet policy is configured")

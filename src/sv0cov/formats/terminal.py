@@ -107,6 +107,28 @@ def change_line(c: dict) -> str:
             f"{_plural(lines, 'changed line')} in {_plural(files, 'source')}; {state}")
 
 
+def exclusion_audit(r: dict, x: dict) -> str:
+    """What one exclusion record removed, and the evidence the excluded code
+    still left (COV-EXC-025): how many of its regions ran, and every
+    excluded contract clause's outcome counts with its owner."""
+    a = x["affected"]
+    entity = {e["entity_index"]: e for e in r["entities"]}
+    # Index by index, so a structure fixture's dangling reference is only not counted.
+    functions = sum(1 for i in a["entity_indices"] if entity.get(i, {}).get("kind") == "function")
+    ran = sum(1 for i in a["region_indices"] if i < len(r["regions"]) and r["regions"][i]["count"]["value"] > 0)
+    parts = [f"removes {_plural(functions, 'function')}, {_plural(len(a['region_indices']), 'region')}, "
+             f"{_plural(len(a['line_indices']), 'line')}, {_plural(len(a['branch_indices']), 'branch', 'branches')}, "
+             f"{_plural(len(a['clause_indices']), 'contract')}",
+             f"ran: {ran} of {_plural(len(a['region_indices']), 'region')}"]
+    for i in a["clause_indices"]:
+        c = r["contracts"][i] if i < len(r["contracts"]) else None
+        if c is None or c["count_true"] is None or c["count_false"] is None:
+            continue  # only a runtime-checked clause has outcome counts
+        owner = entity.get(c["entity_index"], {}).get("qualified_name", f"clause {i}")
+        parts.append(f"{owner} true {count_text(c['count_true'])} false {count_text(c['count_false'])}")
+    return "; ".join(parts)
+
+
 RATCHET_STATE = {"ok": "baseline", "missing": "no baseline", "invalid": "invalid baseline", "incompatible": "incompatible baseline",
                  "stale": "stale baseline (its commit is not HEAD or an ancestor)"}
 
@@ -301,6 +323,7 @@ class _View:
         self.lines.append(f"statically unreachable: {_plural(unreachable, 'branch outcome')}")
         for x in records:
             self.lines.append(f"#{x['exclusion_index']} {self.where(x)} {x['mode']} ({x['origin']}): {_quoted(x['reason'])}")
+            self.lines.append(f"    {exclusion_audit(self.r, x)}")
 
     def warnings(self) -> None:
         self.section("Warnings")

@@ -315,14 +315,12 @@ class ThresholdTest(unittest.TestCase):
                 self.assertEqual((report["summary"]["contract"]["ratio"], report["evidence_eligibility"]), (None, eligibility))
                 read_report(encode(report))
 
-    def test_assertions_this_build_cannot_evaluate_are_refused(self) -> None:
+    def test_exclusion_policy_is_evaluated_not_refused(self) -> None:
+        """CV-314: the last refused assertion kind is evaluated (tests/test_exclusion_policy.py has the matrix)."""
         ix = simple("f0")
-        cases = {
-            "exclusion cap": "[tool.sv0cov.exclusions]\nmax_records = 0\n",
-        }
-        for label, toml in cases.items():
-            with self.subTest(case=label):
-                self.assertEqual(code_of(build_report, encode(ix), config(toml=toml), fixture_sources("f0", ix)), "COV5001")
+        report = build_report(encode(ix), config(toml="[tool.sv0cov.exclusions]\nmax_records = 0\n"), fixture_sources("f0", ix), tool_version=V)
+        (e,) = [e for e in report["policy"]["evaluations"] if e["assertion_kind"] == "exclusion"]
+        self.assertEqual((e["metric"], e["comparison"], e["result"]), ("exclusion_records", "at_most", "pass"))
 
     def test_a_failed_or_signalled_test_command_fails_integrity_whatever_the_coverage(self) -> None:
         """SPEC 21.3.5, 22.5; AC-022: the coverage result is still reported, separately."""
