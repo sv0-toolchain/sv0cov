@@ -53,7 +53,7 @@ jobs:
         run: python bench/corpus.py check
 
       - name: Host descriptor (provisional)
-        run: python bench/harness.py host --stage managed-ci-provisional > "host-${{ matrix.host }}.json"
+        run: python bench/harness.py host --stage managed-ci-provisional --toolchain-revision "${{ github.sha }}" > "host-${{ matrix.host }}.json"
 
       - name: Materialize the merge-scale fixture (replay digest must match the manifest)
         run: python bench/corpus.py plan --work "$RUNNER_TEMP/bench" --dimension ingest --id scale-merge-1m-pairs > plan.json
@@ -61,7 +61,7 @@ jobs:
       - name: Provisional campaign
         run: >-
           python bench/harness.py run --plan plan.json --stage managed-ci-provisional
-          --out "results-${{ matrix.host }}.json"
+          --toolchain-revision "${{ github.sha }}" --out "results-${{ matrix.host }}.json"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

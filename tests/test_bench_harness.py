@@ -167,5 +167,45 @@ class BundleTest(unittest.TestCase):
         self.assertNotIn(os.path.realpath(sys.executable), json.dumps(d))
 
 
+class ProbeTest(unittest.TestCase):
+    def test_cpuinfo_x86(self) -> None:
+        self.assertEqual(H._cpuinfo_model("processor\t: 0\nmodel name\t: AMD EPYC 7763 64-Core Processor\n"), "AMD EPYC 7763 64-Core Processor")
+
+    def test_cpuinfo_arm(self) -> None:
+        arm = "processor\t: 0\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU part\t: 0xd4f\n\nprocessor\t: 1\nCPU implementer\t: 0x41\nCPU part\t: 0xd4f\n"
+        self.assertEqual(H._cpuinfo_model(arm), "Arm Neoverse-V2")
+        self.assertEqual(H._cpuinfo_model("CPU implementer\t: 0x41\nCPU part\t: 0xdead\n"), "arm implementer 0x41 part 0xdead")
+        self.assertEqual(H._cpuinfo_model("CPU implementer\t: 0xc0\nCPU part\t: 0xac3\n"), "Ampere-1")
+
+    def test_cpuinfo_unobservable(self) -> None:
+        self.assertEqual(H._cpuinfo_model(""), H.UNKNOWN)
+        self.assertEqual(H._cpuinfo_model("processor : 0\nBogoMIPS : 50\n"), H.UNKNOWN)
+
+    def test_mountinfo_longest_prefix(self) -> None:
+        text = (
+            "22 1 8:1 / / rw,relatime shared:1 - ext4 /dev/sda1 rw\n"
+            "30 22 0:27 / /tmp rw - tmpfs tmpfs rw\n"
+            "31 22 0:28 / /tmpx rw - xfs /dev/sdb rw\n"
+            "32 22 0:29 / /mnt/with\\040space rw - btrfs /dev/sdc rw\n"
+        )
+        self.assertEqual(H._mountinfo_fstype(text, "/tmp/bench"), "tmpfs")
+        self.assertEqual(H._mountinfo_fstype(text, "/tmp"), "tmpfs")
+        self.assertEqual(H._mountinfo_fstype(text, "/tmpx/a"), "xfs")
+        self.assertEqual(H._mountinfo_fstype(text, "/home/runner/work"), "ext4")
+        self.assertEqual(H._mountinfo_fstype(text, "/mnt/with space/x"), "btrfs")
+        self.assertEqual(H._mountinfo_fstype("garbage\n", "/tmp"), H.UNKNOWN)
+
+    def test_mount_output(self) -> None:
+        text = "/dev/disk3s1s1 on / (apfs, sealed, local, read-only)\n/dev/disk3s5 on /System/Volumes/Data (apfs, local)\nmap auto_home on /System/Volumes/Data/home (autofs, automounted)\n"
+        self.assertEqual(H._mount_output_fstype(text, "/System/Volumes/Data/Users/a"), "apfs")
+        self.assertEqual(H._mount_output_fstype(text, "/System/Volumes/Data/home/u"), "autofs")
+        self.assertEqual(H._mount_output_fstype(text, "/private/tmp"), "apfs")
+        self.assertEqual(H._mount_output_fstype("", "/x"), H.UNKNOWN)
+
+    def test_descriptor_deterministic(self) -> None:
+        self.assertEqual(H.host_descriptor("local-development", "abc"), H.host_descriptor("local-development", "abc"))
+        self.assertTrue(H.host_descriptor("local-development")["filesystem"])
+
+
 if __name__ == "__main__":
     unittest.main()

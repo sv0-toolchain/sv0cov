@@ -11,7 +11,11 @@
   canonical `sv0cov.benchmark-results` 1.0 bundle with the host descriptor,
   every raw sample (including invalid runs and their reasons), per-arm
   statistics, and the trend-series key. `harness.py host --stage <stage>`
-  prints the descriptor alone.
+  prints the descriptor alone (both take `--toolchain-revision`; the
+  CI workflow passes the checked-out commit). `cpu_model` is read from
+  `/proc/cpuinfo` (x86 model name, or Arm implementer/part mapped to a name),
+  and `filesystem` is the type of the work/temp directory (mountinfo on
+  Linux, `stat -f %T` on macOS); only truly unobservable fields stay `unknown`.
 - Stages: `managed-ci-provisional` (F0-R0.1 trend evidence only),
   `reference-dedicated` (R1 conformance), `local-development`. Only
   `reference-dedicated` bundles may claim conformance.

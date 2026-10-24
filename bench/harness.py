@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -91,16 +92,103 @@ def _run_text(argv: list[str]) -> str:
     return out.splitlines()[0].strip() if out else UNKNOWN
 
 
+ARM_IMPLEMENTERS = {0x41: "Arm", 0x51: "Qualcomm", 0x61: "Apple", 0x6D: "Microsoft", 0xC0: "Ampere"}
+ARM_PARTS = {
+    (0x41, 0xD03): "Cortex-A53", (0x41, 0xD07): "Cortex-A57", (0x41, 0xD08): "Cortex-A72", (0x41, 0xD09): "Cortex-A73",
+    (0x41, 0xD0A): "Cortex-A75", (0x41, 0xD0B): "Cortex-A76", (0x41, 0xD0C): "Neoverse-N1", (0x41, 0xD0D): "Cortex-A77",
+    (0x41, 0xD40): "Neoverse-V1", (0x41, 0xD41): "Cortex-A78", (0x41, 0xD49): "Neoverse-N2", (0x41, 0xD4F): "Neoverse-V2",
+    (0x41, 0xD8E): "Neoverse-N3", (0x41, 0xD83): "Neoverse-V3",
+    (0xC0, 0xAC3): "Ampere-1", (0xC0, 0xAC4): "Ampere-1A",
+    (0x6D, 0xD49): "Cobalt-100",
+}
+
+
+def _cpuinfo_model(text: str) -> str:
+    """CPU model from /proc/cpuinfo text: x86 ``model name`` or Arm implementer+part ids."""
+    fields: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition(":")
+        if not sep:
+            continue
+        key = key.strip().lower()
+        value = value.strip()
+        if key in ("model name", "cpu model") and value:
+            return value
+        if key in ("cpu implementer", "cpu part") and value and key not in fields:
+            fields[key] = value
+    try:
+        impl = int(fields["cpu implementer"], 0)
+        part = int(fields["cpu part"], 0)
+    except (KeyError, ValueError):
+        return UNKNOWN
+    name = ARM_PARTS.get((impl, part))
+    vendor = ARM_IMPLEMENTERS.get(impl)
+    if name:
+        return f"{vendor} {name}" if vendor and not name.startswith(vendor) else name
+    return f"arm implementer {impl:#x} part {part:#x}"
+
+
 def _cpu_model() -> str:
     if sys.platform == "darwin":
         return _run_text(["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"])
     try:
-        for line in Path("/proc/cpuinfo").read_text().splitlines():
-            if line.lower().startswith(("model name", "cpu model")):
-                return line.split(":", 1)[1].strip()
+        return _cpuinfo_model(Path("/proc/cpuinfo").read_text())
     except OSError:
-        pass
-    return UNKNOWN
+        return UNKNOWN
+
+
+def _unescape_mount(field: str) -> str:
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), field)
+
+
+def _mountinfo_fstype(text: str, path: str) -> str:
+    """Filesystem type of the longest mount point containing ``path`` (Linux mountinfo text)."""
+    best, best_type = -1, UNKNOWN
+    for line in text.splitlines():
+        left, sep, right = line.partition(" - ")
+        parts = left.split()
+        rest = right.split()
+        if not sep or len(parts) < 5 or not rest:
+            continue
+        mount = _unescape_mount(parts[4])
+        inside = mount == "/" or path == mount or path.startswith(mount.rstrip("/") + "/")
+        if inside and len(mount) > best:
+            best, best_type = len(mount), rest[0]
+    return best_type
+
+
+def _work_dir() -> str:
+    return os.path.realpath(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir())
+
+
+def _mount_output_fstype(text: str, path: str) -> str:
+    """Filesystem type from macOS ``mount`` output (``dev on /point (type, flags)``)."""
+    best, best_type = -1, UNKNOWN
+    for line in text.splitlines():
+        m = re.match(r"^.+? on (/.*) \(([^,)\s]+)", line)
+        if not m:
+            continue
+        mount = m.group(1)
+        inside = mount == "/" or path == mount or path.startswith(mount.rstrip("/") + "/")
+        if inside and len(mount) > best:
+            best, best_type = len(mount), m.group(2)
+    return best_type
+
+
+def _filesystem(path: str | None = None) -> str:
+    path = path or _work_dir()
+    if sys.platform == "darwin":
+        exe = "/sbin/mount"
+        if not os.access(exe, os.X_OK):
+            return UNKNOWN
+        try:
+            return _mount_output_fstype(subprocess.run([exe], capture_output=True, text=True, timeout=10).stdout, path)
+        except (OSError, subprocess.SubprocessError):
+            return UNKNOWN
+    try:
+        return _mountinfo_fstype(Path("/proc/self/mountinfo").read_text(), path)
+    except OSError:
+        return UNKNOWN
 
 
 def _memory_bytes() -> int | str:
@@ -151,7 +239,7 @@ def host_descriptor(stage: str, toolchain_revision: str = UNKNOWN) -> dict:
         "clock_source": "time.perf_counter_ns",
         "c_compiler": _run_text(["/usr/bin/cc", "--version"]),
         "cpu_model": _cpu_model(),
-        "filesystem": UNKNOWN,
+        "filesystem": _filesystem(),
         "installed_memory_bytes": _memory_bytes(),
         "isolation": "shared managed runner" if github else UNKNOWN,
         "kernel": uname.release or UNKNOWN,
@@ -373,9 +461,10 @@ def main() -> int:
     r.add_argument("--out", type=Path, required=True)
     h = sub.add_parser("host")
     h.add_argument("--stage", required=True, choices=STAGES)
+    h.add_argument("--toolchain-revision", default=UNKNOWN)
     args = ap.parse_args()
     if args.cmd == "host":
-        sys.stdout.buffer.write(encode(host_descriptor(args.stage)))
+        sys.stdout.buffer.write(encode(host_descriptor(args.stage, args.toolchain_revision)))
         return 0
     plan = json.loads(args.plan.read_bytes())
     data = run_plan(plan, args.stage, args.toolchain_revision)
