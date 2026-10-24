@@ -135,11 +135,11 @@ class ManifestTest(unittest.TestCase):
     def test_running_manifest(self) -> None:
         data = cli.version_manifest()
         obj = validate_manifest(data)
-        # What passed the R0 gate review (CV-244): every command, native and VM-v1, no VM-v2 (COV-VM-027).
+        # What passed the R0 (CV-244) and R0.1 (CV-316) gate reviews: every command, native and VM-v1, no VM-v2
+        # (COV-VM-027); every R1 feature but LCOV, Cobertura, process-tree spawn and ratchets.
         self.assertEqual((obj["commands"], obj["backends"], obj["bytecode_profiles"]),
                          (list(inv.COMMANDS), ["native", "vm-v1"], ["sv0vm-v1-coverage"]))
-        self.assertEqual(obj["features"], ["native-json-report", "run-sets", "saturation-lower-bounds", "self-contained-indexed",
-                                           "source-integrity"])
+        self.assertEqual(obj["features"], sorted(set(inv.FEATURES) - {"cobertura-r1-core", "lcov-r1-core", "process-tree-spawn", "ratchets"}))
         self.assertEqual(obj["implementation"]["language"], "python")
         self.assertEqual(data, cli.version_manifest())  # byte-identical on repeat
 
