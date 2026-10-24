@@ -50,11 +50,11 @@ order, contiguous decision and outcome indexes and every summary, and
 `check_lcov` also requires the totals of every source to equal the report's;
 anything else is `COV4401`.
 
-## Not yet on the command line
+## On the command line
 
-SPEC 21.4 publishes every LCOV export together with its native JSON and an
-export manifest. `report --format lcov` and `run --report lcov` therefore
-stay refused (`COV5001`) until the manifest lands (CV-403). The
+`report --format lcov` and `run --report lcov` publish the tracefile with
+its native JSON report and an export commit manifest (CV-403;
+[export-manifest.md](export-manifest.md), [report.md](report.md)). The
 pinned-consumer checks against LCOV 1.16 and 2.5 are CV-418.
 
 Goldens: `tests/fixtures/lcov/` (one per semantic fixture, rebuilt by its

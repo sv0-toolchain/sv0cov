@@ -33,6 +33,7 @@ from test_cli import records  # noqa: E402
 from test_indexed_reader import fixture_inputs  # noqa: E402
 
 from sv0cov import cli, cmd_run  # noqa: E402
+from sv0cov.formats.export_manifest import verify_export  # noqa: E402
 from sv0cov.model.indexed import read_indexed  # noqa: E402
 from sv0cov.model.report import read_report  # noqa: E402
 
@@ -584,16 +585,21 @@ class ReportSelectionTest(Base):
         code, out, err = self.run_cli("--quiet", "--threshold-line", "100", "--", "demo")
         self.assertEqual((code, out, [r["code"] for r in records(err)]), (1, "program output\n", ["COV4101"]))
 
-    def test_a_format_this_build_lacks_stops_before_anything_exists(self) -> None:
-        for args, toml in ((("--report", "lcov"), None), (("--report", "term", "--report", "lcov"), None), ((), 'reports = ["cobertura"]\n')):
-            with self.subTest(args=args, toml=toml):
-                self.setUp()
-                if toml:
-                    (self.cwd / "sv0.toml").write_text(HEAD + toml)
-                code, out, err = self.run_cli(*args, "--", "demo")
-                (r,) = records(err)
-                self.assertEqual((code, out, r["code"], r["phase"]), (7, "", "COV5001", "invocation"))
-                self.assertFalse((self.cwd / ".sv0cov").exists())
+    def test_standard_exports_join_the_bundle_with_native_json_and_manifests(self) -> None:
+        (self.cwd / "sv0.toml").write_text(HEAD + 'reports = ["cobertura", "lcov"]\n')
+        code, out, err = self.run_cli("--", "demo")
+        (run_id,) = self.run_dirs()
+        run_dir = self.cwd / ".sv0cov/runs" / run_id
+        self.assertEqual(code, 0, err)
+        self.assertEqual(sorted(os.listdir(run_dir / "reports")),
+                         ["cobertura.manifest.json", "cobertura.xml", "coverage.json", "lcov.info", "lcov.manifest.json"])
+        files = {n: (run_dir / "reports" / n).read_bytes() for n in os.listdir(run_dir / "reports")}
+        indexed = (run_dir / "coverage.sv0covdata.json").read_bytes()
+        for fmt, primary in (("lcov", "lcov.info"), ("cobertura", "cobertura.xml")):
+            m = verify_export(files[f"{fmt}.manifest.json"], files[primary], files["coverage.json"], names=(primary, "coverage.json"),
+                              indexed=indexed)
+            self.assertEqual(m["format"], fmt)
+
         self.assertEqual(self.run_cli("--report", "term", "--report", "term", "--", "demo")[0], 2)
         self.assertEqual(self.run_cli("--format", "term", "--", "demo")[0], 2)  # --format belongs to report
 

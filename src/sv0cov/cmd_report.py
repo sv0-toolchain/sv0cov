@@ -12,8 +12,16 @@ and publishes the selected formats without replacing anything
 **Formats.** Only ``--format`` selects them; ``[tool.sv0cov].reports`` is
 for ``run`` and is not read. Request order does not matter: artifacts are
 produced in the canonical order ``term``, ``html``, ``json``, ``lcov``,
-``cobertura``. This build produces ``term``, ``html`` and ``json``; asking
-for another is refused with ``COV5001`` before anything is read.
+``cobertura``.
+
+**Standard exports** (CV-403). ``lcov`` and ``cobertura`` are published
+with the native JSON report and an export commit manifest
+(:mod:`sv0cov.exports`): in a bundle as ``coverage.json`` and
+``<format>.manifest.json``; beside a single file ``P`` as
+``P.sv0cov.json`` and ``P.manifest.json`` (native first, manifest last);
+for stdout in the new directory ``<output_dir>/reports/<format>-stdout-support``,
+published only after stdout took the primary. A saturated count refuses the
+export (``COV4020``, 6).
 
 **Destination** (SPEC 20.2.2).
 
@@ -43,9 +51,12 @@ or publication fails; 7 for a format or assertion this build lacks.
 
 from __future__ import annotations
 
+import os
+
 from sv0cov import cli
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.evidence import Stop, load_report
+from sv0cov.exports import MANIFEST_SUFFIX, NATIVE_SUFFIX, STANDARD, ExportStop, bundle, single, support_dir
 from sv0cov.formats.html import check_html, render_html
 from sv0cov.formats.terminal import render_terminal, terminal_bytes
 from sv0cov.model.report import read_report
@@ -53,7 +64,7 @@ from sv0cov.publish import PublishError, check_destination, publish_bundle, publ
 
 #: Canonical order and primary filename of every format (SPEC 20.2.1).
 FILENAMES = {"term": "coverage.txt", "html": "coverage.html", "json": "coverage.json", "lcov": "lcov.info", "cobertura": "cobertura.xml"}
-IMPLEMENTED = ("term", "html", "json")
+IMPLEMENTED = tuple(FILENAMES)
 REPORTS_DIR = "reports"
 
 
@@ -75,55 +86,89 @@ def cmd_report(ctx: cli.Context) -> int:
     formats = [f for f in FILENAMES if f in requested]
     output = config.controls.get("--output")
     to_stdout = output == "-"
-    bundle = len(formats) > 1
+    is_bundle = len(formats) > 1
+    standard = [f for f in formats if f in STANDARD]
+    lone_export = standard[0] if standard and not is_bundle else None
 
     missing = [f for f in formats if f not in IMPLEMENTED]
     if missing:
         console.report(Diagnostic("COV5001", "invocation", facts=(
             ("detail", "this build of sv0cov does not produce this report format yet"), ("format", missing[0]))))
         return cli.EXIT_UNSUPPORTED
-    if bundle and to_stdout:
+    if is_bundle and to_stdout:
         console.report(Diagnostic("COV0001", "invocation", facts=(
             ("detail", "stdout takes exactly one format; several formats need a bundle directory"), ("subject", "--output"))))
         return cli.EXIT_USAGE
 
+    reports_dir = f"{config.value('output_dir')}/{REPORTS_DIR}"
     if output is None:
-        base = f"{config.value('output_dir')}/{REPORTS_DIR}"
-        final, anchor = (base if bundle else f"{base}/{FILENAMES[formats[0]]}"), str(ctx.cwd)
+        final, anchor = (reports_dir if is_bundle else f"{reports_dir}/{FILENAMES[formats[0]]}"), str(ctx.cwd)
     else:
         final, anchor = str(ctx.cwd / output), None
+    support = f"{reports_dir}/{support_dir(lone_export)}" if lone_export and to_stdout else None
     tier = config.tier().name
+    timestamp = config.value("reproducible_epoch")
 
     def native(data: bytes) -> None:
         read_report(data, tier=tier)
 
     validators = {"coverage.txt": _plain_text, "coverage.json": native, "coverage.html": check_html}
     try:
-        if not to_stdout:
-            try:
+        try:
+            if not to_stdout:
                 check_destination(final, anchor=anchor)
-            except PublishError as exc:
-                console.report(_publish_failure(exc))
-                return cli.EXIT_REPORT
+                if lone_export:
+                    check_destination(final + NATIVE_SUFFIX, anchor=anchor)
+                    check_destination(final + MANIFEST_SUFFIX, anchor=anchor)
+            elif support is not None:
+                check_destination(support, anchor=str(ctx.cwd))
+        except PublishError as exc:
+            console.report(_publish_failure(exc))
+            return cli.EXIT_REPORT
         sources: dict[str, bytes | None] = {}
-        report, encoded = load_report(ctx, sources_out=sources)
+        report, encoded = load_report(ctx, standard_export=bool(standard), sources_out=sources)
     except Stop as stop:
         console.report(stop.diagnostic)
         return stop.status
 
     render = {"term": lambda: terminal_bytes(report), "html": lambda: render_html(report, sources), "json": lambda: encoded}
-    files = {FILENAMES[f]: render[f]() for f in formats}
-    first = next(iter(files))
     try:
-        if to_stdout:
+        files = {FILENAMES[f]: render[f]() for f in formats if f not in STANDARD}
+        if is_bundle:
+            extra, checks = bundle(formats, report, encoded, timestamp=timestamp, tier=tier)
+            files.update(extra)
+            validators.update(checks)
+        elif lone_export:
+            export = single(lone_export, report, encoded, basename=None if to_stdout else os.path.basename(final),
+                            timestamp=timestamp, tier=tier)
+    except ExportStop as stop:
+        console.report(stop.diagnostic)
+        return stop.status
+    try:
+        if lone_export and to_stdout:
+            # The support set is complete and valid before stdout is touched; it is committed only after.
+            members = {export["native_name"]: export["native"], export["manifest_name"]: export["manifest"]}
+            checks = {export["native_name"]: native, export["manifest_name"]: export["check_manifest"]}
+            for name, data in members.items():
+                checks[name](data)
+            publish_stdout(console.binary_stdout(), export["primary"], validate=export["check_primary"])
+            publish_bundle(support, members, anchor=str(ctx.cwd), validate=checks)
+        elif lone_export:
+            # Three names, three commits: native, primary, then the manifest that commits the set (SPEC 20.2.3).
+            publish_file(final + NATIVE_SUFFIX, export["native"], anchor=anchor, validate=native)
+            publish_file(final, export["primary"], anchor=anchor, validate=export["check_primary"])
+            publish_file(final + MANIFEST_SUFFIX, export["manifest"], anchor=anchor, validate=export["check_manifest"])
+        elif to_stdout:
+            first = next(iter(files))
             data = files[first]
             if formats[0] == "term" and console.colored(console.stdout):
                 data = render_terminal(report, color=True).encode("utf-8")
             # The colorless bytes are what is validated; color only repeats their status words.
             publish_stdout(console.binary_stdout(), data, validate=lambda _written: validators[first](files[first]))
-        elif bundle:
+        elif is_bundle:
             publish_bundle(final, files, anchor=anchor, validate=validators)
         else:
+            first = next(iter(files))
             publish_file(final, files[first], anchor=anchor, validate=validators[first])
     except PublishError as exc:
         if to_stdout:
@@ -132,5 +177,9 @@ def cmd_report(ctx: cli.Context) -> int:
         return cli.EXIT_REPORT
     if not to_stdout:  # stdout carries the one format and nothing else (SPEC 20.2)
         shown = final if output is None else output
-        console.say(f"wrote {shown}" + (f" ({', '.join(files)})" if bundle else ""))
+        if is_bundle:
+            shown += f" ({', '.join(files)})"
+        elif lone_export:
+            shown += f" (with {os.path.basename(final)}{NATIVE_SUFFIX} and {os.path.basename(final)}{MANIFEST_SUFFIX})"
+        console.say(f"wrote {shown}")
     return cli.EXIT_OK

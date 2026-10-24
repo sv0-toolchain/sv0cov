@@ -336,6 +336,15 @@ def _string_array(value: object, path: str, *, nonempty: bool) -> list[str]:
     return value
 
 
+def _profile_hint(kind: Kind, value: object) -> str:
+    """AC-053: an extended or vendor LCOV or Cobertura profile is not an R1
+    format; say where to go instead."""
+    if kind.values != REPORT_FORMATS or not isinstance(value, str) or not value.lower().startswith(("lcov", "cobertura")):
+        return ""
+    return ("; R1 has only the sv0cov-lcov-r1-core and sv0cov-cobertura-r1-core profiles: use native JSON (json) for "
+            "everything they omit, or propose an extended profile after R1")
+
+
 def check_value(kind: Kind, value: object, path: str) -> object:
     """Validate one value against its kind; returns the resolved value."""
     if kind.toml == "threshold":
@@ -355,7 +364,7 @@ def check_value(kind: Kind, value: object, path: str) -> object:
     if kind.toml == "string":
         n = _utf8_len(value, path)
         if kind.values and value not in kind.values:
-            raise ConfigError(BAD_VALUE, path, f"must be one of {', '.join(kind.values)}")
+            raise ConfigError(BAD_VALUE, path, f"must be one of {', '.join(kind.values)}{_profile_hint(kind, value)}")
         if kind is ARTIFACT_PATH:
             check_artifact_path(value, path)
         elif kind is CONTEXT and n > kind.max_bytes:
@@ -372,7 +381,7 @@ def check_value(kind: Kind, value: object, path: str) -> object:
         items = _string_array(value, path, nonempty=True)
         bad = [v for v in items if v not in kind.values]
         if bad:
-            raise ConfigError(BAD_VALUE, path, f"{bad[0]!r} is not one of {', '.join(kind.values)}")
+            raise ConfigError(BAD_VALUE, path, f"{bad[0]!r} is not one of {', '.join(kind.values)}{_profile_hint(kind, bad[0])}")
         _unique(items, path)
         return list(items)
     if kind in (PATTERNS, FORBIDDEN_SOURCES):
@@ -522,7 +531,7 @@ def check_cli_value(option: str, text: str, command: str) -> object:
     kind = opt.kind
     if kind in (FORMAT, COLOR, DIAGNOSTIC_FORMAT):
         if text not in kind.values:
-            raise ConfigError("COV0001", option, f"must be one of {', '.join(kind.values)}")
+            raise ConfigError("COV0001", option, f"must be one of {', '.join(kind.values)}{_profile_hint(kind, text)}")
         return text
     if kind is RUN_ID:
         try:

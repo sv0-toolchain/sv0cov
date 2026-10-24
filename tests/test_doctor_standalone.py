@@ -68,7 +68,7 @@ class GoldenTest(unittest.TestCase):
         facts = {p["id"]: {f["name"]: f["value"] for f in p["facts"]} for p in obj["probes"]}
         man = obj["version_manifest"]
         self.assertEqual(facts["D001"], {"manifest_sha256": man["manifest_sha256"]})
-        self.assertEqual(facts["D003"], {"validated_schema_count": 14})
+        self.assertEqual(facts["D003"], {"validated_schema_count": 15})
         self.assertEqual(facts["D004"], {"validated_member_count": len(probes.MODULES) + len(probes.RESOURCES)})
         self.assertEqual(facts["D005"], {"host": f"{man['host']['operating_system']}-{man['host']['architecture']}"})
         self.assertEqual(facts["D006"]["runtime_version"], man["implementation"]["runtime"]["version"])
@@ -104,7 +104,7 @@ class InventoryTest(unittest.TestCase):
     def test_an_installed_layout_gives_the_same_counts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             layout = installed_copy(Path(tmp))
-            self.assertEqual(probes.d003_schemas(layout), {"validated_schema_count": 14})
+            self.assertEqual(probes.d003_schemas(layout), {"validated_schema_count": 15})
             self.assertEqual(probes.d004_layout(layout), {"validated_member_count": len(probes.MODULES) + len(probes.RESOURCES)})
             self.assertEqual(probes.d008_runtime(layout), {"validated_member_count": 2})
 

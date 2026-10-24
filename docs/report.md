@@ -25,11 +25,12 @@ and under the canonical names:
 | `term` | `coverage.txt` | yes ([terminal-report.md](terminal-report.md)) |
 | `html` | `coverage.html` | yes ([html-report.md](html-report.md)) |
 | `json` | `coverage.json` | yes ([native-report.md](native-report.md)) |
-| `lcov` | `lcov.info` | not yet |
-| `cobertura` | `cobertura.xml` | not yet |
+| `lcov` | `lcov.info` | yes ([lcov.md](lcov.md)) |
+| `cobertura` | `cobertura.xml` | yes ([cobertura.md](cobertura.md)) |
 
-Asking for a format this build lacks is refused with `COV5001` (exit 7)
-before anything is read or created.
+LCOV and Cobertura are standard exports: each is published together with
+the native JSON report and an export commit manifest
+([export-manifest.md](export-manifest.md)).
 
 ## Destination
 
@@ -52,6 +53,21 @@ that exists in any form, including a dangling symlink, is a collision
 consequence of the two default rows: after a single-format report has
 created `<output_dir>/reports`, a multi-format report with no `--output`
 collides with that directory. Use `--output`, or `sv0cov clean` first.
+
+### Standard-export companions
+
+| Layout | Native report | Manifest |
+|---|---|---|
+| bundle | `coverage.json` (shared by both exports and `--format json`) | `lcov.manifest.json`, `cobertura.manifest.json` |
+| one file `P` | `P.sv0cov.json` | `P.manifest.json` |
+| stdout | `coverage.json` in the new `<output_dir>/reports/<format>-stdout-support` | `<format>.manifest.json` beside it |
+
+The companions are checked for collisions together with the primary, before
+the evidence is read. One file `P` is three commits: the native report,
+then `P`, then the manifest, which is the commit record; files without
+their manifest are not a complete export. For stdout the support directory
+is published only after stdout took every byte. A saturated count refuses
+the export (`COV4020`, exit 6) and nothing is published.
 
 A terminal report written to a file is always colorless. On stdout it
 follows `--color`, and color only repeats status words.

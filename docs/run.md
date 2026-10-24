@@ -52,7 +52,9 @@ sv0cov run --threshold-line 85 --report term --report json -- myproject
    with the command's result as the execution record.
 7. **Publication.** Complete evidence becomes
    `<run>/coverage.sv0covdata.json`. The selected nonterminal reports become
-   the bundle `<run>/reports`. A selected terminal report goes to stdout
+   the bundle `<run>/reports`; LCOV and Cobertura bring the shared
+   `coverage.json` and their export manifests
+   ([export-manifest.md](export-manifest.md)). A selected terminal report goes to stdout
    unless `--quiet`.
 8. **Check.** Every assertion that did not pass is a diagnostic on stderr,
    as in [`check`](check.md).
@@ -150,4 +152,3 @@ Before the test command runs:
 ## Not in this build
 
 - The VM backend. `run` builds the generated-C executable only.
-- The `lcov` and `cobertura` formats. (`html` is produced: [html-report.md](html-report.md).)

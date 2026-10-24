@@ -226,7 +226,7 @@ def standalone_pass() -> bytes:
     passing = {
         "D001": ("pass", {"manifest_sha256": manifest["manifest_sha256"]}),
         "D002": ("pass", {"registry_revision": REG.revision, "registry_sha256": REG.sha256}),
-        "D003": ("pass", {"validated_schema_count": 14}),
+        "D003": ("pass", {"validated_schema_count": 15}),
         "D004": ("pass", {"validated_member_count": MEMBER_COUNT}),
         "D005": ("pass", {"host": "macos-arm64"}),
         "D006": ("pass", {"language": "python", "runtime_name": "cpython", "runtime_version": "3.13.0"}),
@@ -242,7 +242,7 @@ def toolchain_d012_fail() -> bytes:
     results = {
         "D001": ("pass", {"manifest_sha256": manifest["manifest_sha256"]}),
         "D002": ("pass", {"registry_revision": REG.revision, "registry_sha256": REG.sha256}),
-        "D003": ("pass", {"validated_schema_count": 14}),
+        "D003": ("pass", {"validated_schema_count": 15}),
         "D004": ("pass", {"validated_member_count": MEMBER_COUNT}),
         "D005": ("pass", {"host": "macos-arm64"}),
         "D006": ("pass", {"language": "python", "runtime_name": "cpython", "runtime_version": "3.13.0"}),

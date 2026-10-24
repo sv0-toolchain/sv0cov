@@ -80,11 +80,13 @@ the DTD, then recomputes every line, condition, rate and total.
 `check_cobertura` also requires the classes, methods and line and branch
 totals to equal the report's. Everything else is `COV4401`.
 
-## Not yet on the command line
+## On the command line
 
-As for LCOV, `report --format cobertura` and `run --report cobertura` stay
-refused (`COV5001`) until the export manifest lands (CV-403). The GitLab
-visualization smoke fixture is CV-419.
+As for LCOV, `report --format cobertura` and `run --report cobertura`
+publish the document with its native JSON report and an export commit
+manifest (CV-403; [export-manifest.md](export-manifest.md)).
+`--reproducible-epoch` (or `reproducible_epoch`) sets `timestamp`. The
+GitLab visualization smoke fixture is CV-419.
 
 Goldens: `tests/fixtures/cobertura/` (rebuilt by its `build.py`). Tests:
 `tests/test_cobertura.py`; the DTD validator used as the independent oracle

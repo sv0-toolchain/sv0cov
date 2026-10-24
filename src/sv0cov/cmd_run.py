@@ -54,7 +54,9 @@ What happens, in order:
    zero coverage.
 7. **Publication.** Complete evidence becomes
    ``<run>/coverage.sv0covdata.json``. The selected nonterminal reports
-   become the bundle ``<run>/reports``. A selected terminal report goes to
+   become the bundle ``<run>/reports``; LCOV and Cobertura add the shared
+   ``coverage.json`` and their export manifests (CV-403), and a saturated
+   count refuses them (``COV4020``, 6). A selected terminal report goes to
    stdout unless ``--quiet``. With a diff policy, a compiled user source
    that is untracked or ignored (``COV4304``), or whose bytes differ from
    the capture at any point up to publication (``COV4305``), stops it: no
@@ -86,12 +88,13 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Mapping
 
-from sv0cov import cli, evidence, gitdiff
+from sv0cov import cli, evidence, exports, gitdiff
 from sv0cov.cmd_check import coverage_failed, evaluation_diagnostics, exit_status
 from sv0cov.cmd_merge import INDEXED_NAME, collect
 from sv0cov.cmd_report import FILENAMES, IMPLEMENTED, REPORTS_DIR
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.evidence import report_of
+from sv0cov.exports import STANDARD
 from sv0cov.formats import runset
 from sv0cov.formats.html import check_html, render_html
 from sv0cov.formats.map import MapError, map_limits, validate_map
@@ -354,7 +357,8 @@ def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int
         raise _Stop(cli.EXIT_EVIDENCE, exc.code, "publication", artifact="indexed-profile", detail=exc.detail) from None
     try:
         sources: dict[str, bytes | None] = {}
-        report, encoded = report_of(ctx, result.data, sources_out=sources, capture=snap)
+        report, encoded = report_of(ctx, result.data, standard_export=any(f in STANDARD for f in formats), sources_out=sources,
+                                    capture=snap)
         if snap is not None:
             # The last look before publication: the bytes are still the captured, compiled ones (SPEC 22.3).
             stale = gitdiff.stale_paths(snap.restrict([s["path"] for s in report["sources"] if s["ownership"] == "user"]), ctx.cwd)
@@ -364,8 +368,15 @@ def finish(ctx: cli.Context, run_dir: Path, shown: str, run_id: str, status: int
     except evidence.Stop as stop:
         console.report(stop.diagnostic)
         return stop.status, False
-    files = {FILENAMES[f]: (render_html(report, sources) if f == "html" else encoded) for f in formats if f != "term"}
+    files = {FILENAMES[f]: (render_html(report, sources) if f == "html" else encoded) for f in formats if f not in ("term", *STANDARD)}
     checks = {FILENAMES["json"]: lambda data: read_report(data, tier=tier.name), FILENAMES["html"]: check_html}
+    try:
+        extra, export_checks = exports.bundle(formats, report, encoded, timestamp=config.value("reproducible_epoch"), tier=tier.name)
+    except exports.ExportStop as stop:
+        console.report(stop.diagnostic)
+        return stop.status, coverage_failed(report)
+    files.update(extra)
+    checks.update(export_checks)
     if files:
         try:
             publish_bundle(f"{shown}/{REPORTS_DIR}", files, anchor=str(ctx.cwd), validate={name: checks[name] for name in files})
