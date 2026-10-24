@@ -1,0 +1,17 @@
+TN:
+SF:main.sv0
+FN:4,main
+FNDA:1,main
+FNF:1
+FNH:1
+DA:5,1
+DA:6,1
+DA:7,0
+DA:8,1
+LF:4
+LH:3
+BRDA:7,0,0,0
+BRDA:7,0,1,1
+BRF:2
+BRH:1
+end_of_record

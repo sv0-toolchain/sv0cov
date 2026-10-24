@@ -16,6 +16,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Terminal report](terminal-report.md): the plain-text view of a native report, its sections, its escaping and color rules, and its goldens.
 - [HTML report](html-report.md): the self-contained, offline HTML view of a native report, its navigation, context filter and safety rules.
 - [Changed-region coverage](changed-region.md): the Git model: explicit base, merge base, the capture taken before instrumentation, changed lines, staleness, and how Git is run.
+- [LCOV export](lcov.md): the `sv0cov-lcov-r1-core` profile: which sources, functions, lines and branches are written, the binary line projection, and what is never written.
 - [Ratchets](ratchets.md): the baseline file and its pin, how a ratchet compares, the states and outcomes, and `sv0cov baseline`.
 - [Run](run.md): what `sv0cov run` builds, how the test command is started, its environment and run directory.
 - [Report](report.md): formats, the destination matrix, and the exit statuses of `sv0cov report`.

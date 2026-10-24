@@ -76,7 +76,7 @@ MODULES = (
     "sv0cov/cmd_clean.py", "sv0cov/cmd_doctor.py", "sv0cov/cmd_merge.py", "sv0cov/cmd_report.py", "sv0cov/cmd_run.py",
     "sv0cov/config.py", "sv0cov/config_resolve.py", "sv0cov/console.py", "sv0cov/diagnostics.py", "sv0cov/evidence.py",
     "sv0cov/expr.py", "sv0cov/formats/__init__.py", "sv0cov/formats/baseline.py", "sv0cov/formats/canonical_json.py", "sv0cov/formats/compatibility.py",
-    "sv0cov/formats/crc32c.py", "sv0cov/formats/doctor.py", "sv0cov/formats/html.py", "sv0cov/formats/indexed.py", "sv0cov/formats/map.py",
+    "sv0cov/formats/crc32c.py", "sv0cov/formats/doctor.py", "sv0cov/formats/html.py", "sv0cov/formats/indexed.py", "sv0cov/formats/lcov.py", "sv0cov/formats/map.py",
     "sv0cov/formats/rawprofile.py", "sv0cov/formats/release.py", "sv0cov/formats/report.py", "sv0cov/formats/runset.py",
     "sv0cov/formats/structural.py", "sv0cov/formats/terminal.py", "sv0cov/formats/version_manifest.py", "sv0cov/formats/vmbinding.py", "sv0cov/gitdiff.py", "sv0cov/gitignore.py",
     "sv0cov/invocation.py", "sv0cov/lines.py", "sv0cov/model/__init__.py", "sv0cov/model/context.py", "sv0cov/model/identity.py", "sv0cov/model/indexed.py",
