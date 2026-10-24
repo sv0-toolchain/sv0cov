@@ -44,7 +44,7 @@ HEADER_LINES = 5
 
 # Third-party trees keep their own licenses; each is bound by its own manifest
 # (tests/vendor/*.manifest.json), which records the upstream license.
-THIRD_PARTY_PREFIXES = ("tests/vendor/json-schema-test-suite/",)
+THIRD_PARTY_PREFIXES = ("tests/vendor/json-schema-test-suite/", "tests/vendor/cobertura/")
 
 
 def project_files() -> list[str]:
