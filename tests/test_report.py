@@ -77,8 +77,11 @@ def evaluation(report: dict, metric: str, kind: str = "project") -> dict:
 
 # An independent count of the five metrics, written without the producer's helpers.
 def oracle(report: dict, source: int | None = None) -> dict[str, tuple]:
+    root = {s["source_index"] for s in report["sources"] if s["ownership"] == "user"}
+
     def here(rec: dict) -> bool:
-        return source is None or rec["source_index"] == source
+        # The project is the root project's sources (SPEC 18.1); a source is itself, whoever owns it.
+        return rec["source_index"] in root if source is None else rec["source_index"] == source
 
     regions = [r for r in report["regions"] if r["classification"] == "user" and here(r)]
     lines = [ln for ln in report["lines"] if ln["status"] in ("covered", "partial", "uncovered") and here(ln)]

@@ -129,6 +129,12 @@ class _Detail:
         excluded = {i for x in r["exclusions"] for i in x["affected"]["clause_indices"]}
         self.clauses = [c["clause_index"] for c in r["contracts"] if c["enforcement"] == "runtime_checked" and c["clause_index"] not in excluded]
         self.points = points
+        # The root project (SPEC 18.1): dependency sources are reported on their own and stay out of
+        # project metrics and thresholds unless a scope or entity names them (CV-417, B12).
+        self.root = root_sources(r)
+
+    def _root(self, rec: dict) -> bool:
+        return rec["source_index"] in self.root
 
     def _metric(self, covered: int, total: int, partial: int | None = None) -> dict:
         return {"covered": covered, "partial": partial, "ratio": ratio(covered, total), "total": total}
@@ -153,8 +159,10 @@ class _Detail:
         mine = [self.r["lines"][i] for i in self.lines if keep(self.r["lines"][i])]
         return self._metric(sum(x["status"] == "covered" for x in mine), len(mine), sum(x["status"] == "partial" for x in mine))
 
-    def group(self, keep=lambda rec: True) -> dict:
-        """The five metrics over the units ``keep`` selects (by source, or all)."""
+    def group(self, keep=None) -> dict:
+        """The five metrics over the units ``keep`` selects (by default, the
+        root project's: every ``user`` source)."""
+        keep = keep or self._root
         return {"branch": self._branches(keep), "contract": self._contracts(keep), "function": self._functions(keep),
                 "line": self._lines(keep), "region": self._regions(keep)}
 
@@ -180,8 +188,10 @@ class _Detail:
                 "line": self._metric(covered, total, partial),
                 "region": self._regions(mine)}
 
-    def members(self, metric: str, keep=lambda rec: True) -> list[int]:
-        """The denominator membership of ``metric`` over the units ``keep`` selects."""
+    def members(self, metric: str, keep=None) -> list[int]:
+        """The denominator membership of ``metric`` over the units ``keep``
+        selects (by default, the root project's)."""
+        keep = keep or self._root
         r = self.r
         if metric == "branch":
             return sorted({b for b, _ in self.outcomes if keep(r["branches"][b])})
@@ -381,28 +391,38 @@ def _diff_evaluations(r: dict, detail: _Detail) -> list[dict]:
 # ── ratchets (CV-313; SPEC 22.4) ────────────────────────────────────────────
 
 
+def root_sources(r: dict) -> set[int]:
+    """The root project's sources: every ``user`` source (SPEC 18.1)."""
+    return {s["source_index"] for s in r["sources"] if s["ownership"] == "user"}
+
+
 def excluded_members(r: dict, metric: str) -> list[int]:
-    """The records of ``metric`` that an exclusion removed from its
-    denominator: excluded regions, lines, functions and runtime-checked
-    clauses, and branches with an excluded outcome."""
+    """The root project's records of ``metric`` that an exclusion removed
+    from its denominator: excluded regions, lines, functions and
+    runtime-checked clauses, and branches with an excluded outcome."""
+    root = root_sources(r)
     if metric == "region":
-        return [x["region_index"] for x in r["regions"] if x["classification"] == "excluded"]
+        return [x["region_index"] for x in r["regions"] if x["classification"] == "excluded" and x["source_index"] in root]
     if metric == "line":
-        return [x["line_index"] for x in r["lines"] if x["status"] == "excluded"]
+        return [x["line_index"] for x in r["lines"] if x["status"] == "excluded" and x["source_index"] in root]
     if metric == "branch":
-        return [b["branch_index"] for b in r["branches"] if any(o["status"] == "excluded" for o in b["outcomes"])]
+        return [b["branch_index"] for b in r["branches"]
+                if b["source_index"] in root and any(o["status"] == "excluded" for o in b["outcomes"])]
     if metric == "function":
         entry = {p["entity_index"]: p for p in r["points"] if p["kind"] == "function_entry"}
-        return [e["entity_index"] for e in r["entities"]
-                if e["kind"] == "function" and entry.get(e["entity_index"], {}).get("classification") == "excluded"]
+        return [e["entity_index"] for e in r["entities"] if e["kind"] == "function" and e["source_index"] in root
+                and entry.get(e["entity_index"], {}).get("classification") == "excluded"]
     off = {i for x in r["exclusions"] for i in x["affected"]["clause_indices"]}
-    return [c["clause_index"] for c in r["contracts"] if c["enforcement"] == "runtime_checked" and c["clause_index"] in off]
+    return [c["clause_index"] for c in r["contracts"]
+            if c["enforcement"] == "runtime_checked" and c["clause_index"] in off and c["source_index"] in root]
 
 
 def excluded_units(r: dict, metric: str) -> int:
-    """How many units of ``metric`` exclusions removed (a branch counts its excluded outcomes)."""
+    """How many of the root project's units of ``metric`` exclusions removed
+    (a branch counts its excluded outcomes)."""
     if metric == "branch":
-        return sum(o["status"] == "excluded" for b in r["branches"] for o in b["outcomes"])
+        root = root_sources(r)
+        return sum(o["status"] == "excluded" for b in r["branches"] if b["source_index"] in root for o in b["outcomes"])
     return len(excluded_members(r, metric))
 
 

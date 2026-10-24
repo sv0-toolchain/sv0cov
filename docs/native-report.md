@@ -138,6 +138,11 @@ a report is never made from evidence that does not validate.
 Excluded, statically unreachable and synthetic-support records are outside
 every denominator. A zero denominator gives a `null` ratio.
 
+The project metrics, and every project threshold, ratchet and exclusion cap,
+count the root project only: the `user` sources (SPEC 18.1). A `dependency`
+source has its own summary and enters policy only when a scope or entity
+names it. Ownership is the map's build-graph fact, never a path.
+
 The project and each source get all five metrics. A function entity counts
 only what it owns: its own entry, its regions, the outcomes of its branches,
 its clauses, and each line once where one of its regions contributes, with
