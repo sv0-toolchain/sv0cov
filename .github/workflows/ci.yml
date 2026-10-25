@@ -165,7 +165,8 @@ jobs:
   # `genhtml` with branch coverage, no ignored error, totals equal to the
   # tracefile's. The two tarballs are fetched first and refused unless their
   # pinned digests match (tests/conformance/lcov-distributions.json); the
-  # check itself runs with no network. Both run on the host perl.
+  # check itself runs with no network. Both run on the host perl, with LCOV
+  # 2.5's Perl modules from the runner's distribution.
   lcov-consumers:
     name: LCOV 1.16 + 2.5 consumers
     runs-on: ubuntu-24.04
@@ -180,6 +181,13 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
+
+      # LCOV 2.5's non-core Perl modules (lcovutil.pm, genhtml); 1.16 needs none.
+      - name: Perl modules for LCOV 2.5
+        run: >-
+          sudo apt-get install --no-install-recommends -y
+          libcapture-tiny-perl libdatetime-perl libdatetime-format-w3cdtf-perl libdevel-stacktrace-perl
+          libtimedate-perl libjson-xs-perl libmemory-process-perl
 
       - name: Fetch the pinned LCOV releases
         run: |
