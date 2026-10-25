@@ -25,8 +25,12 @@ very bytes beside it.
 
 A saturated count has no exact value; the export is refused (``COV4020``,
 exit 6) before anything is published. ``--allow-lossy-saturated-export``
-on saturated evidence is the diagnostic-only lossy export, which this build
-does not produce yet (``COV5001``, exit 7; CV-420).
+asks for the diagnostic-only lossy export instead (CV-420; SPEC 14.2.1,
+COV-POL-011): an inexact count is written as the hit count ``1``, the
+manifest says ``saturation_disposition: lossy_hit_only``, and the native
+report beside it is ``diagnostic_only`` with ``COV4021`` in its integrity
+evaluation, so the set is never policy evidence. With the flag but no
+inexact exported count the export is simply exact.
 """
 
 from __future__ import annotations
@@ -37,7 +41,7 @@ from sv0cov import cli
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.formats.cobertura import CoberturaError, check_cobertura, render_cobertura
 from sv0cov.formats.export_manifest import FORMATS, build_manifest, verify_export
-from sv0cov.formats.lcov import LcovError, check_lcov, render_lcov
+from sv0cov.formats.lcov import LcovError, check_lcov, has_inexact, render_lcov
 
 STANDARD = ("lcov", "cobertura")
 NATIVE = "coverage.json"
@@ -58,17 +62,29 @@ def support_dir(fmt: str) -> str:
     return f"{fmt}-stdout-support"
 
 
-def render(fmt: str, report: dict, *, timestamp: int) -> bytes:
-    """The primary bytes, or :class:`ExportStop`."""
-    if report["saturation"]["any"] and report["resolved_configuration"]["report"]["allow_lossy_saturated_export"]["value"]:
-        raise ExportStop(Diagnostic("COV5001", "report", facts=(
-            ("detail", "the diagnostic-only lossy export of saturated evidence is not implemented yet"), ("format", fmt))),
-            cli.EXIT_UNSUPPORTED)
+def disposition(report: dict) -> str:
+    """``lossy_hit_only`` when an exported count is inexact and the lossy
+    export was asked for, else ``exact`` (a refusal comes from :func:`render`)."""
+    allowed = report["resolved_configuration"]["report"]["allow_lossy_saturated_export"]["value"]
+    return "lossy_hit_only" if allowed and has_inexact(report) else "exact"
+
+
+def render(fmt: str, report: dict, *, timestamp: int) -> tuple[bytes, str]:
+    """The primary bytes and their saturation disposition, or :class:`ExportStop`."""
+    lossy = disposition(report) == "lossy_hit_only"
     try:
-        return render_lcov(report) if fmt == "lcov" else render_cobertura(report, timestamp=timestamp)
+        data = render_lcov(report, lossy=lossy) if fmt == "lcov" else render_cobertura(report, timestamp=timestamp, lossy=lossy)
     except (LcovError, CoberturaError) as exc:
         raise ExportStop(Diagnostic(exc.code, "report", facts=(("detail", cli.fact_text(exc.detail)), ("format", fmt))),
                          cli.EXIT_REPORT) from None
+    return data, ("lossy_hit_only" if lossy else "exact")
+
+
+def lossy_warning(fmt: str) -> Diagnostic:
+    """The ``COV4021`` warning a lossy export is published with."""
+    return Diagnostic("COV4021", "report", facts=(
+        ("detail", "saturated counts were written as hit count 1; this export and its native report are diagnostic only"),
+        ("format", fmt)))
 
 
 def _check_primary(fmt: str, report: dict) -> Callable[[bytes], None]:
@@ -83,10 +99,11 @@ def bundle(formats: list[str], report: dict, native: bytes, *, timestamp: int, t
     checks: dict[str, Callable] = {}
     for fmt in (f for f in formats if f in STANDARD):
         name, manifest = FORMATS[fmt]["filename"], FORMATS[fmt]["manifest"]
-        primary = render(fmt, report, timestamp=timestamp)
+        primary, how = render(fmt, report, timestamp=timestamp)
         files[name] = primary
         files[NATIVE] = native
-        files[manifest] = build_manifest(fmt, report, primary=primary, primary_name=name, native=native, native_name=NATIVE)
+        files[manifest] = build_manifest(fmt, report, primary=primary, primary_name=name, native=native, native_name=NATIVE,
+                                         saturation_disposition=how)
         checks[name] = _check_primary(fmt, report)
         checks[manifest] = (lambda p, n: lambda data: verify_export(data, p, native, names=(n, NATIVE), tier=tier))(primary, name)
     return files, checks
@@ -96,9 +113,10 @@ def single(fmt: str, report: dict, native: bytes, *, basename: str | None, times
     """One export set: ``primary``, ``native``, ``manifest`` bytes, the
     names they are committed under (``None`` for a stdout primary) and a
     validator for each."""
-    primary = render(fmt, report, timestamp=timestamp)
+    primary, how = render(fmt, report, timestamp=timestamp)
     native_name = NATIVE if basename is None else basename + NATIVE_SUFFIX
-    manifest = build_manifest(fmt, report, primary=primary, primary_name=basename, native=native, native_name=native_name)
+    manifest = build_manifest(fmt, report, primary=primary, primary_name=basename, native=native, native_name=native_name,
+                              saturation_disposition=how)
     return {
         "primary": primary, "native": native, "manifest": manifest, "native_name": native_name,
         "manifest_name": FORMATS[fmt]["manifest"] if basename is None else basename + MANIFEST_SUFFIX,
@@ -107,4 +125,5 @@ def single(fmt: str, report: dict, native: bytes, *, basename: str | None, times
     }
 
 
-__all__ = ["ExportStop", "MANIFEST_SUFFIX", "NATIVE", "NATIVE_SUFFIX", "STANDARD", "bundle", "render", "single", "support_dir"]
+__all__ = ["ExportStop", "MANIFEST_SUFFIX", "NATIVE", "NATIVE_SUFFIX", "STANDARD", "bundle", "disposition", "lossy_warning", "render", "single",
+           "support_dir"]

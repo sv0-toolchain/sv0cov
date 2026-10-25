@@ -70,7 +70,10 @@ them. Native JSON stays authoritative.
 
 Text XML 1.0 cannot carry (control characters) is refused with `COV4401`;
 markup-sensitive text is escaped. A saturated or lower-bound count is
-refused with `COV4020` (the explicit lossy export is CV-420).
+refused with `COV4020`, unless the diagnostic-only lossy export is asked for
+(`--allow-lossy-saturated-export`). Cobertura writes no exact count, so the
+lossy document equals the exact one would; only its manifest says
+`lossy_hit_only` ([export-manifest.md](export-manifest.md)).
 
 ## Reading back
 

@@ -27,9 +27,12 @@ lengths, the native report (read and cross-validated), the configuration
 digest, the indexed input when it is available, and the primary against
 the report. Anything else is ``COV4402``.
 
-``saturation_disposition`` is ``exact`` in this build: a saturated export is
-refused before any manifest exists. ``lossy_hit_only`` is valid in a
-manifest and is produced only by the explicit lossy export (CV-420).
+``saturation_disposition`` is ``exact`` exactly when no exported count of
+the native report is inexact, and ``lossy_hit_only`` only for the explicit
+diagnostic-only lossy export (CV-420): the native report must then have
+saturated exported counts, the override, ``COV4021`` in its integrity
+evaluation and ``diagnostic_only`` eligibility, so a lossy set can never be
+read as policy evidence.
 """
 
 from __future__ import annotations
@@ -183,7 +186,7 @@ def verify_export(manifest: bytes, primary: bytes, native: bytes, *, names: tupl
     given, are the basenames the artifacts were found under (``None`` for
     stdout). ``indexed``, when available, is the indexed input."""
     from sv0cov.formats.cobertura import CoberturaError, check_cobertura
-    from sv0cov.formats.lcov import LcovError, check_lcov
+    from sv0cov.formats.lcov import LcovError, check_lcov, has_inexact
     from sv0cov.formats.report import ReportError
     from sv0cov.model.report import read_report
 
@@ -205,11 +208,22 @@ def verify_export(manifest: bytes, primary: bytes, native: bytes, *, names: tupl
         raise ManifestError("indexed_input_sha256 is not the indexed input's")
     if report["tool"]["version"] != obj["producer"]["version"]:
         raise ManifestError("producer/version is not the native report's tool version")
-    if obj["saturation_disposition"] == "exact":
-        try:
-            (check_lcov if obj["format"] == "lcov" else check_cobertura)(primary, report)
-        except (LcovError, CoberturaError) as exc:
-            raise ManifestError(f"the primary does not match the native report ({exc.detail})") from None
+    try:
+        inexact = has_inexact(report)
+    except LcovError as exc:
+        raise ManifestError(f"the native report cannot be exported ({exc.detail})") from None
+    if obj["saturation_disposition"] == "exact" and inexact:
+        raise ManifestError("saturation_disposition is exact, but an exported count of the native report is inexact")
+    if obj["saturation_disposition"] == "lossy_hit_only":
+        integrity = next(e for e in report["policy"]["evaluations"] if e["assertion_kind"] == "integrity")
+        if not (inexact and report["resolved_configuration"]["report"]["allow_lossy_saturated_export"]["value"]
+                and "COV4021" in integrity["diagnostics"] and report["evidence_eligibility"] in ("diagnostic_only", "incomplete")):
+            raise ManifestError("a lossy_hit_only export needs saturated exported counts, the explicit lossy override, and a "
+                                "diagnostic-only native report that names COV4021")
+    try:
+        (check_lcov if obj["format"] == "lcov" else check_cobertura)(primary, report)
+    except (LcovError, CoberturaError) as exc:
+        raise ManifestError(f"the primary does not match the native report ({exc.detail})") from None
     return obj
 
 

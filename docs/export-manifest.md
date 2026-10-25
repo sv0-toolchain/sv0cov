@@ -65,6 +65,18 @@ the `f0` fixture, and `mutations.json`, a corpus of single changes, each
 marked `valid` or `COV4402`, for every reader of the schema (`build.py`
 rebuilds and checks them). Tests: `tests/test_exports.py`.
 
+## Lossy exports
+
+`saturation_disposition` is `exact` exactly when no exported count of the
+native report is inexact. `--allow-lossy-saturated-export` on saturated
+evidence publishes the diagnostic-only lossy export instead of refusing it
+(CV-420): every inexact count is written as hit count `1`, the manifest says
+`lossy_hit_only`, the native report beside it is `diagnostic_only` with
+`COV4021` in its integrity evaluation, and `report` prints a `COV4021`
+warning per export. `verify_export` refuses a manifest whose disposition
+does not match its native report either way. A lossy set is never policy
+evidence. Tests: `tests/test_lossy_export.py` (the flag × evidence ×
+format × layout matrix).
+
 The `lcov-r1-core` and `cobertura-r1-core` capability features are not
-advertised yet: they wait for the consumer checks (CV-418, CV-419) and the
-lossy export (CV-420).
+advertised yet: they wait for the consumer checks (CV-418, CV-419).

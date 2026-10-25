@@ -21,7 +21,9 @@ with the native JSON report and an export commit manifest
 ``P.sv0cov.json`` and ``P.manifest.json`` (native first, manifest last);
 for stdout in the new directory ``<output_dir>/reports/<format>-stdout-support``,
 published only after stdout took the primary. A saturated count refuses the
-export (``COV4020``, 6).
+export (``COV4020``, 6) unless ``--allow-lossy-saturated-export`` asks for
+the diagnostic-only lossy export, which is published with a ``COV4021``
+warning (CV-420).
 
 **Destination** (SPEC 20.2.2).
 
@@ -56,7 +58,7 @@ import os
 from sv0cov import cli
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.evidence import Stop, load_report
-from sv0cov.exports import MANIFEST_SUFFIX, NATIVE_SUFFIX, STANDARD, ExportStop, bundle, single, support_dir
+from sv0cov.exports import MANIFEST_SUFFIX, NATIVE_SUFFIX, STANDARD, ExportStop, bundle, disposition, lossy_warning, single, support_dir
 from sv0cov.formats.html import check_html, render_html
 from sv0cov.formats.terminal import render_terminal, terminal_bytes
 from sv0cov.model.report import read_report
@@ -150,7 +152,10 @@ def cmd_report(ctx: cli.Context) -> int:
             members = {export["native_name"]: export["native"], export["manifest_name"]: export["manifest"]}
             checks = {export["native_name"]: native, export["manifest_name"]: export["check_manifest"]}
             for name, data in members.items():
-                checks[name](data)
+                try:
+                    checks[name](data)
+                except Exception as exc:  # noqa: BLE001 - any validator failure means nothing is written
+                    raise PublishError("failed", f"validation failed ({type(exc).__name__})") from None
             publish_stdout(console.binary_stdout(), export["primary"], validate=export["check_primary"])
             publish_bundle(support, members, anchor=str(ctx.cwd), validate=checks)
         elif lone_export:
@@ -175,6 +180,9 @@ def cmd_report(ctx: cli.Context) -> int:
             console.abandon_stdout()
         console.report(_publish_failure(exc))
         return cli.EXIT_REPORT
+    if standard and disposition(report) == "lossy_hit_only":
+        for fmt in standard:
+            console.report(lossy_warning(fmt))
     if not to_stdout:  # stdout carries the one format and nothing else (SPEC 20.2)
         shown = final if output is None else output
         if is_bundle:

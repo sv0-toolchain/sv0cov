@@ -67,7 +67,10 @@ the evidence is read. One file `P` is three commits: the native report,
 then `P`, then the manifest, which is the commit record; files without
 their manifest are not a complete export. For stdout the support directory
 is published only after stdout took every byte. A saturated count refuses
-the export (`COV4020`, exit 6) and nothing is published.
+the export (`COV4020`, exit 6) and nothing is published, unless
+`--allow-lossy-saturated-export` asks for the diagnostic-only lossy export:
+it is published with a `COV4021` warning, a `lossy_hit_only` manifest and a
+`diagnostic_only` native report.
 
 A terminal report written to a file is always colorless. On stdout it
 follows `--color`, and color only repeats status words.

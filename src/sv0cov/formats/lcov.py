@@ -35,8 +35,10 @@ native per-source function, line and branch metrics; a zero denominator is
 written ``0``.
 
 A count that is saturated or only a lower bound has no exact value, so a
-report holding one in an exported unit is refused (``COV4020``); the
-explicit lossy path is CV-420. A malformed tracefile, or one that does not
+report holding one in an exported unit is refused (``COV4020``) unless the
+caller asks for the explicit diagnostic-only lossy export (``lossy=True``;
+CV-420, SPEC 14.2.1), which writes each such count as the hit count ``1``.
+:func:`has_inexact` says whether an export would need it. A malformed tracefile, or one that does not
 match its report, is ``COV4401``.
 """
 
@@ -60,13 +62,15 @@ class LcovError(ValueError):
         self.detail = detail
 
 
-def _exact(count: dict, what: str) -> int:
+def _exact(count: dict, what: str, lossy: bool) -> int:
     if count["saturated"] or count["lower_bound"]:
+        if lossy:
+            return 1  # the lossy hit-only projection: executed, magnitude unknown
         raise LcovError(SATURATED, f"{what} has no exact count (it saturated); LCOV needs exact counts")
     return count["value"]
 
 
-def _records(r: dict) -> list[dict]:
+def _records(r: dict, lossy: bool = False) -> list[dict]:
     """Per root-project source: its functions, lines and decisions as LCOV sees them."""
     entry = {p["entity_index"]: p for p in r["points"] if p["kind"] == "function_entry"}
     out = []
@@ -82,7 +86,7 @@ def _records(r: dict) -> list[dict]:
             name = e["qualified_name"]
             if not RE_NAME.fullmatch(name):
                 raise LcovError(INVALID, f"function name {name!r} cannot be written as an LCOV record")
-            functions.append((e["span"]["start_line"], name, _exact(p["count"], f"function {name}")))
+            functions.append((e["span"]["start_line"], name, _exact(p["count"], f"function {name}", lossy)))
         lines = [(x["line"], int(x["status"] == "covered")) for x in r["lines"] if x["source_index"] == n and x["status"] in EXECUTABLE]
         lines.sort()
         decisions: dict[int, list[list[int]]] = {}
@@ -90,15 +94,27 @@ def _records(r: dict) -> list[dict]:
             outcomes = sorted((o for o in b["outcomes"] if o["status"] in ELIGIBLE), key=lambda o: o["ordinal"])
             if outcomes:
                 where = f"branch {b['branch_index']} in {s['path']}"
-                decisions.setdefault(b["span"]["start_line"], []).append([_exact(o["count"], where) for o in outcomes])
+                decisions.setdefault(b["span"]["start_line"], []).append([_exact(o["count"], where, lossy) for o in outcomes])
         out.append({"path": s["path"], "functions": functions, "lines": lines, "decisions": decisions})
     return out
 
 
-def render_lcov(report: dict) -> bytes:
-    """The ``sv0cov-lcov-r1-core`` tracefile of a validated native report."""
+def has_inexact(report: dict) -> bool:
+    """Whether some exported count is saturated or a lower bound."""
+    try:
+        _records(report)
+    except LcovError as exc:
+        if exc.code == SATURATED:
+            return True
+        raise
+    return False
+
+
+def render_lcov(report: dict, *, lossy: bool = False) -> bytes:
+    """The ``sv0cov-lcov-r1-core`` tracefile of a validated native report;
+    ``lossy`` writes an inexact count as ``1`` instead of refusing it."""
     text = []
-    for rec in _records(report):
+    for rec in _records(report, lossy):
         text += ["TN:", f"SF:{rec['path']}"]
         text += [f"FN:{line},{name}" for line, name, _ in rec["functions"]]
         text += [f"FNDA:{count},{name}" for _, name, count in rec["functions"]]
@@ -227,4 +243,4 @@ def check_lcov(data: bytes, report: dict) -> None:
                                          f"report's {m['covered']}/{m['total']}")
 
 
-__all__ = ["LcovError", "PROFILE", "check_lcov", "parse_lcov", "render_lcov"]
+__all__ = ["LcovError", "PROFILE", "check_lcov", "has_inexact", "parse_lcov", "render_lcov"]

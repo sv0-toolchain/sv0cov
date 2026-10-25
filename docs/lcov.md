@@ -44,8 +44,9 @@ units, and every extension: `VER`, line checksums, `FNL`, `FNA`, function
 end lines, MC/DC, comments, vendor records. Native JSON stays authoritative.
 
 A saturated or lower-bound count has no exact value; a report holding one in
-an exported unit is refused with `COV4020` (the explicit lossy export is
-CV-420). `parse_lcov` reads a tracefile under exactly this grammar, checking
+an exported unit is refused with `COV4020`, unless the diagnostic-only lossy
+export is asked for (`lossy=True`, `--allow-lossy-saturated-export`;
+[export-manifest.md](export-manifest.md)), which writes it as `1`. `parse_lcov` reads a tracefile under exactly this grammar, checking
 order, contiguous decision and outcome indexes and every summary, and
 `check_lcov` also requires the totals of every source to equal the report's;
 anything else is `COV4401`.

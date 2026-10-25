@@ -46,8 +46,10 @@ The mapping:
   and never drive policy.
 
 A saturated or lower-bound count in an exported unit is refused
-(``COV4020``), as SPEC 9.6 requires for every standard export; the explicit
-lossy path is CV-420. Text XML 1.0 cannot carry, or a document outside the
+(``COV4020``), as SPEC 14.2.1 requires for every standard export, unless the
+caller asks for the explicit diagnostic-only lossy export (``lossy=True``;
+CV-420). Cobertura writes no exact count, so the lossy document is the same
+document; only its manifest says ``lossy_hit_only``. Text XML 1.0 cannot carry, or a document outside the
 profile or disagreeing with its report, is ``COV4401``.
 """
 
@@ -93,12 +95,12 @@ def _fraction(covered: int, total: int) -> str:
     return f"{100 * covered // total}% ({covered}/{total})"
 
 
-def _check_exact(count: dict, what: str) -> None:
-    if count["saturated"] or count["lower_bound"]:
+def _check_exact(count: dict, what: str, lossy: bool) -> None:
+    if (count["saturated"] or count["lower_bound"]) and not lossy:
         raise CoberturaError(SATURATED, f"{what} has no exact count (it saturated); a standard export needs exact counts")
 
 
-def _classes(r: dict) -> list[tuple[str, list[dict]]]:
+def _classes(r: dict, lossy: bool = False) -> list[tuple[str, list[dict]]]:
     """Per package, in name order: its root-project sources as classes."""
     entry = {p["entity_index"]: p for p in r["points"] if p["kind"] == "function_entry"}
     packages: dict[str, list[dict]] = {}
@@ -114,7 +116,7 @@ def _classes(r: dict) -> list[tuple[str, list[dict]]]:
                 continue
             where = f"branch {b['branch_index']} in {s['path']}"
             for o in outcomes:
-                _check_exact(o["count"], where)
+                _check_exact(o["count"], where, lossy)
             span = b["span"]
             at = next((k for k in sorted(lines) if span["start_line"] <= k <= span["end_line"]), None)
             if at is None:
@@ -130,7 +132,7 @@ def _classes(r: dict) -> list[tuple[str, list[dict]]]:
             p = entry.get(e["entity_index"])
             if e["kind"] != "function" or e["source_index"] != n or p is None or p["classification"] != "user":
                 continue
-            _check_exact(p["count"], f"function {e['qualified_name']}")
+            _check_exact(p["count"], f"function {e['qualified_name']}", lossy)
             methods.append({"name": e["qualified_name"], "lines": sorted(touched.get(e["entity_index"], ()))})
         packages.setdefault(s["package"] or ROOT_PACKAGE, []).append({"path": s["path"], "lines": lines, "methods": methods})
     return sorted(packages.items(), key=lambda kv: kv[0].encode("utf-8"))
@@ -169,12 +171,13 @@ def _lines_xml(lines: dict, numbers: list[int], pad: str) -> list[str]:
     return out + [f"{pad}</lines>"]
 
 
-def render_cobertura(report: dict, *, timestamp: int = 0) -> bytes:
+def render_cobertura(report: dict, *, timestamp: int = 0, lossy: bool = False) -> bytes:
     """The ``sv0cov-cobertura-r1-core`` document of a validated native
-    report; ``timestamp`` is the reproducible-build epoch, ``0`` by default."""
+    report; ``timestamp`` is the reproducible-build epoch, ``0`` by default;
+    ``lossy`` accepts inexact counts instead of refusing them."""
     if type(timestamp) is not int or timestamp < 0:
         raise CoberturaError(INVALID, f"timestamp {timestamp!r} is not a nonnegative integer")
-    packages = _classes(report)
+    packages = _classes(report, lossy)
     body = []
     total = [0, 0, 0, 0]
     for name, classes in packages:
@@ -436,7 +439,7 @@ def check_cobertura(data: bytes, report: dict) -> None:
     root-project sources in package order, with the report's own line and
     branch fractions and one method per exported function."""
     got = parse_cobertura(data)["classes"]
-    want = [(name, c) for name, classes in _classes(report) for c in classes]
+    want = [(name, c) for name, classes in _classes(report, lossy=True) for c in classes]  # structure only: counts are not compared
     if [(g["package"], g["path"]) for g in got] != [(name, c["path"]) for name, c in want]:
         raise CoberturaError(INVALID, "the document's classes are not the report's root-project sources")
     summary = {s["path"]: s["summary"] for s in report["sources"] if s["ownership"] == "user"}

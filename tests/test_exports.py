@@ -151,11 +151,11 @@ class ExportSetTest(unittest.TestCase):
         manifest = build_manifest("lcov", report, primary=wrong, primary_name="lcov.info", native=native, native_name="coverage.json")
         self.assertEqual(code_of(verify_export, manifest, wrong, native), "COV4402")
 
-    def test_saturation_refuses_and_the_lossy_flag_is_not_yet_implemented(self) -> None:
+    def test_saturation_refuses_without_the_lossy_flag(self) -> None:
+        """The lossy matrix is tests/test_lossy_export.py (CV-420)."""
         maps, profiles, selection = rich_inputs()
         indexed = encode(build_indexed(maps, profiles, run_selection=selection, tool_version=V))
-        for opts, code, status in ((STALE_OK, "COV4020", cli.EXIT_REPORT),
-                                   ([*STALE_OK, ("--allow-lossy-saturated-export", None)], "COV5001", cli.EXIT_UNSUPPORTED)):
+        for opts, code, status in ((STALE_OK, "COV4020", cli.EXIT_REPORT),):
             report = build_report(indexed, config(opts), {}, standard_export=True, tool_version=V)
             for fmt in ("lcov", "cobertura"):
                 with self.subTest(fmt=fmt, opts=opts):
@@ -231,6 +231,26 @@ class PublicationTest(ReportBase):
                         stderr=err, cwd=self.cwd)
         self.assertEqual((code, records(err.getvalue())[0]["code"]), (6, "COV4011"))
         self.assertFalse((self.cwd / REPORTS / "cobertura-stdout-support").exists())
+
+    def test_a_support_file_that_fails_validation_is_a_publication_failure(self) -> None:
+        """Regression (CV-420): this escaped as an internal error (COV8001, exit 8)."""
+        from unittest import mock
+
+        from sv0cov import cmd_report
+
+        def bad(*a, **k):
+            s = single(*a, **k)
+
+            def refuse(_data: bytes) -> None:
+                raise ManifestError("refused")
+
+            return {**s, "check_manifest": refuse}
+
+        self.project()
+        with mock.patch.object(cmd_report, "single", bad):
+            code, out, err = self.run_report("--format", "lcov", "--output", "-")
+        self.assertEqual((code, out, records(err)[0]["code"]), (6, "", "COV4011"))
+        self.assertFalse((self.cwd / REPORTS / "lcov-stdout-support").exists())
 
     def test_a_bundle_holds_every_export_and_the_shared_native_report(self) -> None:
         self.project()
