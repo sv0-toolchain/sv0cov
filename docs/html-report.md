@@ -37,7 +37,7 @@ A skip link, landmarks (`header`, `nav`, `main`, `footer`), a section index
 and headed sections. The uncovered places form one chain: in a source, each
 links to the next ("next uncovered"), so the chain works without the script.
 With the script, `n` (or `j`) and `p` (or `k`) move focus along the chain of
-the context being shown. Long source lines scroll inside a focusable region.
+the context being shown, while focus is in a source listing (WCAG 2.1.4). Long source lines scroll inside a focusable region.
 
 ## Contexts
 
@@ -81,6 +81,6 @@ quotes, ESC sequences, a bidi override, NUL) in every untrusted field stays
 text; one chain reaches every uncovered place; every status is a word; the
 filter carries the numbers of each context; landmarks, headings, scoped
 table headers, labels and focusable scroll regions; an unavailable source;
-CRLF and tabs. The behavior in a browser (filter, keys, no policy
-violation) was checked by hand for CV-309; WCAG 2.2 AA is an R1 gate
-(COV-REP-007).
+CRLF and tabs. WCAG 2.2 AA (CV-408, COV-REP-007): axe-core and keyboard
+checks in CI, contrast in `tests/test_accessibility.py`, and the manual
+review in [accessibility-audit.md](accessibility-audit.md).

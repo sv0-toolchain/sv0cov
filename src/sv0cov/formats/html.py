@@ -23,7 +23,9 @@ numbers come from :func:`sv0cov.model.context.context_view`.
   and functions linking to their sources, and one chain through every
   uncovered or partial line and every line with an outcome not taken: each
   stop links to the next, so the chain works without the script; with it,
-  ``n`` and ``p`` move along the chain of the context being shown.
+  ``n`` and ``p`` move along the chain of the context being shown while
+  focus is in a source listing (WCAG 2.1.4: a single-key shortcut acts only
+  when its component has focus).
 - **Status in words.** Every status is written out; color only repeats it.
 - **Contexts.** With two or more contexts, a filter shows the summary, the
   file and function metrics, line statuses and outcome counts of one
@@ -81,6 +83,7 @@ code,.src td.code,.hash{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,m
 .src td,.src th{border:0;padding:0 .5em}
 .src td.code{white-space:pre;tab-size:4;width:100%}
 .src th{font-weight:400;color:var(--muted);text-align:right}
+.src th a{display:inline-block;min-width:24px;min-height:24px;line-height:24px}
 .src td.st{white-space:nowrap;font-size:12px}
 .wrap{overflow-x:auto}
 .src tr.note td{padding-bottom:.2em}
@@ -96,8 +99,7 @@ SCRIPT = """
 (function () {
   "use strict";
   var block = document.getElementById("sv0cov-data");
-  if (!block) { return; }
-  var data = JSON.parse(block.textContent);
+  var data = block ? JSON.parse(block.textContent) : null;
   var lineWords = {c: "covered", p: "partial", u: "uncovered", n: "", x: "excluded"};
   var shown = 0;
   function apply(v) {
@@ -126,13 +128,17 @@ SCRIPT = """
     if (label) { label.textContent = view.name; }
   }
   function stops() {
-    var view = data.views[shown];
-    var rows = document.querySelectorAll("tr[data-l]");
+    // Every uncovered or partial line and every line with an outcome not taken (in the note
+    // row after it), as the "next uncovered" links chain them. The classes always show the
+    // context being shown (apply keeps them in step), so this works with one context too,
+    // where there is no data block.
+    var rows = document.querySelectorAll(".src tbody tr[id]");
     var out = [];
     for (var i = 0; i < rows.length; i++) {
-      var code = view.l.charAt(Number(rows[i].getAttribute("data-l")));
-      var missed = rows[i].querySelector(".o-u");
-      if (code === "u" || code === "p" || missed) { out.push(rows[i]); }
+      var code = rows[i].className;
+      var note = rows[i].nextElementSibling;
+      var missed = note && note.className === "note" && note.querySelector(".o-u");
+      if (code === "l-u" || code === "l-p" || missed) { out.push(rows[i]); }
     }
     return out;
   }
@@ -145,12 +151,14 @@ SCRIPT = """
     list[next].scrollIntoView({block: "center"});
   }
   var select = document.getElementById("sv0cov-context");
-  if (select) {
+  if (select && data) {
     select.addEventListener("change", function () { apply(Number(select.value)); });
   }
   document.addEventListener("keydown", function (e) {
     var tag = e.target && e.target.tagName;
     if (e.altKey || e.ctrlKey || e.metaKey || tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") { return; }
+    // WCAG 2.1.4: the single-key shortcuts act only while focus is in a source listing.
+    if (!e.target || !e.target.closest || !e.target.closest(".wrap")) { return; }
     if (e.key === "n" || e.key === "j") { move(1); e.preventDefault(); }
     else if (e.key === "p" || e.key === "k") { move(-1); e.preventDefault(); }
   });
@@ -286,7 +294,7 @@ class _Page:
                    '<option value="0" selected>all contexts (aggregate)</option>\n')
             for n, c in enumerate(self.r["contexts"], 1):
                 self.w(f'<option value="{n}">context {esc(_quoted(c["value"]))}</option>\n')
-            self.w('</select> <span class="ann">showing: <span id="sv0cov-shown">all contexts (aggregate)</span>. '
+            self.w('</select> <span class="ann" role="status">showing: <span id="sv0cov-shown">all contexts (aggregate)</span>. '
                    "Policy and thresholds always use the aggregate.</span></p>\n")
         self.w("</header>\n")
 
@@ -628,12 +636,12 @@ class _Page:
                 attrs = f' id="L{n}-{ln}"'
                 word = ""
                 if x is not None:
-                    attrs += f' class="l-{LINE_CODE[x["status"]]}" data-l="{x["line_index"]}" tabindex="-1"'
+                    attrs += f' class="l-{LINE_CODE[x["status"]]}" data-l="{x["line_index"]}"'
                     word = STATUS_WORD[x["status"]]
                 note = "<br>".join(notes.get((n, ln), []))
                 if (n, ln) in nxt:
                     note += (" " if note else "") + f'<a class="nx" href="{nxt[(n, ln)]}">next uncovered</a>'
-                self.w(f'<tr{attrs}><th scope="row"><a href="#L{n}-{ln}">{ln}</a></th><td class="st">{word}</td>'
+                self.w(f'<tr{attrs} tabindex="-1"><th scope="row"><a href="#L{n}-{ln}">{ln}</a></th><td class="st">{word}</td>'
                        f'<td class="code">{esc_code(raw)}</td></tr>\n')
                 if note:
                     self.w(f'<tr class="note"><td></td><td></td><td class="ann">{note}</td></tr>\n')

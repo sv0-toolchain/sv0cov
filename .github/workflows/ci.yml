@@ -206,6 +206,42 @@ jobs:
           "${{ steps.py.outputs.python-path }}" tools/lcov_conformance.py
           --tarball 1.16="$RUNNER_TEMP/lcov/lcov-1.16.tar.gz" --tarball 2.5="$RUNNER_TEMP/lcov/lcov-2.5.tar.gz"
 
+  # CV-408 (SPEC 21.2, R1-G8, COV-REP-007): WCAG 2.2 AA on the representative
+  # HTML report set with the lockfile-pinned axe-core and Playwright Chromium
+  # (tools/accessibility, the non-runtime 'accessibility' group), plus the
+  # keyboard walk; tests/test_accessibility.py covers what needs no browser.
+  accessibility:
+    name: HTML WCAG 2.2 AA (axe-core + keyboard)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Install the pinned checker (lockfile only) and Chromium
+        working-directory: tools/accessibility
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Render the representative reports
+        run: python tools/accessibility/build_reports.py "$RUNNER_TEMP/a11y"
+
+      - name: axe-core WCAG 2.2 AA and keyboard checks
+        working-directory: tools/accessibility
+        run: node axe_check.mjs "$RUNNER_TEMP/a11y"
+
   fuzz:
     name: fuzz (linux-x86_64 / py3.14)
     runs-on: ubuntu-24.04

@@ -95,3 +95,10 @@ path = "bench/corpus/real/**"
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
 SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# CV-408: the accessibility checker's npm manifest, lockfile and ignore file.
+[[annotations]]
+path = ["tools/accessibility/package.json", "tools/accessibility/package-lock.json", "tools/accessibility/.gitignore"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Sasank Vishnubhatla"
+SPDX-License-Identifier = "MIT OR Apache-2.0"

@@ -1,0 +1,11 @@
+{
+  "name": "sv0cov-accessibility",
+  "private": true,
+  "description": "Non-runtime accessibility checks for the sv0cov HTML report (CV-408; SPEC 25.2.5 'accessibility' group). Exact versions; the lockfile pins integrity hashes.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "axe-core": "4.14.0",
+    "playwright": "1.64.0"
+  }
+}

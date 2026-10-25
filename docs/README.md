@@ -15,6 +15,7 @@ specification (`project-specs/sv0cov/SPEC.md`).
 - [Native report 1.0](native-report.md): the report and resolved-configuration schemas, how a report is produced and counted, and what the reader re-derives.
 - [Terminal report](terminal-report.md): the plain-text view of a native report, its sections, its escaping and color rules, and its goldens.
 - [HTML report](html-report.md): the self-contained, offline HTML view of a native report, its navigation, context filter and safety rules.
+- [HTML accessibility audit](accessibility-audit.md): the WCAG 2.2 AA report set, automated axe-core and keyboard checks, the manual review record and the defects it fixed.
 - [Changed-region coverage](changed-region.md): the Git model: explicit base, merge base, the capture taken before instrumentation, changed lines, staleness, and how Git is run.
 - [LCOV export](lcov.md): the `sv0cov-lcov-r1-core` profile: which sources, functions, lines and branches are written, the binary line projection, and what is never written.
 - [Cobertura export](cobertura.md): the `sv0cov-cobertura-r1-core` profile: packages, classes, methods, the binary line projection, conditions per decision, rates, the pinned DTD and what a document may never contain.
