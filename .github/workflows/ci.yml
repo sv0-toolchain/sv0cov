@@ -187,7 +187,7 @@ jobs:
         run: >-
           sudo apt-get install --no-install-recommends -y
           libcapture-tiny-perl libdatetime-perl libdatetime-format-w3cdtf-perl libdevel-stacktrace-perl
-          libtimedate-perl libjson-xs-perl libmemory-process-perl
+          libtimedate-perl libjson-xs-perl
 
       - name: Fetch the pinned LCOV releases
         run: |
