@@ -72,8 +72,9 @@ accepted only by an explicit baseline update.
 
 A changed source set (a compiled source added, removed or renamed) makes
 every ratio `ineligible` with `COV4201`, so the ratchet fails until the
-baseline is updated. Saturation follows the threshold rule: under `fail` a
-saturated count makes the ratio `ineligible` (`COV4020`). An empty current
+baseline is updated. A ratchet is an exact-count use: any saturated count,
+under either saturation policy, makes every ratio `ineligible` (`COV4020`)
+and puts `ratchets` in `saturation.ineligible_uses` (CV-404). An empty current
 metric follows the `empty` policy (`COV4102` under `fail`).
 
 `check` names the baseline's state, the source change and the metric's

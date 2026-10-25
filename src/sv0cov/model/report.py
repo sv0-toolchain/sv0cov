@@ -521,7 +521,6 @@ def _ratchet_evaluations(r: dict, detail: _Detail) -> list[dict]:
     cfg = r["resolved_configuration"]["coverage"]["ratchet"]
     metrics, tolerance = cfg["metrics"]["value"], cfg["tolerance_basis_points"]["value"]
     sat, empty = r["saturation"], r["resolved_configuration"]["coverage"]["empty"]["value"]
-    contract_points = {p["point_id"] for p in r["points"] if p["kind"] in ("contract_true", "contract_false")}
     out = []
     for m in metrics:
         cur = r["summary"][m]
@@ -533,7 +532,7 @@ def _ratchet_evaluations(r: dict, detail: _Detail) -> list[dict]:
             continue
         old = rec["baseline"]["metrics"][m]
         base = dict(limit=ratchet_limit(old, tolerance), source="ratchet", members=members)
-        if sat["any"] and (sat["policy"] == "fail" or (m == "contract" and contract_points & set(sat["affected_point_ids"]))):
+        if sat["any"]:  # a ratchet is an exact-count use (SPEC 11.1, 21.3.8; owner decision, CV-404)
             out.append(_evaluation("ratchet", "ratchet", m, "at_least", "ineligible", codes=[SATURATED], **base))
         elif rec["sources_added"] or rec["sources_removed"]:
             out.append(_evaluation("ratchet", "ratchet", m, "at_least", "ineligible", actual=actual, codes=[RATCHET_FAILED], **base))
@@ -697,6 +696,9 @@ def _ineligible_uses(r: dict, standard_export: bool) -> list[str]:
         uses.add("contract_counts")
     if any(c["value"] is not None for c in r["contexts"]):
         uses.add("context_exact_counts")
+    if r["resolved_configuration"]["coverage"]["ratchet"] is not None:
+        # A lower-bounded count cannot prove that nothing regressed, under either policy (owner decision, CV-404).
+        uses.add("ratchets")
     if standard_export:
         uses.add("standard_exports")
     return sorted(uses)

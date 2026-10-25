@@ -199,10 +199,26 @@ contexts and does not depend on whether contexts were collected.
   every one does. A package, source or entity the evidence does not have is
   `COV0013`. The reader works every scope and entity evaluation out again
   from the resolved configuration in the report.
-- **Saturation.** Under the `fail` policy any saturation makes every
-  threshold `ineligible`. Under `allow-ordinary`, function, region, line and
-  branch are evaluated; a contract threshold is `ineligible` when one of its
-  points saturated.
+- **Saturation** (CV-404, SPEC 14.2.1, 21.3.8). The policy is `fail` unless
+  `allow-ordinary` is chosen explicitly (`--saturation-policy` or
+  `[tool.sv0cov.integrity].saturation`); it is recorded in the resolved
+  configuration, in `saturation.policy` and in every baseline, and evidence
+  merged under one policy cannot be reported under the other (`COV0013`).
+  Under `fail` any saturation makes every evaluation `ineligible`
+  (`COV4020`). Under `allow-ordinary` the function, region, line and branch
+  thresholds are decided, from proven-positive lower bounds only: an
+  inexact zero is uncovered, and so is every line that depends on it, so
+  the result may fail where exact evidence would pass but never passes
+  where it would fail. What stays ineligible, listed in
+  `saturation.ineligible_uses`, is any exact-count use present: contract
+  counts (a contract threshold whose points saturated), named contexts,
+  standard exports and ratchets. A ratchet is an exact-count use under
+  either policy (owner decision, CV-404): its ratios are `ineligible`, its
+  exclusion comparisons, which read no counts, are still decided. Any such
+  use makes the report `diagnostic_only`; with none, saturated evidence
+  under `allow-ordinary` can be `passing`. R1 has no exact-count assertion,
+  so `exact_count_assertions` never appears. Human reports write a lower
+  bound as `>=N`.
 
 - **Changed regions** (CV-312, SPEC 22.3). With a diff policy the
   report keeps the Git capture as `changes` and has one `diff` evaluation
