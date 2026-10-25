@@ -3,14 +3,19 @@
 """The ``check`` command (CV-231; SPEC 11.6, 20.1, 20.3, 22.1, 22.5;
 COV-CLI-002, COV-POL-001, COV-MET-012, AC-014, AC-015)::
 
-    sv0cov check [options] <indexed-profile>
+    sv0cov check [options] <indexed-profile-or-native-report>
 
-It reads one indexed profile, compares the current source files with the
+It reads one indexed profile, or a native report (CV-416, D-10), compares the current source files with the
 ones the evidence was collected from, and evaluates the resolved policy:
 the integrity of the evidence, every configured threshold, scope and entity
 assertion and, with a diff policy, changed-region coverage against a Git base
 (:mod:`sv0cov.gitdiff`, captured now and bound to the evidence by source
 digest). It writes nothing to disk.
+
+A native-report operand is read through the cross-validating reader and its
+detail re-evaluated under the current configuration and against the current
+sources, exactly as the indexed profile it came from would be: the verdict
+it recorded is never reused.
 
 The evaluation itself is the native report's (:mod:`sv0cov.evidence`), so
 ``check`` and a report of the same evidence under the same configuration
@@ -37,8 +42,7 @@ exit meaning
      incomplete, or a source file is missing or changed; or, with a diff
      policy, a compiled source is not tracked by Git (COV4304) or is not
      the bytes compiled (COV4305).
-7    The policy needs something this build cannot evaluate, or the operand
-     is a native report.
+7    The policy needs something this build cannot evaluate.
 ==== ==========================================================
 
 Every assertion that did not pass is a diagnostic on stderr with its exact

@@ -308,13 +308,11 @@ class OperandTest(Base):
         self.assertEqual(self.check(operand="link.json")[0], 0)
         self.assertEqual(self.check(operand=str(self.cwd / EVIDENCE))[0], 0)
 
-    def test_a_native_report_is_not_accepted_yet(self) -> None:
+    def test_a_native_report_is_re_evaluated(self) -> None:
+        """CV-416 (D-10); the full suite is tests/test_check_native.py."""
         self.project()
         self.put("coverage.json", encode(self.report()))
-        code, out, err = self.check(operand="coverage.json")
-        (r,) = records(err)
-        self.assertEqual((code, out, r["code"], r["phase"]), (7, "", "COV5001", "invocation"))
-        self.assertIn("for check, not a native report", r["facts"][0]["value"])
+        self.assertEqual(self.check(operand="coverage.json"), self.check())
 
     def test_an_oversized_profile_is_refused_before_it_is_read(self) -> None:
         self.project()

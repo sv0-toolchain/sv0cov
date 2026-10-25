@@ -723,6 +723,62 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     :class:`ReportError`, or ``IndexedError`` for invalid evidence."""
     tier = config.tier().name
     ix = _ix.read_indexed(indexed, tier=tier)
+    return _produce(ix, hashlib.sha256(indexed).hexdigest(), config, sources, standard_export=standard_export,
+                    tool_version=tool_version, changes=changes, ratchet=ratchet)
+
+
+def _evidence_of(r: dict) -> dict:
+    """The indexed evidence a validated native report was made from, as far
+    as the producer reads it: every semantic record without the members the
+    report adds, the inputs, maps, execution, run selection and registry
+    identity, and the evidence findings (the integrity evaluation's codes
+    less those a report adds at report time)."""
+    integrity = next(e for e in r["policy"]["evaluations"] if e["assertion_kind"] == "integrity")
+    p = r["provenance"]
+    return {
+        "diagnostics": [],
+        "execution": {"exit_code": p["execution_exit_code"], "signal": p["execution_signal"], "status": p["execution_status"]},
+        "maps": r["maps"],
+        "merge": {"tool": {"diagnostic_registry_revision": p["indexed_diagnostic_registry_revision"],
+                           "diagnostic_registry_sha256": p["indexed_diagnostic_registry_sha256"]}},
+        "profile_inputs": r["inputs"],
+        "run_selection": {"manifest_sha256": p["run_manifest_sha256"], "mode": p["run_selection"], "selected_run_ids": p["run_ids"]},
+        "semantic": {
+            "branches": r["branches"],
+            "complete": r["complete"],
+            "contexts": r["contexts"],
+            "contracts": r["contracts"],
+            "diagnostics": sorted(set(integrity["diagnostics"]) - set(REPORT_TIME) - {COMMAND_FAILED}),
+            "entities": [{k: v for k, v in e.items() if k != "summary"} for e in r["entities"]],
+            "exclusions": [{**x, "affected": {k: v for k, v in x["affected"].items() if k != "line_indices"}} for x in r["exclusions"]],
+            "lines": r["lines"],
+            "map_ids": p["map_ids"],
+            "points": r["points"],
+            "regions": [{k: v for k, v in x.items() if k != "point_ids"} for x in r["regions"]],
+            "saturation": {**r["saturation"], "ineligible_uses": []},
+            "sources": [{k: s[k] for k in ("digest", "ownership", "package", "path", "source_index")} for s in r["sources"]],
+        },
+        "semantic_projection_sha256": p["semantic_projection_sha256"],
+    }
+
+
+def rebuild_report(data: bytes, config: Resolved, sources: Mapping[str, bytes | None], *, standard_export: bool = False,
+                   tool_version: str | None = None, changes: dict | None = None, ratchet: dict | None = None) -> dict:
+    """A native report re-evaluated under ``config`` (CV-416, owner decision
+    D-10): ``data`` is read and cross-validated by :func:`read_report`, then
+    its detail is evaluated exactly as :func:`build_report` evaluates the
+    indexed profile it came from, against the current ``sources``. The
+    result equals the report that indexed profile gives under ``config``;
+    the report's own verdict, configuration and source states are not
+    reused. Raises :class:`ReportError`."""
+    r = read_report(data, tier=config.tier().name)
+    return _produce(_evidence_of(r), r["provenance"]["indexed_input_sha256"], config, sources, standard_export=standard_export,
+                    tool_version=tool_version, changes=changes, ratchet=ratchet)
+
+
+def _produce(ix: dict, indexed_sha256: str, config: Resolved, sources: Mapping[str, bytes | None], *, standard_export: bool,
+             tool_version: str | None, changes: dict | None, ratchet: dict | None) -> dict:
+    tier = config.tier().name
     sem = ix["semantic"]
     cov = config.coverage
     if (cov["ratchet"] is None) != (ratchet is None):
@@ -769,7 +825,7 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
             "execution_status": ix["execution"]["status"],
             "indexed_diagnostic_registry_revision": ix["merge"]["tool"]["diagnostic_registry_revision"],
             "indexed_diagnostic_registry_sha256": ix["merge"]["tool"]["diagnostic_registry_sha256"],
-            "indexed_input_sha256": hashlib.sha256(indexed).hexdigest(),
+            "indexed_input_sha256": indexed_sha256,
             "map_ids": sem["map_ids"],
             "run_ids": ix["run_selection"]["selected_run_ids"],
             "run_manifest_sha256": ix["run_selection"]["manifest_sha256"],
@@ -978,4 +1034,4 @@ def read_report(data: bytes, *, registry: diagnostics.Registry | None = None, ti
     return obj
 
 
-__all__ = ["build_report", "read_report"]
+__all__ = ["build_report", "read_report", "rebuild_report"]

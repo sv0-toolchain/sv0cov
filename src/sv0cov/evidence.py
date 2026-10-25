@@ -17,7 +17,14 @@ exit status of SPEC 20.3:
 - 2: the configured saturation policy is not the one the evidence was
   merged under;
 - 7: the policy needs an assertion this build cannot evaluate, or the
-  operand is a native report.
+  operand is a native report and the command is not ``check``.
+
+``check`` also takes a native report (CV-416, owner decision D-10): it is
+read through the cross-validating reader (an invalid one is 5), its source
+paths are read like the evidence's, and its detail is re-evaluated under the
+command's configuration (:func:`sv0cov.model.report.rebuild_report`), so the
+result is exactly what the indexed profile it came from gives. Its recorded
+verdict, configuration and source states are not reused.
 
 With a ratchet policy the configured baseline is read (a missing one is
 not an error here: the ratchet reports it) and Git is asked for ``HEAD``
@@ -47,7 +54,7 @@ from sv0cov.formats.indexed import IndexedError
 from sv0cov.formats.map import map_limits
 from sv0cov.formats.report import ReportError
 from sv0cov.model.indexed import read_indexed
-from sv0cov.model.report import build_report, read_report
+from sv0cov.model.report import build_report, read_report, rebuild_report
 
 #: What a refusal to evaluate means for the exit status.
 REFUSAL_EXIT = {"COV0013": cli.EXIT_USAGE, "COV5001": cli.EXIT_UNSUPPORTED}
@@ -144,16 +151,24 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
     config = ctx.config
     tier = config.tier().name
     limit = map_limits(tier).max_bytes
+    native = None
     try:
         indexed = read_indexed(data, tier=tier)
+        records = indexed["semantic"]["sources"]
     except IndexedError as exc:
-        if NATIVE_REPORT in data:  # canonical JSON: these bytes can only be the top-level member
-            raise Stop("COV5001", "invocation", f"this build of sv0cov takes an indexed profile for {ctx.invocation.command}, "
-                                                "not a native report", cli.EXIT_UNSUPPORTED) from None
-        raise Stop(exc.code, "collection", exc.detail, cli.EXIT_EVIDENCE) from None
+        if NATIVE_REPORT not in data:  # canonical JSON: these bytes can only be the top-level member
+            raise Stop(exc.code, "collection", exc.detail, cli.EXIT_EVIDENCE) from None
+        if ctx.invocation.command != "check":
+            raise Stop("COV5001", "invocation", f"{ctx.invocation.command} takes an indexed profile, not a native report; "
+                                                "only check re-evaluates a native report", cli.EXIT_UNSUPPORTED) from None
+        try:
+            native = read_report(data, tier=tier)  # D-10: a native report is re-evaluated, its verdict never reused
+        except ReportError as report_exc:
+            raise Stop(report_exc.code, "collection", f"the native report is not valid: {report_exc.detail}", cli.EXIT_EVIDENCE) from None
+        records = native["sources"]
 
     sources = {}
-    for s in indexed["semantic"]["sources"]:
+    for s in records:
         # A source is read only where it really is inside the project (COV-SEC-002).
         if not inside(ctx, s["path"]):
             raise Stop("COV6002", "report", f"source {s['path']} resolves outside the project", cli.EXIT_EVIDENCE)
@@ -162,7 +177,7 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
         sources_out.update(sources)
     changes = None
     if config.coverage["diff"] is not None:
-        users = [s["path"] for s in indexed["semantic"]["sources"] if s["ownership"] == "user"]
+        users = [s["path"] for s in records if s["ownership"] == "user"]
         try:
             if capture is None:
                 capture = gitdiff.snapshot(diff_base(ctx), users)
@@ -170,8 +185,8 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
         except gitdiff.GitDiffError as exc:
             raise git_stop(exc) from None
     try:
-        encoded = encode(build_report(data, config, sources, standard_export=standard_export, changes=changes,
-                                      ratchet=ratchet_input(ctx)))
+        build = build_report if native is None else rebuild_report
+        encoded = encode(build(data, config, sources, standard_export=standard_export, changes=changes, ratchet=ratchet_input(ctx)))
         return read_report(encoded, tier=tier), encoded
     except ReportError as exc:
         if exc.code in REFUSAL_EXIT:
