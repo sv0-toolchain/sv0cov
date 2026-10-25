@@ -58,6 +58,30 @@ copies of a project: once with a minimal environment, once with reserved
 `TMPDIR`. Exit statuses, stdout, stderr and every published byte must be
 identical.
 
+## Privacy and repeat renders (CV-424; COV-MAP-011, COV-SEC-005, COV-REP-006)
+
+`tests/test_privacy.py` drives every command that writes something public in
+one isolated interpreter: `run` with all five formats, `merge`, `baseline`,
+`report` in every format and destination (bundle, single file with its
+native JSON and manifest, stdout with its support directory), `check` on
+an indexed profile and on a native report, a failing `check`, `version
+--json` and `doctor --json`. The project sits at a marked absolute path,
+and the environment carries marked user, login, host and shell names, its
+own `HOME`, `TMPDIR` and `PWD`.
+
+- No artifact, stdout or stderr holds the project's absolute path (as given
+  or resolved), its parent, the home or temporary directory, the
+  interpreter's or driver's path, a marked name, or any absolute path under
+  `/Users`, `/home`, `/private`, `/tmp`, `/var` or `/root`.
+- The same workflow in a second project at another absolute path, under
+  another user, host, time zone and locale, in another process, gives
+  byte-identical artifacts, stdout, stderr and exit statuses (SPEC 21.6
+  gate 2). That comparison is also what proves no process fact (a PID, the
+  clock, the locale) reaches an output.
+
+The program the toolchain builds into `<run>/bin/` is the project's, not an
+sv0cov artifact, and is not scanned.
+
 ## Fixed by this suite
 
 - A source symlink pointing outside the project was read by `check` and

@@ -148,8 +148,9 @@ class LifecycleTest(Base):
         self.assertEqual(modes, [0o700] * 6 + [0o600])
         self.assertEqual(sorted((run_dir / "build.log").read_text().splitlines()), ["driver says hello", "driver warns"])  # not on our streams
         build = self.recorded("build")
-        self.assertEqual(build["argv"], ["native-compile", "--coverage=instrument", "--coverage-map", str(run_dir / "maps/demo.sv0covmap.json"),
-                                         "-o", str(run_dir / "bin/demo"), "--project", "."])
+        # project-relative, so the driver's echo in build.log names no host path (CV-424)
+        self.assertEqual(build["argv"], ["native-compile", "--coverage=instrument", "--coverage-map", f".sv0cov/runs/{run_id}/maps/demo.sv0covmap.json",
+                                         "-o", f".sv0cov/runs/{run_id}/bin/demo", "--project", "."])
         self.assertEqual(build["cwd"], str(self.cwd))
         self.assertTrue(build["stdin_is_null"])  # the build cannot read what was meant for the test command
         ran = self.recorded("run")

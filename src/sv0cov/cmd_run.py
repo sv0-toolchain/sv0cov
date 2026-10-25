@@ -214,12 +214,15 @@ def reserve(cwd: Path, output_dir: str, run_id: str) -> Path:
 def build(driver: Path, cwd: Path, run_dir: Path, name: str, tier, env: Mapping[str, str]) -> tuple[Path, Path]:
     """Build the project in ``cwd`` with instrumentation; the executable and its map."""
     exe, cmap = run_dir / "bin" / name, run_dir / "maps" / (name + MAP_SUFFIX)
-    argv = [str(driver), "native-compile", "--coverage=instrument", "--coverage-map", str(cmap)]
+    # Project-relative spellings: the driver runs in the project and echoes what it is given into
+    # build.log, which is published with the run, so no absolute host path may reach it (CV-424).
+    rel_exe, rel_map = os.path.relpath(exe, cwd), os.path.relpath(cmap, cwd)
+    argv = [str(driver), "native-compile", "--coverage=instrument", "--coverage-map", rel_map]
     if tier.name != "standard":
         argv.append(f"--coverage-tier={tier.name}")
     if tier.name == "custom":
         argv += ["--coverage-max-counters", str(tier.max_counters), "--coverage-max-bytes", str(tier.max_bytes)]
-    argv += ["-o", str(exe), "--project", "."]
+    argv += ["-o", rel_exe, "--project", "."]
     log = run_dir / BUILD_LOG
     fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
     try:
