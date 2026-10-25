@@ -83,6 +83,33 @@ the DTD, then recomputes every line, condition, rate and total.
 `check_cobertura` also requires the classes, methods and line and branch
 totals to equal the report's. Everything else is `COV4401`.
 
+## GitLab coverage visualization (CV-419)
+
+GitLab draws a merge request's line coverage from a `coverage_report`
+artifact. `tools/gitlab_cobertura.py` is an offline oracle of what its
+parser reads (written from GitLab's documentation and the behaviour of
+`cobertura_document.rb` at gitlab-org/gitlab commit `377055c1`,
+2025-12-03): only `source`, `package`, `class` and `line`; integer
+`number` and `hits`; a `source` counts only when it holds the pipeline's
+project path; at most 100 sources and 10 MiB. `tests/test_gitlab_smoke.py`
+runs every golden through it:
+
+- every class resolves to its repository path when the sv0 project is the
+  repository root, and each line is green exactly when native status is
+  `covered`; partial and uncovered lines are red;
+- the branch data is accepted and not drawn: GitLab shows no branch or
+  condition coverage at all, so the SPEC's "branch annotations" cannot be
+  shown (mismatch M11, owed);
+- a project in a subdirectory does not resolve: `<source>.</source>`
+  names no repository prefix, so GitLab takes the logical path as the
+  repository path (also M11).
+
+`python3 tools/gitlab_smoke.py --out DIR` writes the kit a maintainer
+pushes to GitLab once per release: the `f0` source, its Cobertura document,
+a `.gitlab-ci.yml` that publishes it, `EXPECTED.md` (steps and the expected
+colour of every line, from the oracle) and `observation.json` to fill in.
+The observed GitLab release or GitLab.com date is release evidence (CV-415).
+
 ## On the command line
 
 As for LCOV, `report --format cobertura` and `run --report cobertura`
