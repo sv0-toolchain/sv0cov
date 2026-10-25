@@ -15,13 +15,17 @@ What is exported:
   owner decision, CV-401). Dependency sources are omitted, and the export
   manifest (CV-403) says so.
 - **Functions.** ``FN`` and then ``FNDA`` for every function the native
-  function metric counts, in entity order: the start line of its span, its
-  canonical qualified name, its exact entry count.
-- **Lines.** ``DA`` for every executable line, ascending: ``1`` exactly for
-  native status ``covered``; ``partial`` and ``uncovered`` are ``0`` (the
-  binary projection, COV-REP-010).
+  function metric counts, in entity order: the first executable line of
+  its span, its canonical qualified name, its exact entry count.
+- **Lines.** ``DA`` for every executable line, ascending: ``1`` for a line
+  that executed (native status ``covered`` or ``partial``), ``0`` for
+  ``uncovered``. LCOV's own meaning of a hit line; LCOV 2.5 refuses a
+  ``DA`` of ``0`` on a line with a taken branch (owner decision, CV-418;
+  the native report keeps ``partial`` apart).
 - **Branches.** ``BRDA`` for every eligible outcome (``covered`` or
-  ``uncovered``), on the first line of its branch's span. Within a line,
+  ``uncovered``), on the first executable line of its branch's span (a
+  ``loop`` header is not executable; LCOV 2.5 places branch data only on
+  ``DA`` lines). Within a line,
   decisions are numbered from zero in canonical branch order and outcomes
   from zero in ordinal order; a decision with no eligible outcome has no
   number. Counts are exact.
@@ -31,8 +35,10 @@ What is exported:
   end lines, comments). Native JSON stays authoritative.
 
 The summaries (``FNF``/``FNH``, ``LF``/``LH``, ``BRF``/``BRH``) equal the
-native per-source function, line and branch metrics; a zero denominator is
-written ``0``.
+native per-source function and branch metrics and the line metric's
+executed lines (covered plus partial); a zero denominator is written ``0``.
+Every golden is accepted by LCOV 1.16 and 2.5 ``lcov --summary`` and
+``genhtml`` with no ignored error (``tools/lcov_conformance.py``).
 
 A count that is saturated or only a lower bound has no exact value, so a
 report holding one in an exported unit is refused (``COV4020``) unless the
@@ -44,6 +50,7 @@ match its report, is ``COV4401``.
 
 from __future__ import annotations
 
+import bisect
 import re
 
 PROFILE = "sv0cov-lcov-r1-core"
@@ -86,15 +93,27 @@ def _records(r: dict, lossy: bool = False) -> list[dict]:
             name = e["qualified_name"]
             if not RE_NAME.fullmatch(name):
                 raise LcovError(INVALID, f"function name {name!r} cannot be written as an LCOV record")
-            functions.append((e["span"]["start_line"], name, _exact(p["count"], f"function {name}", lossy)))
-        lines = [(x["line"], int(x["status"] == "covered")) for x in r["lines"] if x["source_index"] == n and x["status"] in EXECUTABLE]
-        lines.sort()
+            functions.append((e["span"], name, _exact(p["count"], f"function {name}", lossy)))
+        # DA is 1 for a line that executed at all, partial included (owner decision, CV-418): LCOV 2.5 refuses
+        # a DA 0 line holding a taken branch, and a partial line nearly always holds one.
+        lines = sorted((x["line"], int(x["status"] != "uncovered")) for x in r["lines"] if x["source_index"] == n and x["status"] in EXECUTABLE)
+        numbers = [k for k, _ in lines]
+
+        def first_line(span: dict, what: str) -> int:
+            """The first executable line inside ``span``: LCOV 2.5 places function and
+            branch data only on lines that have DA (owner decision, CV-418)."""
+            at = bisect.bisect_left(numbers, span["start_line"])
+            if at == len(numbers) or numbers[at] > span["end_line"]:
+                raise LcovError(INVALID, f"{what} in {s['path']} has no executable line to carry it")
+            return numbers[at]
+
+        functions = [(first_line(span, f"function {name}"), name, count) for span, name, count in functions]
         decisions: dict[int, list[list[int]]] = {}
         for b in sorted((b for b in r["branches"] if b["source_index"] == n), key=lambda b: (b["span"]["start_line"], b["branch_index"])):
             outcomes = sorted((o for o in b["outcomes"] if o["status"] in ELIGIBLE), key=lambda o: o["ordinal"])
             if outcomes:
                 where = f"branch {b['branch_index']} in {s['path']}"
-                decisions.setdefault(b["span"]["start_line"], []).append([_exact(o["count"], where, lossy) for o in outcomes])
+                decisions.setdefault(first_line(b["span"], where), []).append([_exact(o["count"], where, lossy) for o in outcomes])
         out.append({"path": s["path"], "functions": functions, "lines": lines, "decisions": decisions})
     return out
 
@@ -238,9 +257,10 @@ def check_lcov(data: bytes, report: dict) -> None:
     for g, s in zip(got, want):
         for metric in ("function", "line", "branch"):
             m = s["summary"][metric]
-            if g[metric] != (m["covered"], m["total"]):
+            hit = m["covered"] + (m["partial"] or 0) if metric == "line" else m["covered"]  # DA 1 = executed
+            if g[metric] != (hit, m["total"]):
                 raise LcovError(INVALID, f"{s['path']}: the {metric} fraction {g[metric][0]}/{g[metric][1]} is not the "
-                                         f"report's {m['covered']}/{m['total']}")
+                                         f"report's {hit}/{m['total']}")
 
 
 __all__ = ["LcovError", "PROFILE", "check_lcov", "has_inexact", "parse_lcov", "render_lcov"]

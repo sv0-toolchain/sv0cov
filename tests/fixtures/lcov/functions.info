@@ -1,10 +1,10 @@
 TN:
 SF:main.sv0
-FN:4,never
-FN:8,once
-FN:12,twice
-FN:16,noop
-FN:20,main
+FN:5,never
+FN:9,once
+FN:13,twice
+FN:17,noop
+FN:21,main
 FNDA:0,never
 FNDA:1,once
 FNDA:2,twice

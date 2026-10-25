@@ -9,11 +9,11 @@ defines: the conservative records that LCOV 1.16 and 2.5 both read.
 ```text
 TN:
 SF:<logical path>
-FN:<start line>,<qualified name>      every exported function, then
+FN:<first executable line>,<name>     every exported function, then
 FNDA:<exact entry count>,<qualified name>
 FNF:<functions>   FNH:<functions entered>
 DA:<line>,<0 or 1>                    ascending
-LF:<executable lines>   LH:<covered lines>
+LF:<executable lines>   LH:<executed lines>
 BRDA:<line>,<decision>,<outcome>,<exact count>
 BRF:<branch outcomes>   BRH:<outcomes taken>
 end_of_record
@@ -26,16 +26,39 @@ end_of_record
   Dependency sources are left out (SPEC 18.1; owner decision); the export
   manifest (CV-403) records the omission.
 - **Functions:** every function the native function metric counts, with the
-  first line of its span and its exact entry count.
-- **Lines:** every executable line. `DA` is a binary projection: `1` only
-  for native status `covered`; `partial` and `uncovered` are `0`.
+  first executable line of its span and its exact entry count.
+- **Lines:** every executable line. `DA` is a binary projection: `1` for a
+  line that executed (native status `covered` or `partial`), `0` for
+  `uncovered`. The native report keeps partial lines apart.
 - **Branches:** every eligible outcome (`covered` or `uncovered`) on the
-  first line of its branch's span. Within a line, decisions are numbered
+  first executable line of its branch's span (a `loop` header is not
+  executable). Within a line, decisions are numbered
   from zero in canonical branch order and outcomes from zero in ordinal
   order; a decision with no eligible outcome gets no number.
-- **Summaries** equal the native per-source function, line and branch
-  metrics; a zero denominator is `0`. `TN:` is always empty: all contexts
+- **Summaries** equal the native per-source function and branch metrics
+  and, for lines, the executed lines (covered plus partial); a zero
+  denominator is `0`. `TN:` is always empty: all contexts
   are aggregated.
+
+## Why: the pinned consumers (CV-418)
+
+LCOV 2.5 refuses, as a consistency error, a `DA` of `0` on a line holding
+a branch that was taken, and it places function and branch data only on
+lines that have `DA`. A partial line nearly always holds a taken branch,
+and a function's declaration line and a `loop` header are not executable.
+So, by owner decision (CV-418; a SPEC 21.4, 16.6 and COV-REP-010 amendment
+is owed), `DA` marks every executed line and `FN`/`BRDA` sit on the first
+executable line of their unit. The manifest says so:
+`line_status_binary_executed` and `unit_lines_as_first_executable_line`.
+
+`tools/lcov_conformance.py` runs every golden through the exact pinned
+LCOV 1.16 and 2.5 releases (`tests/conformance/lcov-distributions.json`:
+tarball size and SHA-256, verified before extraction), `lcov --summary`
+and `genhtml` with branch coverage, on the host `perl`, and requires exit
+0, no warning, error or ignored message, and totals equal to the
+tracefile's. CI runs it in the `lcov-consumers` job with no network;
+locally, `SV0COV_LCOV_TARBALLS=<dir>` makes `tests/test_lcov_conformance.py`
+run it.
 
 ## What is never written
 
@@ -56,7 +79,7 @@ anything else is `COV4401`.
 `report --format lcov` and `run --report lcov` publish the tracefile with
 its native JSON report and an export commit manifest (CV-403;
 [export-manifest.md](export-manifest.md), [report.md](report.md)). The
-pinned-consumer checks against LCOV 1.16 and 2.5 are CV-418.
+pinned-consumer checks against LCOV 1.16 and 2.5 are above.
 
 Goldens: `tests/fixtures/lcov/` (one per semantic fixture, rebuilt by its
 `build.py`). Tests: `tests/test_lcov.py`.

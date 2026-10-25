@@ -61,7 +61,10 @@ FORMATS = {
         "omissions": ["contract_coverage", "exclusion_inventory", "named_contexts", "partial_line_state", "provenance_detail",
                       "region_coverage", "saturation_qualifiers"],
         "placeholders": [],
-        "projections": ["branch_outcomes_as_brda", "contexts_aggregated", "line_status_binary_covered_only", "zero_denominators_as_zero"],
+        # CV-418 (owner decisions): DA marks every executed line, partial included, and function and
+        # branch data sit on the first executable line of their span, as LCOV 2.5 requires.
+        "projections": ["branch_outcomes_as_brda", "contexts_aggregated", "line_status_binary_executed", "unit_lines_as_first_executable_line",
+                        "zero_denominators_as_zero"],
     },
     "cobertura": {
         "profile": "sv0cov-cobertura-r1-core",
@@ -75,7 +78,7 @@ FORMATS = {
         "placeholders": ["complexity_unavailable_as_0.0", "java_signature_unavailable_as_empty"],
         "projections": ["branch_outcomes_as_conditions", "condition_percentage_floor_integer", "contexts_aggregated",
                         "line_status_binary_covered_only", "rates_six_fractional_half_even", "source_root_as_dot",
-                        "timestamp_from_reproducible_epoch", "zero_denominators_as_zero"],
+                        "timestamp_from_reproducible_epoch", "unit_lines_as_first_executable_line", "zero_denominators_as_zero"],
     },
 }
 

@@ -59,23 +59,46 @@ class GoldenTest(unittest.TestCase):
                 project = parse_lcov(data)
                 for metric in ("function", "line", "branch"):
                     total = report["summary"][metric]
+                    hit = total["covered"] + (total["partial"] or 0) if metric == "line" else total["covered"]  # DA 1 = executed (CV-418)
                     self.assertEqual((sum(r[metric][0] for r in project), sum(r[metric][1] for r in project)),
-                                     (total["covered"], total["total"]), metric)
+                                     (hit, total["total"]), metric)
 
 
 class ProjectionTest(unittest.TestCase):
-    def test_partial_lines_are_not_covered(self) -> None:
+    def test_da_marks_every_executed_line(self) -> None:
+        """CV-418 (owner decision): DA 1 for covered and partial lines, 0 for
+        uncovered; LCOV 2.5 refuses DA 0 on a line holding a taken branch."""
         report, _ = fixture_report("f0")
         partial = [x for x in report["lines"] if x["status"] == "partial"]
         self.assertTrue(partial)
         data = render_lcov(report).decode().splitlines()
-        for x in partial:
-            self.assertIn(f"DA:{x['line']},0", data)
         for x in report["lines"]:
-            if x["status"] == "covered":
+            if x["status"] in ("covered", "partial"):
                 self.assertIn(f"DA:{x['line']},1", data)
+            if x["status"] == "uncovered":
+                self.assertIn(f"DA:{x['line']},0", data)
             if x["status"] in ("excluded", "non_executable"):
                 self.assertFalse(any(d.startswith(f"DA:{x['line']},") for d in data))
+
+    def test_function_and_branch_data_sit_on_executable_lines(self) -> None:
+        """CV-418 (owner decision): the first DA line inside the unit's span."""
+        from test_indexed_reader import FIXTURES as ALL
+        for name in ALL:
+            with self.subTest(fixture=name):
+                report, _ = fixture_report(name)
+                text = render_lcov(report).decode()
+                for block in text.split("end_of_record\n")[:-1]:
+                    rows = block.splitlines()
+                    da = {int(r[3:].split(",")[0]) for r in rows if r.startswith("DA:")}
+                    for r in rows:
+                        if r.startswith(("FN:", "BRDA:")):
+                            self.assertIn(int(r.split(":", 1)[1].split(",")[0]), da, r)
+        report, _ = fixture_report("f0")
+        fn = next(e for e in report["entities"] if e["kind"] == "function" and e["qualified_name"] == "classify")
+        first = min(x["line"] for x in report["lines"] if x["status"] != "non_executable" and x["status"] != "excluded"
+                    and fn["span"]["start_line"] <= x["line"] <= fn["span"]["end_line"])
+        self.assertIn(f"FN:{first},classify", render_lcov(report).decode())
+        self.assertGreater(first, fn["span"]["start_line"])
 
     def test_exact_counts_and_branch_indexes(self) -> None:
         report, _ = fixture_report("boolean")

@@ -1,6 +1,6 @@
 TN:
 SF:lib/util.sv0
-FN:4,lib::triple
+FN:5,lib::triple
 FNDA:1,lib::triple
 FNF:1
 FNH:1
@@ -12,7 +12,7 @@ BRH:0
 end_of_record
 TN:
 SF:main.sv0
-FN:7,main
+FN:8,main
 FNDA:1,main
 FNF:1
 FNH:1
@@ -26,7 +26,7 @@ BRH:0
 end_of_record
 TN:
 SF:util/util.sv0
-FN:4,util::doubled
+FN:5,util::doubled
 FNDA:1,util::doubled
 FNF:1
 FNH:1

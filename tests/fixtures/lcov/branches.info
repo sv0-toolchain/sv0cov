@@ -1,9 +1,9 @@
 TN:
 SF:main.sv0
-FN:4,sign
-FN:15,clamp
-FN:23,magnitude
-FN:30,main
+FN:5,sign
+FN:16,clamp
+FN:24,magnitude
+FN:31,main
 FNDA:2,sign
 FNDA:1,clamp
 FNDA:1,magnitude

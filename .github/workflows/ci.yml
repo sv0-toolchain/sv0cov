@@ -160,6 +160,44 @@ jobs:
   # fresh seed. A finding fails the job and its minimized input is uploaded;
   # checked into tests/fixtures/fuzz/<harness>/ it becomes a regression
   # fixture the test suite replays. Standard library only.
+  # CV-418 (SPEC 21.4, COV-REP-009, AC-050): every LCOV golden through the
+  # exact checksum-pinned LCOV 1.16 and 2.5 releases, `lcov --summary` and
+  # `genhtml` with branch coverage, no ignored error, totals equal to the
+  # tracefile's. The two tarballs are fetched first and refused unless their
+  # pinned digests match (tests/conformance/lcov-distributions.json); the
+  # check itself runs with no network. Both run on the host perl.
+  lcov-consumers:
+    name: LCOV 1.16 + 2.5 consumers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Fetch the pinned LCOV releases
+        run: |
+          mkdir -p "$RUNNER_TEMP/lcov"
+          python tools/lcov_conformance.py --fetch-into "$RUNNER_TEMP/lcov" | bash -euo pipefail
+
+      - id: py
+        name: Interpreter path
+        run: echo "python-path=$(command -v python)" >> "$GITHUB_OUTPUT"
+
+      - name: Conformance in an empty network namespace
+        run: >-
+          sudo unshare --net --
+          setpriv --reuid="$(id -u)" --regid="$(id -g)" --init-groups --
+          env PATH="$PATH" HOME="$HOME"
+          "${{ steps.py.outputs.python-path }}" tools/lcov_conformance.py
+          --tarball 1.16="$RUNNER_TEMP/lcov/lcov-1.16.tar.gz" --tarball 2.5="$RUNNER_TEMP/lcov/lcov-2.5.tar.gz"
+
   fuzz:
     name: fuzz (linux-x86_64 / py3.14)
     runs-on: ubuntu-24.04

@@ -91,11 +91,13 @@ class ManifestTest(unittest.TestCase):
         """SPEC 16.6's table, restated."""
         self.assertEqual(FORMATS["lcov"]["omissions"], ["contract_coverage", "exclusion_inventory", "named_contexts", "partial_line_state",
                                                         "provenance_detail", "region_coverage", "saturation_qualifiers"])
-        self.assertEqual(FORMATS["lcov"]["projections"], ["branch_outcomes_as_brda", "contexts_aggregated", "line_status_binary_covered_only",
-                                                          "zero_denominators_as_zero"])
+        # line_status_binary_executed and unit_lines_as_first_executable_line replace SPEC 16.6's
+        # line_status_binary_covered_only (owner decisions, CV-418; amendment owed)
+        self.assertEqual(FORMATS["lcov"]["projections"], ["branch_outcomes_as_brda", "contexts_aggregated", "line_status_binary_executed",
+                                                          "unit_lines_as_first_executable_line", "zero_denominators_as_zero"])
         self.assertEqual(FORMATS["cobertura"]["placeholders"], ["complexity_unavailable_as_0.0", "java_signature_unavailable_as_empty"])
         self.assertEqual(len(FORMATS["cobertura"]["omissions"]), 9)
-        self.assertEqual(len(FORMATS["cobertura"]["projections"]), 8)
+        self.assertEqual(len(FORMATS["cobertura"]["projections"]), 9)
         self.assertTrue(FORMATS["cobertura"]["compatibility_reference"].endswith(
             "sha256:e467cb8252e20feb794fc2dedfbea7b4957921669c758f0282d525df88897917"))
 
