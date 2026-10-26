@@ -47,7 +47,16 @@ from sv0cov.formats.canonical_json import decode_canonical, encode  # noqa: E402
 
 PROTOCOL_FILE = ROOT / "bench" / "protocol.json"
 PROTOCOL_SHA256 = "e630003f16f609f08fb5a7f3cdb4ec9ac982cf6d608599855457b302b0bdb67e"
-STAGES = ("managed-ci-provisional", "reference-dedicated", "local-development")
+STAGES = ("managed-ci-provisional", "managed-ci-recorded", "reference-dedicated", "local-development")
+#: What each stage's bundle is (SPEC 24.1, DEC-087). Only reference-dedicated bundles claim conformance
+#: themselves; a managed-ci-recorded bundle satisfies an R1 gate only through bench/evaluate.py with the
+#: DEC-087 exception record for that gate (CV-410).
+LABELS = {
+    "managed-ci-provisional": "provisional trend evidence; not performance conformance",
+    "managed-ci-recorded": "managed-ci-recorded evidence; satisfies an R1 gate only with its DEC-087 exception record",
+    "reference-dedicated": "reference-dedicated evidence",
+    "local-development": "provisional trend evidence; not performance conformance",
+}
 UNKNOWN = "unknown"
 DESCRIPTOR_KEYS = (
     "architecture", "clock_source", "c_compiler", "cpu_model", "filesystem", "installed_memory_bytes", "isolation",
@@ -292,13 +301,16 @@ def _maxrss_bytes(ru_maxrss: int) -> int:
     return ru_maxrss if sys.platform == "darwin" else ru_maxrss * 1024
 
 
-def run_once(argv: list[str], cwd: str, expect: dict, timeout: int) -> dict:
-    """One measured process: wall time and its own max RSS (wait4), then validation."""
+def run_once(argv: list[str], cwd: str, expect: dict, timeout: int, env: dict | None = None) -> dict:
+    """One measured process: wall time and its own max RSS (wait4), then validation.
+    ``env`` adds variables to the inherited environment (a coverage-on arm's
+    run ID and profile directory)."""
     with tempfile.TemporaryFile() as out:
         fired = threading.Event()
         try:
             start = time.perf_counter_ns()
-            proc = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.DEVNULL)
+            proc = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.DEVNULL,
+                                    env=None if env is None else {**os.environ, **env})
         except OSError as exc:
             return {"detail": type(exc).__name__, "invalid": "spawn-failure"}
 
@@ -340,7 +352,7 @@ def run_fixture(fixture: dict, protocol: dict) -> dict:
             runs = {}
             for arm in slot_order(slot, arms):
                 spec = fixture["arms"][arm]
-                runs[arm] = run_once(spec["argv"], fixture["cwd"], spec["expect"], timeout)
+                runs[arm] = run_once(spec["argv"], fixture["cwd"], spec["expect"], timeout, spec.get("env"))
             attempts.append({"order": slot_order(slot, arms), "runs": runs})
             if not any("invalid" in r for r in runs.values()):
                 break
@@ -360,6 +372,8 @@ def run_fixture(fixture: dict, protocol: dict) -> dict:
         "statistics": stats,
         "valid": fixture_valid,
     }
+    if fixture.get("facts"):
+        result["facts"] = fixture["facts"]  # planned points, artifact sizes: what the budgets compare with
     if not fixture_valid:
         result["invalid"] = "invalid-slots-over-budget"
     if arms == ["off", "on"] and fixture_valid and stats["off"]["wall_ns"]["p95"]:
@@ -422,7 +436,7 @@ def run_plan(plan: dict, stage: str, toolchain_revision: str = UNKNOWN) -> bytes
         "corpus": plan["corpus"],
         "fixtures": results,
         "host": host,
-        "label": "provisional trend evidence; not performance conformance" if stage != "reference-dedicated" else "reference-dedicated evidence",
+        "label": LABELS[stage],
         "protocol_sha256": PROTOCOL_SHA256,
         "schema": "sv0cov.benchmark-results",
         "series": series_key(host),
@@ -443,6 +457,8 @@ def validate_bundle(data: bytes) -> dict:
     check_descriptor(b["host"])
     if b["conformance"] != (b["host"]["stage"] == "reference-dedicated"):
         raise HarnessError("only reference-dedicated bundles may claim conformance")
+    if b["label"] != LABELS[b["host"]["stage"]]:
+        raise HarnessError("the bundle's label is not its stage's")
     if b["series"] != series_key(b["host"]):
         raise HarnessError("series key does not match the host descriptor")
     ids = [f["id"] for f in b["fixtures"]]

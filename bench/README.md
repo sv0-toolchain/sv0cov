@@ -17,11 +17,44 @@
   and `filesystem` is the type of the work/temp directory (mountinfo on
   Linux, `stat -f %T` on macOS); only truly unobservable fields stay `unknown`.
 - Stages: `managed-ci-provisional` (F0-R0.1 trend evidence only),
-  `reference-dedicated` (R1 conformance), `local-development`. Only
-  `reference-dedicated` bundles may claim conformance.
+  `managed-ci-recorded` (R1 evidence under the DEC-087 managed-CI exception,
+  CV-410), `reference-dedicated` (R1 conformance), `local-development`.
+  Only `reference-dedicated` bundles claim conformance themselves; each
+  stage has its own fixed label.
+- Arms: `corpus.py plan` pairs the native build without and with
+  `--coverage=instrument` (compile dimension) and the two executables
+  (execute dimension; the instrumented one writes its profiles to a
+  per-fixture directory, through the arm's `env`). Both builds run once at
+  plan time to record each fixture's `facts`: the artifact sizes and the
+  map's planned counters. Ingest stays one arm.
 
-Until coverage instrumentation exists, fixtures have only a coverage-off arm;
-those runs are baselines, never overhead evidence.
+## Budgets and the evaluator (CV-410)
+
+- `budgets.json`: the SPEC 24 table frozen as gates: compile and execution
+  p95 overhead (1.20), artifact size (geometric mean 1.30, every fixture
+  1.75), counter memory (16 B per planned point + 8 MiB), merge and report
+  absolutes, determinism; and the campaigns each stage needs (three
+  `managed-ci-recorded`, one `reference-dedicated`).
+- `evaluate.py --campaign a.json,b.json [--campaign ...] [--exception rec.json] [--template out.json]`:
+  one host class at a time; refuses to pool another series (observed
+  hardware), stage, toolchain revision, corpus or class. Per campaign:
+  per-fixture values, equal-weight category geometric means (exact integer
+  roots), the corpus value, ceiling failures. A gate passes only in every
+  campaign (no compensation) and is `incomplete` while any applicable
+  fixture of the frozen corpus is pending, missing, invalid or one-arm.
+  Eligibility: `reference-dedicated` stands alone; `managed-ci-recorded`
+  needs three campaigns and a DEC-087 exception record naming the gate,
+  else `refused`; other stages are `ineligible`.
+- The exception record (`sv0cov.perf-exception` 1.0) binds the exact
+  bundle digests and repeats the campaigns' facts (host class, provider,
+  runner label and image, observed hardware, every `unknown` descriptor
+  field, the measured variance per gate); `--template` writes it with those
+  filled in, and a person adds the accepted risk, the owner and the date.
+  A record that disagrees with the campaigns, or is not accepted by a
+  person, covers nothing.
+- The root workflow `.github/workflows/perf-recorded.yml` runs one campaign
+  per dispatch. Only Linux x86-64 can build the toolchain in CI today; the
+  other classes wait for CV-409.
 
 ## Corpus (`corpus/`, `corpus.py`)
 

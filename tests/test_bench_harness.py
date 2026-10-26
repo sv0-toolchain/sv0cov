@@ -146,7 +146,7 @@ class BundleTest(unittest.TestCase):
 
     def test_bundle_validation(self) -> None:
         host = H.host_descriptor("managed-ci-provisional")
-        good = {"conformance": False, "corpus": {}, "fixtures": [], "host": host, "label": "x", "protocol_sha256": H.PROTOCOL_SHA256,
+        good = {"conformance": False, "corpus": {}, "fixtures": [], "host": host, "label": H.LABELS["managed-ci-provisional"], "protocol_sha256": H.PROTOCOL_SHA256,
                 "schema": "sv0cov.benchmark-results", "series": H.series_key(host), "version": "1.0"}
         H.validate_bundle(encode(good))
         for name, change in {
@@ -154,6 +154,7 @@ class BundleTest(unittest.TestCase):
             "other-protocol": {"protocol_sha256": "0" * 64},
             "series": {"series": "x"},
             "extra": {"extra": 1},
+            "another stage's label": {"label": H.LABELS["managed-ci-recorded"]},
         }.items():
             with self.subTest(case=name), self.assertRaises(H.HarnessError):
                 H.validate_bundle(encode({**good, **change}))

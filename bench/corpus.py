@@ -594,8 +594,14 @@ def write_tree(files: dict[str, bytes], target: Path) -> None:
 # --- run plans ------------------------------------------------------------------------------
 
 
+#: The run ID every coverage-on execution uses; its profiles are written and not read.
+BENCH_RUN_ID = "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0"
+
+
 def plan(toolchain: Path, work: Path, dimension: str, ids: list[str] | None) -> dict:
-    """Bind runnable fixtures to coverage-off commands (the only arm that exists yet)."""
+    """Bind runnable fixtures to paired coverage-off and coverage-on commands (CV-410): the
+    native build without and with ``--coverage=instrument``, and their executables, the
+    instrumented one writing its profiles to a per-fixture directory. Ingest stays one arm."""
     sv0 = str(toolchain / "scripts" / "sv0")
     recorded = {f["id"]: f for f in json.loads(MANIFEST.read_bytes())["fixtures"]}
     out = []
@@ -619,15 +625,25 @@ def plan(toolchain: Path, work: Path, dimension: str, ids: list[str] | None) -> 
             continue
         if prog is None or "native" not in f.backends:
             continue
-        exe = work / f"{f.id}.exe"
+        exe, exe_on, cmap = work / f"{f.id}.exe", work / f"{f.id}.cov.exe", work / f"{f.id}.sv0covmap.json"
         target = ["--project", str(src)] if prog.entry == "." else [str(src / prog.entry)]
         compile_argv = [sv0, "native-compile", "-o", str(exe), *target]
+        compile_on = [sv0, "native-compile", "--coverage=instrument", "--coverage-map", str(cmap), "-o", str(exe_on), *target]
+        # Both builds once at plan time: the facts the budgets compare with (CV-410).
+        subprocess.run(compile_argv, check=True, capture_output=True)
+        subprocess.run(compile_on, check=True, capture_output=True)
+        facts = {"artifact_bytes": {"off": exe.stat().st_size, "on": exe_on.stat().st_size},
+                 "planned_points": json.loads(cmap.read_bytes())["program_counter_count"]}
         if dimension == "compile":
-            argv, expect = compile_argv, {"exit_code": 0, "stdout_sha256": None}
+            ok = {"exit_code": 0, "stdout_sha256": None}
+            arms = {"off": {"argv": compile_argv, "expect": ok}, "on": {"argv": compile_on, "expect": ok}}
         else:
-            subprocess.run(compile_argv, check=True, capture_output=True)
-            argv, expect = [str(exe)], {"exit_code": prog.exit_code, "stdout_sha256": EMPTY_STDOUT}
-        out.append({"arms": {"off": {"argv": argv, "expect": expect}, "on": None}, "category": f.category, "cwd": str(work), "id": f"{f.id}/{dimension}"})
+            profiles = work / f"{f.id}.profiles"
+            profiles.mkdir(exist_ok=True)
+            expect = {"exit_code": prog.exit_code, "stdout_sha256": EMPTY_STDOUT}
+            arms = {"off": {"argv": [str(exe)], "expect": expect},
+                    "on": {"argv": [str(exe_on)], "env": {"SV0COV_RUN_ID": BENCH_RUN_ID, "SV0COV_PROFILE_DIR": str(profiles)}, "expect": expect}}
+        out.append({"arms": arms, "category": f.category, "cwd": str(work), "facts": facts, "id": f"{f.id}/{dimension}"})
     return {"corpus": {"generator": GENERATOR, "manifest_sha256": hashlib.sha256(MANIFEST.read_bytes()).hexdigest(), "version": CORPUS_VERSION}, "fixtures": out}
 
 
