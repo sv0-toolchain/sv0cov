@@ -13,12 +13,16 @@ C/native executables and `.sv0b` bytecode on `sv0vm`.
 
 ## Status
 
-**F0 complete (2026-10-08).** The protocols are frozen (canonical JSON,
-point identities, schemas, raw-profile and VM codecs). sv0c plans, maps and
-instruments programs for generated C and `sv0vm-v1-coverage`. The native
-runtime (`runtime/c`) and sv0vm publish raw profiles, and one fixture gives
-identical point identities and counts on both backends (F0-G4). R0, the
-developer preview, is next. The slice-by-slice status is in the checklist
+**F0, R0 and R0.1 complete; R1 in progress.** F0 (2026-10-08) froze the
+protocols (canonical JSON, point identities, schemas, raw-profile and VM
+codecs); R0 (2026-10-17) delivered the developer preview (the lifecycle
+CLI, merge, terminal and native JSON reports, fixed thresholds, submodule and
+compatibility policy); R0.1 (2026-10-24) added exclusions, contexts, HTML, contract and
+entity coverage, scopes, changed-region checks, ratchets and exclusion caps.
+R1 work so far (2026-10-26): LCOV and Cobertura export with commit manifests
+and consumer conformance, native-report `check`, saturation policy, privacy,
+HTML accessibility, native concurrency, process-lifecycle fork guards and the
+recorded performance campaign. The slice-by-slice status is in the checklist
 named below. Nothing is released.
 
 The governing contract is the sv0cov specification
