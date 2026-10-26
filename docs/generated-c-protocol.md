@@ -187,9 +187,9 @@ The profile's contents:
 
 The counters are read twice, once to size the profile and once to write
 it. Each read takes one relaxed load per counter, in index order. If the
-set of nonzero counters changes between the two passes, hits ran during
-the flush, so nothing is published. The program should join its worker
-threads before exiting.
+set of nonzero counters changes between the two passes, or a hit arrives
+once the flush has begun, hits ran during the flush, so nothing is
+published. The program should join its worker threads before exiting.
 
 | Failure at exit | Code |
 |---|---|
@@ -197,11 +197,31 @@ threads before exiting.
 | Hits ran during the flush, or a hit named an unregistered counter | COV2011 |
 | A profile with the final name already exists (the existing file is left alone) | COV2112 |
 | A forked child exits; it never publishes its parent's counters | COV2120 |
+| The process forked (unmanaged); its coverage is unresolved | COV2120 |
 
 In required mode, each of these ends the process with `_exit(1)`, after
 flushing the program's buffered output streams (`_exit` would otherwise
 drop what the program had already printed). Outside required mode, the
 diagnostic is printed and the exit status is left unchanged.
+
+### Process creation (SPEC 14.2.2; D-4, CV-405)
+
+sv0 has no process API: a program can only start or replace a process
+through `#[extern_c]` FFI or linked C, and sv0vm rejects FFI altogether
+(E0553), so it exposes no host-process operation. The runtime holds the
+boundary for native programs:
+
+| What the program does | Outcome |
+|---|---|
+| `posix_spawn` an instrumented program (the supported way) | The parent keeps its counts and publishes one profile; the child image starts from zero and publishes its own profile under the same run ID. If the child cannot be executed the parent gets the error and only its own profile is published. |
+| `fork` | `__sv0cov_start` installs `pthread_atfork` handlers before user code. Prepare marks the image unresolved and nothing clears it (no managed spawn wrapper exists), so the parent's profile is withheld (COV2120). The child's copy of the arena is disarmed: it never publishes the inherited counts, and in required mode its first coverage hit ends it with status 1 (COV2120, written with `write` and `_exit` only) before counting. |
+| `fork`, then `exec` in the child | As for `fork`; the new image publishes its own profile from zero. |
+| `exec` in place | The image is replaced before any exit handler runs: nothing is published for it, and the new image publishes only its own counts. A conforming toolchain process API would refuse this; none exists. |
+
+The handlers store lock-free atomics only: no allocation, file, lock,
+entropy or flush. A raw `fork`/`clone`/`vfork` system call that skips the
+C library's fork handlers is outside the conformance boundary and cannot
+produce complete coverage evidence.
 
 sv0vm ends a run the same way on every one of these paths (CV-212): the same
 exit status, the same publication, the same registry code. sv0doc

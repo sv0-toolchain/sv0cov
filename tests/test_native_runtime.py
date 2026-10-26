@@ -20,6 +20,8 @@ by sv0cov.formats.rawprofile), COV-INS-008 (SIGKILL and _exit publish
 nothing and leave no temporary), SPEC 23.4 (mode 0600, <run>-<profile>
 name, no-replace commit: a collision is COV2112 and leaves the existing
 file alone), and a forked child never publishing inherited counters;
+CV-405 (COV-C-007, AC-096): fork, fork with a hit in the child, fork then
+exec, posix_spawn, failed spawn and in-place exec;
 CV-116 (F0-G8, COV-FMT-007): with fixture-supplied IDs the C writer's bytes
 equal every CV-024 golden (the VM goldens through a test-only backend-flag
 override) and sv0cov.formats.rawprofile.encode for 40 seeded random native
@@ -502,16 +504,105 @@ class NativeRuntimeTest(unittest.TestCase):
                 # the process from the exit handler (CV-212).
                 self.assertIn(b"unflushed-tail", p.stdout)
 
-    def test_forked_child_does_not_publish(self) -> None:
-        for required, child in (("1", 1), ("0", 0)):
+    # ── CV-405: process lifecycle (SPEC 14.2.2, D-4) ───────────────────────
+
+    OK_COUNTS = tuple((i, i % 5 + 1) for i in range(70))
+
+    def states(self, p: subprocess.CompletedProcess) -> list[str]:
+        """The profile IDs of the "state=" lines, in print order."""
+        return [REPORT.match(x).group(4) for x in p.stdout.decode().splitlines() if x.startswith("state=")]
+
+    def decoded(self, d: str) -> dict[str, tuple]:
+        """profile ID -> counts, for every profile in `d` (all under RUN_ID)."""
+        out = {}
+        for name in self.profiles(d):
+            prof = decode(Path(d, name).read_bytes(), map_counter_count=70, expected_map_id=MAP_ID)
+            self.assertEqual(prof.run_id.hex(), RUN_ID)
+            out[prof.profile_id.hex()] = prof.counts
+        return out
+
+    def test_unmanaged_fork_publishes_nothing(self) -> None:
+        """COV-C-007, AC-096: after a raw fork the child never publishes the
+        inherited counters (required: it fails at exit), and the parent's
+        lifecycle stays unresolved, so its profile is withheld too
+        (COV2120); required mode fails the parent."""
+        for required, rc in (("1", 1), ("0", 0)):
             with self.subTest(required=required):
                 d = self.fresh_dir()
                 p = self.run_driver("fork", SV0COV_PROFILE_DIR=d, SV0COV_REQUIRED=required)
-                self.assertEqual(p.returncode, 0, p.stderr.decode())
-                self.assertIn(f"child-status={child}".encode(), p.stdout)
-                self.assertIn("error[COV2120]", p.stderr.decode())
-                report = REPORT.match([x for x in p.stdout.decode().splitlines() if x.startswith("state=")][0])
-                self.published(d, {"profile_id": report.group(4)})  # the parent's, exactly one
+                err = p.stderr.decode()
+                self.assertEqual(p.returncode, rc, err)
+                self.assertIn(f"child-status={rc}".encode(), p.stdout)
+                self.assertIn("a forked process image does not publish its parent's counters", err)
+                self.assertIn("an unmanaged fork left this process image's coverage unresolved", err)
+                self.assertEqual(os.listdir(d), [])
+
+    def test_hit_in_a_forked_child(self) -> None:
+        """SPEC 14.2.2: a child that returns into instrumented code fails
+        before its first hit in required mode (and the hit is never counted);
+        otherwise it runs on without collecting. Neither image publishes."""
+        d = self.fresh_dir()
+        p = self.run_driver("fork-hit", SV0COV_PROFILE_DIR=d)
+        err = p.stderr.decode()
+        self.assertEqual(p.returncode, 1, err)
+        self.assertIn(b"child-status=1", p.stdout)
+        self.assertNotIn(b"child-after-hit", p.stdout)
+        self.assertIn("error[COV2120]: unsupported process lifecycle: a coverage hit ran in a forked process image", err)
+        self.assertEqual(os.listdir(d), [])
+        d = self.fresh_dir()
+        p = self.run_driver("fork-hit", SV0COV_PROFILE_DIR=d, SV0COV_REQUIRED="0")
+        self.assertEqual(p.returncode, 0, p.stderr.decode())
+        self.assertIn(b"child-after-hit", p.stdout)
+        self.assertIn(b"child-status=0", p.stdout)
+        self.assertEqual(os.listdir(d), [])
+
+    def test_fork_then_exec(self) -> None:
+        """A raw fork followed by exec: the new image starts from zero and
+        publishes its own profile under the same run ID; the parent forked
+        unmanaged, so its profile is withheld."""
+        d = self.fresh_dir()
+        p = self.run_driver("fork-exec", SV0COV_PROFILE_DIR=d)
+        self.assertEqual(p.returncode, 1, p.stderr.decode())
+        self.assertIn(b"child-status=0", p.stdout)
+        parent, child = self.states(p)
+        self.assertNotEqual(parent, child)
+        self.assertEqual(self.decoded(d), {child: self.OK_COUNTS})
+
+    def test_spawn_and_exec(self) -> None:
+        """AC-096 (supported path, posix_spawn): the parent keeps its counts
+        and publishes one profile; the child image starts from zero and
+        publishes a distinct profile under the same run ID."""
+        for required in ("1", "0"):
+            with self.subTest(required=required):
+                d = self.fresh_dir()
+                p = self.run_driver("spawn", SV0COV_PROFILE_DIR=d, SV0COV_REQUIRED=required)
+                self.assertEqual((p.returncode, p.stderr), (0, b""))
+                self.assertIn(b"child-status=0", p.stdout)
+                parent, child = self.states(p)
+                self.assertNotEqual(parent, child)
+                self.assertEqual(self.decoded(d), {parent: self.OK_COUNTS, child: self.OK_COUNTS})
+
+    def test_failed_spawn(self) -> None:
+        """AC-096: when the child cannot be executed the parent receives the
+        failure, publishes its own profile, and nothing else is published."""
+        d = self.fresh_dir()
+        p = self.run_driver("spawn-fail", SV0COV_PROFILE_DIR=d)
+        self.assertEqual((p.returncode, p.stderr), (0, b""))
+        out = p.stdout.decode()
+        self.assertTrue(re.search(r"^spawn-error=[1-9]\d*$", out, re.M) or "child-status=127" in out, out)
+        (parent,) = self.states(p)
+        self.assertEqual(self.decoded(d), {parent: self.OK_COUNTS})
+
+    def test_in_place_exec(self) -> None:
+        """An in-place exec (only reachable through FFI; sv0 has no process
+        API) replaces the image before its exit handlers: the replaced image
+        publishes nothing and the new one publishes only its own counts."""
+        d = self.fresh_dir()
+        p = self.run_driver("exec", SV0COV_PROFILE_DIR=d)
+        self.assertEqual((p.returncode, p.stderr), (0, b""))
+        replaced, new = self.states(p)
+        self.assertNotEqual(replaced, new)
+        self.assertEqual(self.decoded(d), {new: self.OK_COUNTS})
 
     # ── writer byte parity (CV-116) ───────────────────────────────────────
 
@@ -833,6 +924,8 @@ class SanitizerTest(unittest.TestCase):
         self.run_clean(name, "zero")
         self.run_clean(name, "probe")
         self.run_clean(name, "exit1", want_rc=1)
+        self.run_clean(name, "spawn")
+        self.run_clean(name, "fork-hit", want_rc=1)
         self.run_clean(name, "bad-hit", want_rc=1)  # required: the refused profile fails the process
         self.run_clean(name, "ok", SV0COV_CONTEXT="shard é")
         # Refusals before user code: registration and transport.

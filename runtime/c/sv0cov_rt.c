@@ -56,11 +56,24 @@
  * flush, and the profile is withheld as incomplete. Detection is best
  * effort: a hit that read ACTIVE just before the switch and then changes an
  * already nonzero count is invisible, so a complete profile still needs
- * every coverage-producing thread joined before exit. The overflow bitmap marks exactly the written
- * counts equal to UINT64_MAX. A process image forked from the registering
- * one never publishes the inherited counters. When the profile cannot be
- * published (COV2010, COV2011, COV2112, COV2120) required mode ends the
- * process with status 1.
+ * every coverage-producing thread joined before exit. The overflow bitmap
+ * marks exactly the written counts equal to UINT64_MAX. When the profile
+ * cannot be published (COV2010, COV2011, COV2112, COV2120) required mode
+ * ends the process with status 1.
+ *
+ * Process lifecycle (SPEC 14.2.2; D-4, CV-405). sv0 has no process API, so
+ * every fork reaches the runtime as an unmanaged fork (through FFI or
+ * linked C). Fork handlers installed before user entry, which only store
+ * lock-free atomics: prepare marks this process image's lifecycle
+ * unresolved, and nothing clears it (no managed spawn wrapper exists), so
+ * its profile is withheld (COV2120); the child disarms the copied arena,
+ * so a hit there is not counted, and in required mode it ends the child
+ * with status 1 (write and _exit only) before the hit. A forked image never
+ * publishes the inherited counters. posix_spawn runs no fork handlers: the
+ * parent stays resolved and an instrumented child starts a fresh image with
+ * its own profile ID, which is the supported way to start a process. An
+ * in-place exec replaces the image before any exit handler runs, so it
+ * publishes nothing for the replaced image.
  *
  * __sv0cov_hit is the SPEC 14.2 saturating relaxed compare-and-exchange: a
  * counter at UINT64_MAX stays there and sets its overflow bit.
@@ -73,6 +86,8 @@
 #endif
 
 #include "sv0cov_rt.h"
+
+#include <pthread.h>
 
 #include <stdatomic.h>
 #include <stdio.h>
@@ -125,6 +140,7 @@ static struct {
   uint8_t map_id[32];
   pid_t pid;       /* the process image that registered */
   atomic_int late; /* a hit saw the state FLUSHING */
+  atomic_int unresolved; /* an unmanaged fork happened in this image */
 } rt = {.context_len = -1};
 
 #ifdef SV0COV_RT_TESTING
@@ -558,11 +574,19 @@ static void rt_unpublished(const char *code, const char *title, const char *deta
   }
 }
 
+static void rt_fork_prepare(void);
+static void rt_fork_child(void);
+
 static void rt_flush(void) {
   if (getpid() != rt.pid) {
     /* A forked child must not publish the counters it inherited. */
     rt_unpublished("COV2120", "unsupported process lifecycle",
                    "a forked process image does not publish its parent's counters");
+    return;
+  }
+  if (atomic_load_explicit(&rt.unresolved, memory_order_acquire) != 0) {
+    rt_unpublished("COV2120", "unsupported process lifecycle",
+                   "an unmanaged fork left this process image's coverage unresolved; no complete profile");
     return;
   }
   int active = SV0COV_RT_STATE_ACTIVE;
@@ -776,7 +800,33 @@ void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t modul
     rt_fail("COV2011", "raw profile incomplete", "cannot register the exit-time flush");
     return;
   }
+  if (pthread_atfork(rt_fork_prepare, NULL, rt_fork_child) != 0) {
+    rt_fail("COV2011", "raw profile incomplete", "cannot register the fork handlers");
+    return;
+  }
   atomic_store_explicit(&rt.state, SV0COV_RT_STATE_ACTIVE, memory_order_release);
+}
+
+/* Fork handlers (D-4): async-signal-safe, lock-free atomics only. */
+static void rt_fork_prepare(void) {
+  if (atomic_load_explicit(&rt.state, memory_order_relaxed) != SV0COV_RT_STATE_OFF)
+    atomic_store_explicit(&rt.unresolved, 1, memory_order_release);
+}
+
+static void rt_fork_child(void) {
+  int active = SV0COV_RT_STATE_ACTIVE;
+  atomic_compare_exchange_strong_explicit(&rt.state, &active, SV0COV_RT_STATE_FORKED, memory_order_relaxed,
+                                          memory_order_relaxed);
+}
+
+static void rt_forked_hit(void) {
+  if (!rt.required)
+    return;
+  static const char msg[] = "sv0cov: error[COV2120]: unsupported process lifecycle: a coverage hit ran in a "
+                            "forked process image; stopping it before the hit (SV0COV_REQUIRED=1)\n";
+  ssize_t ignored = write(2, msg, sizeof msg - 1);
+  (void)ignored;
+  _exit(1);
 }
 
 void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index) {
@@ -784,6 +834,8 @@ void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index) {
   if (state != SV0COV_RT_STATE_ACTIVE) {
     if (state == SV0COV_RT_STATE_FLUSHING)
       atomic_store_explicit(&rt.late, 1, memory_order_relaxed);
+    else if (state == SV0COV_RT_STATE_FORKED)
+      rt_forked_hit();
     return;
   }
   int registered = 0;

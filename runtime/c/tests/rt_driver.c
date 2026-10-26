@@ -15,6 +15,10 @@
  * (exit(1), as the sv0 runtime's panic and contract-failure paths do),
  * collide (the final profile name already exists), rmdir (the profile
  * directory is gone), fork (a child exits normally after forking).
+ * The process scenarios (CV-405) follow the same hits: fork-hit (the forked
+ * child hits a counter), fork-exec (the child execs this driver's "ok"),
+ * spawn and spawn-fail (posix_spawn of "ok", and of a missing program), and
+ * exec (this image execs "ok" in place).
  * "per-fragment <order>" (CV-206) registers one module per fragment, as
  * sv0c emits, in the given order; "bad-modules <kind>" breaks one rule in
  * a later module of that set.
@@ -36,6 +40,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +49,17 @@
 #include <unistd.h>
 
 extern char **environ;
+
+static const char *self; /* argv[0]: the process scenarios start "ok" from it */
+
+/* Wait for `child` and print its exit status (-1 when it did not exit). */
+static int reap(pid_t child) {
+  int status;
+  if (waitpid(child, &status, 0) != child)
+    return 3;
+  printf("child-status=%d\n", WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+  return 0;
+}
 
 #define MAP_ID "4f5da9345b6f601cba7b19e442e4b26352c18a1fb2044e8141685a2915b81b6c"
 #define FRAG_A "6d599e56e518833b373e55b1e8c222e77b7cdcc241f74d02a5a1a3a6f6b72971"
@@ -381,6 +397,7 @@ static int bad_registration(const char *kind) {
 
 int main(int argc, char **argv) {
   const char *scenario = argc > 1 ? argv[1] : "ok";
+  self = argv[0];
   if (strcmp(scenario, "per-fragment") == 0) {
     if (argc < 3 || per_fragment(argv[2]) != 0)
       return 2;
@@ -528,7 +545,10 @@ int main(int argc, char **argv) {
     __sv0cov_hit(&mod_lo, 0);
   } else if (strcmp(scenario, "kill") == 0 || strcmp(scenario, "underscore-exit") == 0 ||
              strcmp(scenario, "exit1") == 0 || strcmp(scenario, "collide") == 0 ||
-             strcmp(scenario, "rmdir") == 0 || strcmp(scenario, "fork") == 0) {
+             strcmp(scenario, "rmdir") == 0 || strcmp(scenario, "fork") == 0 ||
+             strcmp(scenario, "fork-hit") == 0 || strcmp(scenario, "fork-exec") == 0 ||
+             strcmp(scenario, "spawn") == 0 || strcmp(scenario, "spawn-fail") == 0 ||
+             strcmp(scenario, "exec") == 0) {
     for (uint32_t i = 0; i < N; i++)
       for (uint32_t k = 0; k <= i % 5; k++)
         __sv0cov_hit(&mod, i);
@@ -568,6 +588,37 @@ int main(int argc, char **argv) {
       if (child < 0 || waitpid(child, &status, 0) != child)
         return 3;
       printf("child-status=%d\n", WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+    }
+    char *ok_argv[] = {(char *)self, "ok", NULL};
+    if (strcmp(scenario, "fork-hit") == 0 || strcmp(scenario, "fork-exec") == 0) {
+      fflush(stdout);
+      pid_t child = fork();
+      if (child == 0) {
+        if (strcmp(scenario, "fork-exec") == 0) {
+          execve(self, ok_argv, environ);
+          _exit(127);
+        }
+        __sv0cov_hit(&mod, 0); /* required: ends the child here */
+        puts("child-after-hit");
+        exit(0);
+      }
+      if (child < 0 || reap(child) != 0)
+        return 3;
+    }
+    if (strcmp(scenario, "spawn") == 0 || strcmp(scenario, "spawn-fail") == 0) {
+      const char *prog = strcmp(scenario, "spawn") == 0 ? self : "/nonexistent/sv0cov-rt-driver";
+      pid_t child;
+      fflush(stdout);
+      int e = posix_spawn(&child, prog, NULL, NULL, ok_argv, environ);
+      if (e != 0)
+        printf("spawn-error=%d\n", e);
+      else if (reap(child) != 0)
+        return 3;
+    }
+    if (strcmp(scenario, "exec") == 0) {
+      fflush(stdout);
+      execve(self, ok_argv, environ);
+      return 3;
     }
     return 0;
   } else {

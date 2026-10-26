@@ -53,6 +53,7 @@ void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);
 #define SV0COV_RT_STATE_ACTIVE 1     /* counting; a complete profile is possible */
 #define SV0COV_RT_STATE_INCOMPLETE 2 /* failed; no complete profile */
 #define SV0COV_RT_STATE_FLUSHING 3   /* the exit-time flush has begun; a hit now is late */
+#define SV0COV_RT_STATE_FORKED 4     /* a forked copy of the image; never counts or publishes */
 
 /* Lock-free probe (SPEC 14.2, COV-INS-010; CV-210). The runtime uses C11
    atomics for the counters and the overflow bitmap and never assumes they
