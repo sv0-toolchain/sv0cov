@@ -49,9 +49,14 @@
  * fsynced, closed, and committed with an atomic no-replace rename
  * (renamex_np RENAME_EXCL / renameat2 RENAME_NOREPLACE, else link+unlink);
  * the directory is then fsynced. Counters are read with one index-ordered
- * relaxed load each, in two passes (size, then write); a nonzero set that
- * changes between them means hits ran during the flush, and the profile is
- * withheld as incomplete. The overflow bitmap marks exactly the written
+ * relaxed load each, in two passes (size, then write). The flush first
+ * moves the state from ACTIVE to FLUSHING; a hit that sees FLUSHING is not
+ * counted but marks the flush late (CV-422, COV-INS-012). A late mark, or a
+ * nonzero set that changes between the passes, means hits ran during the
+ * flush, and the profile is withheld as incomplete. Detection is best
+ * effort: a hit that read ACTIVE just before the switch and then changes an
+ * already nonzero count is invisible, so a complete profile still needs
+ * every coverage-producing thread joined before exit. The overflow bitmap marks exactly the written
  * counts equal to UINT64_MAX. A process image forked from the registering
  * one never publishes the inherited counters. When the profile cannot be
  * published (COV2010, COV2011, COV2112, COV2120) required mode ends the
@@ -119,7 +124,12 @@ static struct {
   int context_len; /* -1 = absent */
   uint8_t map_id[32];
   pid_t pid;       /* the process image that registered */
+  atomic_int late; /* a hit saw the state FLUSHING */
 } rt = {.context_len = -1};
+
+#ifdef SV0COV_RT_TESTING
+void (*sv0cov_rt_test_flush_hook)(void);
+#endif
 
 /* ── diagnostics ───────────────────────────────────────────────────────── */
 
@@ -555,7 +565,9 @@ static void rt_flush(void) {
                    "a forked process image does not publish its parent's counters");
     return;
   }
-  if (atomic_load_explicit(&rt.state, memory_order_acquire) != SV0COV_RT_STATE_ACTIVE) {
+  int active = SV0COV_RT_STATE_ACTIVE;
+  if (!atomic_compare_exchange_strong_explicit(&rt.state, &active, SV0COV_RT_STATE_FLUSHING, memory_order_acq_rel,
+                                               memory_order_acquire)) {
     rt_unpublished("COV2011", "raw profile incomplete",
                    "a coverage hit named an unregistered counter; the counts are not trustworthy");
     return;
@@ -614,6 +626,12 @@ static void rt_flush(void) {
   }
   fchmod(fd, 0600);
 
+#ifdef SV0COV_RT_TESTING
+  /* CV-422: a hit between the passes, deterministically. */
+  if (sv0cov_rt_test_flush_hook != NULL)
+    sv0cov_rt_test_flush_hook();
+#endif
+
   /* Pass 2: write. */
   rt_crc_init();
   o->fd = fd, o->failed = 0, o->crc = 0xffffffffu, o->used = 0;
@@ -657,7 +675,11 @@ static void rt_flush(void) {
         bitmap[i / 64] |= (uint64_t)1 << (i % 64);
     }
   }
-  int racing = written != pairs || saw_saturated != saturated;
+  int racing = written != pairs || saw_saturated != saturated ||
+               atomic_load_explicit(&rt.late, memory_order_seq_cst) != 0;
+  /* A hit that read ACTIVE before the switch may still mark the run
+     incomplete (a bad index): never publish over it. */
+  int broken = atomic_load_explicit(&rt.state, memory_order_acquire) != SV0COV_RT_STATE_FLUSHING;
   rt_out_u32(o, words);
   for (uint32_t w = 0; w < words; w++)
     rt_out_u64(o, bitmap[w]);
@@ -672,10 +694,13 @@ static void rt_flush(void) {
   free(bitmap);
   free(o);
 
-  if (racing || io_failed) {
+  if (broken || racing || io_failed) {
     unlink(tmp);
     free(dst), free(tmp);
-    if (racing)
+    if (broken)
+      rt_unpublished("COV2011", "raw profile incomplete",
+                     "a coverage hit named an unregistered counter; the counts are not trustworthy");
+    else if (racing)
       rt_unpublished("COV2011", "raw profile incomplete",
                      "coverage hits ran while the profile was being written; join worker threads before exit");
     else
@@ -755,8 +780,12 @@ void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t modul
 }
 
 void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index) {
-  if (atomic_load_explicit(&rt.state, memory_order_relaxed) != SV0COV_RT_STATE_ACTIVE)
+  int state = atomic_load_explicit(&rt.state, memory_order_relaxed);
+  if (state != SV0COV_RT_STATE_ACTIVE) {
+    if (state == SV0COV_RT_STATE_FLUSHING)
+      atomic_store_explicit(&rt.late, 1, memory_order_relaxed);
     return;
+  }
   int registered = 0;
   for (uint32_t k = 0; k < rt.module_count; k++)
     if (rt.modules[k] == module)

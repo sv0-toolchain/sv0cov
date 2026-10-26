@@ -44,13 +44,15 @@ void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t modul
 
 /* One execution of a planned point: saturating relaxed increment of program
    counter module->slice_base + local_index. A no-op when collection is not
-   active. */
+   active; during the exit-time flush it is not counted and the profile is
+   withheld as incomplete (join coverage-producing threads before exit). */
 void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);
 
 /* Collection state. */
 #define SV0COV_RT_STATE_OFF 0        /* __sv0cov_start not called */
 #define SV0COV_RT_STATE_ACTIVE 1     /* counting; a complete profile is possible */
 #define SV0COV_RT_STATE_INCOMPLETE 2 /* failed; no complete profile */
+#define SV0COV_RT_STATE_FLUSHING 3   /* the exit-time flush has begun; a hit now is late */
 
 /* Lock-free probe (SPEC 14.2, COV-INS-010; CV-210). The runtime uses C11
    atomics for the counters and the overflow bitmap and never assumes they
@@ -83,6 +85,9 @@ int sv0cov_rt_test_context(const char **bytes);
 int sv0cov_rt_test_storage_aligned(void);
 unsigned sv0cov_rt_test_counter_size(void);
 void sv0cov_rt_test_clear_overflow(uint32_t index);
+/* CV-422: when set, the exit-time flush calls it between its two passes,
+   after the state has become FLUSHING. */
+extern void (*sv0cov_rt_test_flush_hook)(void);
 #endif
 
 #endif /* SV0COV_RT_H */

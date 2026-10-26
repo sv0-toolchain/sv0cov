@@ -24,6 +24,10 @@ CV-116 (F0-G8, COV-FMT-007): with fixture-supplied IDs the C writer's bytes
 equal every CV-024 golden (the VM goldens through a test-only backend-flag
 override) and sv0cov.formats.rawprofile.encode for 40 seeded random native
 profiles (sizes, sparse and saturated counts, absent/empty/UTF-8 context).
+CV-422 (COV-INS-006/009/012): 1, 2, 4 and 8 threads on shared and on
+disjoint counters, every saturated counter named by the overflow bitmap
+under contention, and a hit during the exit-time flush withholding the
+profile.
 """
 
 from __future__ import annotations
@@ -215,7 +219,9 @@ class NativeRuntimeTest(unittest.TestCase):
     def test_unjoined_worker_never_tears_the_profile(self) -> None:
         """COV-INS-012: with a worker still hitting at exit, the run either
         publishes one valid profile or refuses with COV2011; never a torn or
-        partial file."""
+        partial file. (A worker that hits during the flush is detected; one
+        the scheduler keeps off the CPU for the whole flush is not, so both
+        outcomes stay possible.)"""
         for _ in range(5):
             d = self.fresh_dir()
             p = self.run_driver("unjoined", SV0COV_PROFILE_DIR=d)
@@ -229,6 +235,60 @@ class NativeRuntimeTest(unittest.TestCase):
                 # Required mode: a refused profile fails the process.
                 self.assertIn("COV2011", p.stderr.decode())
                 self.assertEqual(p.returncode, 1)
+
+    # ── CV-422: thread sweep, bitmap under contention, quiescence ──────────
+
+    def test_thread_sweep_shared_and_disjoint(self) -> None:
+        """COV-INS-006, AC-035: 1, 2, 4 and 8 joined threads on one shared
+        counter and on one counter each give exact totals, twice over, and
+        the published profile holds exactly those counts."""
+        for nt in (1, 2, 4, 8):
+            for _ in range(2):
+                d = self.fresh_dir()
+                r = self.report(self.run_driver("stress", str(nt), "50000", SV0COV_PROFILE_DIR=d))
+                want = [0] * 70
+                want[0] = nt * 50000
+                want[10:10 + nt] = [50000] * nt
+                self.assertEqual((r["state"], r["counts"]), (1, want), nt)
+                (name,) = self.profiles(d)
+                prof = decode(Path(d, name).read_bytes(), map_counter_count=70, expected_map_id=MAP_ID)
+                self.assertEqual(prof.counts, tuple((i, c) for i, c in enumerate(want) if c), nt)
+                self.assertEqual(prof.saturated(), [])
+
+    def test_overflow_bitmap_names_every_saturated_counter(self) -> None:
+        """COV-INS-009: with every third counter (in both bitmap words)
+        crossing UINT64_MAX while 1, 2, 4 or 8 threads hit every counter,
+        each of them ends at UINT64_MAX with its atomic overflow bit set, no
+        other counter is marked, and the published bitmap names exactly the
+        saturated counters."""
+        sat = [i for i in range(70) if i % 3 == 0]
+        for nt in (1, 2, 4, 8):
+            d = self.fresh_dir()
+            r = self.report(self.run_driver("saturate-mixed", str(nt), SV0COV_PROFILE_DIR=d))
+            want = [MAX if i % 3 == 0 else 8 * nt for i in range(70)]
+            self.assertEqual(r["counts"], want, nt)
+            self.assertEqual([i for i, o in enumerate(r["overflow"]) if o], sat, nt)
+            (name,) = self.profiles(d)
+            prof = decode(Path(d, name).read_bytes(), map_counter_count=70, expected_map_id=MAP_ID)
+            self.assertEqual(prof.counts, tuple(enumerate(want)), nt)
+            self.assertEqual(prof.saturated(), sat, nt)
+
+    def test_hit_during_the_flush_withholds_the_profile(self) -> None:
+        """COV-INS-012, RSK-027: a hit that runs while the exit-time flush
+        writes (here from the flush itself, between its two passes) marks
+        the profile incomplete, whether it would make a counter nonzero or
+        only raise an already nonzero one; nothing is published and no
+        temporary is left. Required mode fails the process; otherwise it
+        exits normally with the diagnostic."""
+        for index in ("0", "1", "69"):
+            for required, rc in (("1", 1), ("0", 0)):
+                d = self.fresh_dir()
+                p = self.run_driver("late-hit", index, SV0COV_PROFILE_DIR=d, SV0COV_REQUIRED=required)
+                err = p.stderr.decode()
+                self.assertEqual(p.returncode, rc, err)
+                self.assertIn("error[COV2011]", err)
+                self.assertIn("join worker threads before exit", err)
+                self.assertEqual(os.listdir(d), [], (index, required))
 
     def test_zero_counter_program(self) -> None:
         r = self.report(self.run_driver("zero"))
@@ -761,6 +821,9 @@ class SanitizerTest(unittest.TestCase):
         p = self.run_clean(name, "stress", "8", "20000")
         counts = REPORT.match(p.stdout.splitlines()[-1]).group(6).split(",")
         self.assertEqual((counts[0], counts[10], counts[17]), (str(8 * 20000), "20000", "20000"))
+        p = self.run_clean(name, "saturate-mixed", "8")
+        self.assertIn("overflow=1,0,0,1", p.stdout)
+        self.run_clean(name, "late-hit", "0", want_rc=1)
         p = self.run_clean(name, "race-saturate", "200")
         self.assertIn("race two_thread_failures=0 eight_thread_failures=0", p.stdout)
         self.run_clean(name, "threads")

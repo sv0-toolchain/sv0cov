@@ -87,8 +87,8 @@ MODULES = (
 REGISTRY = "registries/diagnostics-v1.json"
 #: The packaged C runtime sources and their exact bytes.
 RUNTIME_SHA256 = {
-    "runtime/c/sv0cov_rt.c": "d398ab7d8c016bfad5b465de097691c9797f33914da8cf1170d652d3fc8efe96",
-    "runtime/c/sv0cov_rt.h": "7fe0fa39e66a00d3ebf55202d7f351085a32078e891eb51689eca12be86ccd1f",
+    "runtime/c/sv0cov_rt.c": "3e2cf87cb6bb946cd48f75854099532c343b9c55f4c7843f17e82bf044bf1a4b",
+    "runtime/c/sv0cov_rt.h": "e3221bcb88065d657520e85c41b35f7cf5fe10342836a4e050553c18849ed04b",
 }
 #: The doctor's smoke fixture and its hand-checked oracle (CV-242; SPEC 20.7).
 SMOKE = ("resources/doctor/doctor-r1-smoke.oracle.json", "resources/doctor/doctor-r1-smoke.sv0")

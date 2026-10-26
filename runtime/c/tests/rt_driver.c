@@ -20,6 +20,9 @@
  * a later module of that set.
  * "stress <threads> <hits>", "race-saturate <trials>" and "probe" (CV-210)
  * are the contention, saturation-race, and lock-free/alignment checks.
+ * "saturate-mixed <threads>" (CV-422) saturates every third counter under
+ * contention; "late-hit <index>" (CV-422) hits that counter from inside the
+ * exit-time flush, between its two passes.
  * "write" (CV-116) registers a map of a given size and counts, for byte
  * parity with the Python writer.
  *
@@ -264,6 +267,42 @@ static void *restless(void *arg) {
   return NULL;
 }
 
+/* CV-422 / COV-INS-009: every third counter starts 0-6 below UINT64_MAX;
+   `nthreads` threads each hit every counter 8 times, each thread starting
+   at a different counter, so the saturating ones cross the limit while
+   others hit them. */
+struct sweep {
+  const struct __sv0cov_module *m;
+  uint32_t start;
+};
+
+static void *sweep_all(void *arg) {
+  struct sweep *w = arg;
+  for (int k = 0; k < 8; k++)
+    for (uint32_t i = 0; i < N; i++)
+      __sv0cov_hit(w->m, (w->start + i) % N);
+  return NULL;
+}
+
+static void saturate_mixed(const struct __sv0cov_module *m, int nthreads) {
+  pthread_t t[16];
+  struct sweep w[16];
+  for (uint32_t i = 0; i < N; i += 3)
+    sv0cov_rt_test_set_counter(i, UINT64_MAX - i % 7);
+  for (int i = 0; i < nthreads; i++) {
+    w[i] = (struct sweep){m, (uint32_t)i * 9u};
+    pthread_create(&t[i], NULL, sweep_all, &w[i]);
+  }
+  for (int i = 0; i < nthreads; i++)
+    pthread_join(t[i], NULL);
+}
+
+/* CV-422 / COV-INS-012: the hit the flush hook makes, as if from a thread
+   that was never joined. */
+static uint32_t late_index;
+
+static void late_hit(void) { __sv0cov_hit(&mod, late_index); }
+
 /* CV-210: deliberate faults that prove a sanitizer build is really
    instrumented (the sanitizer must stop each one). Never run otherwise. */
 static int plain_shared;
@@ -457,6 +496,17 @@ int main(int argc, char **argv) {
     int two = race_saturate(&mod, 5, trials, 1, 2, 1);
     int eight = race_saturate(&mod, 64, trials / 10 + 1, 1000, 8, 500);
     printf("race two_thread_failures=%d eight_thread_failures=%d trials=%d\n", two, eight, trials);
+  } else if (strcmp(scenario, "saturate-mixed") == 0) {
+    int nt = argc > 2 ? atoi(argv[2]) : 8;
+    if (nt < 1 || nt > 16)
+      return 2;
+    saturate_mixed(&mod, nt);
+  } else if (strcmp(scenario, "late-hit") == 0) {
+    /* late-hit <index>: counter 0 is hit once; the flush hits <index>. */
+    if (argc < 3 || (late_index = (uint32_t)strtoul(argv[2], NULL, 10)) >= N)
+      return 2;
+    __sv0cov_hit(&mod, 0);
+    sv0cov_rt_test_flush_hook = late_hit;
   } else if (strcmp(scenario, "unjoined") == 0) {
     pthread_t t;
     pthread_create(&t, NULL, restless, &mod);

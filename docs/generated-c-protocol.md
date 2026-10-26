@@ -103,9 +103,15 @@ its overflow bit is set.
 The counters and the overflow bitmap are C11 atomics, allocated with
 `calloc` (aligned for any object type). A hit is data-race-free and
 individually linearizable; it is not a snapshot across counters. A complete
-profile needs the program to join its worker threads before it exits: the
-exit-time flush reads each counter once, in index order, and refuses to
-publish (COV2011) if it sees a counter change while it writes.
+profile needs the program to join its worker threads before it exits;
+process exit does not join them. The exit-time flush first switches the
+runtime from active to flushing, then reads each counter once, in index
+order. A hit that sees the flushing state is not counted and marks the
+flush late; a late mark, or a counter that becomes nonzero while the flush
+writes, withholds the profile (COV2011, "join worker threads before exit").
+Detection is best effort (CV-422): a hit that read the active state just
+before the switch can still raise an already nonzero count unseen, which is
+why joining remains the program's job.
 
 The runtime never assumes 64-bit atomics are lock-free (COV-INS-010).
 `__sv0cov_atomic_u64_lock_free(&build_time)` records what the host
@@ -113,8 +119,12 @@ provides: the compile-time `ATOMIC_LLONG_LOCK_FREE` (0 never, 1 sometimes,
 2 always) and the run-time `atomic_is_lock_free` answer for the counter
 type. Coverage means the same either way; a host without lock-free 64-bit
 atomics would link its C library's lock-based fallback (`-latomic` with
-GCC). Recorded probes (`tests/test_native_runtime.py` prints one line per
-run, on every CI host):
+GCC). `tools/atomics_probe.py` writes the record (`sv0cov-atomics-probe`
+version 1: host, compiler, runtime source digest, both answers, counter
+size, alignment); CI runs it on every host class and keeps each record as
+the `atomics-probe-<host>-py<version>` artifact, and
+`tests/test_atomics_probe.py` checks this table against the host's own
+record. Recorded probes:
 
 | Host | Compiler | Build-time | Run-time | Counter size |
 |---|---|---|---|---|
@@ -131,6 +141,14 @@ The test suite (CV-210) checks, on each host:
   always leave it at `UINT64_MAX` with its overflow bit set, as do eight
   threads crossing the limit together, and the published profile reports
   the saturation (AC-036);
+- 1, 2, 4 and 8 joined threads on one shared counter and on one counter
+  each give exact totals, and the published profile holds them (CV-422);
+- with every third counter crossing `UINT64_MAX` while 1, 2, 4 or 8 threads
+  hit every counter, each ends at `UINT64_MAX` with its overflow bit set,
+  no other bit is set, and the published bitmap names exactly those
+  counters (CV-422, COV-INS-009);
+- a hit during the exit-time flush, whether it makes a counter nonzero or
+  raises one that already is, withholds the profile (CV-422, COV-INS-012);
 - the storage is aligned for its atomic type;
 - a worker that is never joined cannot tear the profile: it is published
   whole or refused;
