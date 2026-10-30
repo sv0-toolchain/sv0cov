@@ -11,7 +11,8 @@
  *   context=<absent|len:<n>:<hex>> counts=<c0,c1,...> overflow=<o0,o1,...>
  *
  * The exit scenarios (CV-115) end the process in a specific way after the
- * "ok" hit pattern: kill (SIGKILL), underscore-exit (_exit(0)), exit1
+ * "ok" hit pattern: kill (SIGKILL), abort (abort(), SIGABRT), segv (a
+ * SIGSEGV crash; CV-423), underscore-exit (_exit(0)), exit1
  * (exit(1), as the sv0 runtime's panic and contract-failure paths do),
  * collide (the final profile name already exists), rmdir (the profile
  * directory is gone), fork (a child exits normally after forking).
@@ -29,6 +30,12 @@
  * exit-time flush, between its two passes.
  * "write" (CV-116) registers a map of a given size and counts, for byte
  * parity with the Python writer.
+ * "trace <ms> [exit1]" (CV-406, trace build only: -DRT_IOTRACE with
+ * rt_iotrace.c) keeps hitting counters for <ms> milliseconds of user code,
+ * then leaves by returning from main or by exit(1), marking the trace
+ * phases as it goes. With RT_DRIVER_KILL_IN_FLUSH set, any scenario SIGKILLs
+ * itself inside the exit-time flush, after the temporary exists and before
+ * any byte of the profile is written (CV-406, AC-032).
  *
  * The fixture program has 70 counters (so the overflow bitmap has two
  * words) in two fragments.
@@ -46,11 +53,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 extern char **environ;
 
 static const char *self; /* argv[0]: the process scenarios start "ok" from it */
+
+#ifdef RT_IOTRACE
+extern const char *volatile rt_iotrace_phase;
+#define PHASE(name) (rt_iotrace_phase = (name))
+#else
+#define PHASE(name) ((void)0)
+#endif
+
+static void die_in_flush(void) { raise(SIGKILL); }
+
+static long elapsed_ms(const struct timespec *since) {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (now.tv_sec - since->tv_sec) * 1000L + (now.tv_nsec - since->tv_nsec) / 1000000L;
+}
 
 /* Wait for `child` and print its exit status (-1 when it did not exit). */
 static int reap(pid_t child) {
@@ -398,6 +421,8 @@ static int bad_registration(const char *kind) {
 int main(int argc, char **argv) {
   const char *scenario = argc > 1 ? argv[1] : "ok";
   self = argv[0];
+  if (getenv("RT_DRIVER_KILL_IN_FLUSH") != NULL)
+    sv0cov_rt_test_flush_hook = die_in_flush;
   if (strcmp(scenario, "per-fragment") == 0) {
     if (argc < 3 || per_fragment(argv[2]) != 0)
       return 2;
@@ -524,6 +549,26 @@ int main(int argc, char **argv) {
       return 2;
     __sv0cov_hit(&mod, 0);
     sv0cov_rt_test_flush_hook = late_hit;
+  } else if (strcmp(scenario, "trace") == 0) {
+    /* trace <ms> [exit1]: hit every counter in turn for <ms> ms, pausing
+       1 ms every 1000 hits so time passes with live, unflushed counts. */
+    long ms = argc > 2 ? atol(argv[2]) : 0;
+    if (ms < 1)
+      return 2;
+    PHASE("user");
+    struct timespec t0, pause = {0, 1000000L};
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (uint64_t k = 0; elapsed_ms(&t0) < ms; k++) {
+      __sv0cov_hit(&mod, (uint32_t)(k % N));
+      if (k % 1000 == 999)
+        nanosleep(&pause, NULL);
+    }
+    report();
+    fflush(stdout);
+    PHASE("exit");
+    if (argc > 3 && strcmp(argv[3], "exit1") == 0)
+      exit(1);
+    return 0;
   } else if (strcmp(scenario, "unjoined") == 0) {
     pthread_t t;
     pthread_create(&t, NULL, restless, &mod);
@@ -543,7 +588,8 @@ int main(int argc, char **argv) {
     __sv0cov_hit(&mod, N);
   } else if (strcmp(scenario, "foreign-hit") == 0) {
     __sv0cov_hit(&mod_lo, 0);
-  } else if (strcmp(scenario, "kill") == 0 || strcmp(scenario, "underscore-exit") == 0 ||
+  } else if (strcmp(scenario, "kill") == 0 || strcmp(scenario, "abort") == 0 ||
+             strcmp(scenario, "segv") == 0 || strcmp(scenario, "underscore-exit") == 0 ||
              strcmp(scenario, "exit1") == 0 || strcmp(scenario, "collide") == 0 ||
              strcmp(scenario, "rmdir") == 0 || strcmp(scenario, "fork") == 0 ||
              strcmp(scenario, "fork-hit") == 0 || strcmp(scenario, "fork-exec") == 0 ||
@@ -556,6 +602,10 @@ int main(int argc, char **argv) {
     fflush(stdout);
     if (strcmp(scenario, "kill") == 0)
       raise(SIGKILL);
+    if (strcmp(scenario, "abort") == 0)
+      abort();
+    if (strcmp(scenario, "segv") == 0)
+      raise(SIGSEGV);
     if (strcmp(scenario, "underscore-exit") == 0)
       _exit(0);
     if (strcmp(scenario, "exit1") == 0)

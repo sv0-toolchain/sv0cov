@@ -19,10 +19,11 @@ codecs); R0 (2026-10-17) delivered the developer preview (the lifecycle
 CLI, merge, terminal and native JSON reports, fixed thresholds, submodule and
 compatibility policy); R0.1 (2026-10-24) added exclusions, contexts, HTML, contract and
 entity coverage, scopes, changed-region checks, ratchets and exclusion caps.
-R1 work so far (2026-10-26): LCOV and Cobertura export with commit manifests
+R1 work so far (2026-10-29): LCOV and Cobertura export with commit manifests
 and consumer conformance, native-report `check`, saturation policy, privacy,
-HTML accessibility, native concurrency, process-lifecycle fork guards and the
-recorded performance campaign. The slice-by-slice status is in the checklist
+HTML accessibility, native concurrency, process-lifecycle fork guards, the
+recorded performance campaign, the orderly-flush-only proof and the
+reliability closure. The slice-by-slice status is in the checklist
 named below. Nothing is released.
 
 The governing contract is the sv0cov specification

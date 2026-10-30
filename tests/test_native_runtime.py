@@ -30,10 +30,19 @@ CV-422 (COV-INS-006/009/012): 1, 2, 4 and 8 threads on shared and on
 disjoint counters, every saturated counter named by the overflow bitmap
 under contention, and a hit during the exit-time flush withholding the
 profile.
+CV-406 (COV-FMT-011/012, AC-032, BL-068): the production object imports no
+mapping, timer, signal or thread-creation call and no file call beyond the
+flush's; an I/O trace (runtime/c/tests/rt_iotrace.c) of seconds of live
+counting shows no file or mapping call before the process leaves user code
+and exactly the SPEC 23.4 publication sequence after it; and a process
+killed before or inside its flush leaves nothing that contributes counts.
+CV-423 (R1-G6, COV-INS-008): abort and SIGSEGV crashes publish nothing; 16
+parallel shards of one run publish side by side and merge exactly.
 """
 
 from __future__ import annotations
 
+import io
 import json
 import itertools
 import os
@@ -51,7 +60,11 @@ ROOT = Path(__file__).resolve().parent.parent
 RT = ROOT / "runtime" / "c"
 sys.path.insert(0, str(ROOT / "src"))
 
+from sv0cov import cli  # noqa: E402
 from sv0cov.formats.rawprofile import RawProfile, decode, encode  # noqa: E402
+from sv0cov.model.indexed import read_indexed  # noqa: E402
+from test_cli import records  # noqa: E402
+from test_indexed_reader import fixture_inputs  # noqa: E402
 
 GOLDEN_DIR = ROOT / "tests" / "fixtures" / "rawprofile"
 
@@ -470,7 +483,8 @@ class NativeRuntimeTest(unittest.TestCase):
         self.assertEqual(len(self.published(d, {"profile_id": report.group(4)}).counts), 70)
 
     def test_killed_or_underscore_exit_publishes_nothing(self) -> None:
-        for scenario, want in (("kill", -9), ("underscore-exit", 0)):
+        """COV-INS-008: a kill, a crash (abort, SIGSEGV) and _exit run no exit handler."""
+        for scenario, want in (("kill", -9), ("abort", -6), ("segv", -11), ("underscore-exit", 0)):
             with self.subTest(scenario):
                 d = self.fresh_dir()
                 p = self.run_driver(scenario, SV0COV_PROFILE_DIR=d)
@@ -955,6 +969,210 @@ class SanitizerTest(unittest.TestCase):
                     "insufficient space for an object")  # GCC's UBSan bounds check fires first
         self.caught("address+undefined", "overflow", "signed integer overflow")
         self.scenarios("address+undefined")
+
+
+# CV-406. Calls whose import would mean a checkpoint, a continuous counter
+# file, or a background writer: mappings, timers, signal handlers, threads,
+# sleeps, positional or asynchronous writes, truncation and preallocation.
+FORBIDDEN_IMPORTS = frozenset("""
+    mmap mmap64 munmap msync mprotect madvise mremap shm_open shm_unlink
+    setitimer timer_create timer_settime alarm ualarm signal sigaction
+    pthread_create thrd_create sleep usleep nanosleep clock_nanosleep
+    dispatch_after dispatch_source_create
+    pwrite pwrite64 pwritev aio_write lio_listio ftruncate ftruncate64
+    fallocate posix_fallocate fdatasync sync_file_range fopen fdopen freopen
+""".split())
+# Every call that creates, writes, names or removes a file, and the ones the
+# runtime is allowed: exactly the flush's (SPEC 23.4).
+FILE_CALLS = frozenset("""
+    open openat creat mkstemp mkostemp mkstemps write writev link linkat
+    unlink unlinkat rename renameat renamex_np renameat2 symlink
+""".split())
+FLUSH_CALLS = frozenset({"open", "mkstemp", "write", "link", "unlink", "renamex_np", "renameat2"})
+# SPEC 23.4: temporary created and made 0600, written, synchronized, closed,
+# committed under its final name without replacing, the directory synchronized.
+PUBLICATION = re.compile(
+    r"mkstemp tmp\nfchmod tmp\n(write tmp\n)+fsync tmp\nclose tmp\n"
+    r"(rename tmp>profile\n|link tmp>profile\nunlink tmp\n)"
+    r"open dir\nfsync dir\nclose dir\n\Z"
+)
+
+
+class PublicationBoundaryTest(unittest.TestCase):
+    """CV-406: R1 publishes only at the orderly flush (COV-FMT-011/012,
+    AC-032). CV-423: parallel shards of one run publish side by side."""
+
+    tmp: tempfile.TemporaryDirectory
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        compiler = cc()
+        if compiler is None:
+            raise unittest.SkipTest("no C compiler on this host")
+        cls.tmp = tempfile.TemporaryDirectory()
+        t = Path(cls.tmp.name)
+        strict = [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic"]
+        cls.obj = t / "rt.o"
+        subprocess.run([*strict, "-c", str(RT / "sv0cov_rt.c"), "-o", str(cls.obj)], check=True)
+        cls.driver = t / "rt_driver"
+        cls.traced = t / "rt_driver_traced"
+        common = [*strict, "-DSV0COV_RT_TESTING", "-pthread"]
+        subprocess.run([*common, "-o", str(cls.driver), str(RT / "sv0cov_rt.c"), str(RT / "tests" / "rt_driver.c")],
+                       check=True)
+        dl = ["-ldl"] if sys.platform.startswith("linux") else []
+        subprocess.run([*common, "-DRT_IOTRACE", "-o", str(cls.traced), str(RT / "sv0cov_rt.c"),
+                        str(RT / "tests" / "rt_driver.c"), str(RT / "tests" / "rt_iotrace.c"), *dl], check=True)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tmp.cleanup()
+
+    def run_driver(self, exe: Path, profile_dir: str, *args: str, **env: str) -> subprocess.CompletedProcess:
+        base = {k: v for k, v in os.environ.items() if not k.startswith(("SV0COV", "RT_"))}
+        base.update({"SV0COV_PROFILE_DIR": profile_dir, "SV0COV_RUN_ID": RUN_ID, "SV0COV_REQUIRED": "1"}, **env)
+        return subprocess.run([str(exe), *args], capture_output=True, env=base, timeout=120)
+
+    def trace(self, *args: str, **env: str) -> tuple[subprocess.CompletedProcess, list[str], str]:
+        """Run the traced driver: the process, its trace lines, its profile directory."""
+        d = tempfile.mkdtemp(dir=self.tmp.name)
+        log = Path(d + ".trace")
+        p = self.run_driver(self.traced, d, *args, RT_IOTRACE=str(log), **env)
+        return p, log.read_text().splitlines() if log.exists() else [], d
+
+    def test_the_runtime_imports_no_checkpoint_or_mapping_call(self) -> None:
+        """COV-FMT-012 by dependency inspection: the production object's
+        undefined symbols are every call it can make."""
+        nm = shutil.which("nm")
+        if nm is None:
+            self.skipTest("no nm on this host")
+        out = subprocess.run([nm, "-u", str(self.obj)], capture_output=True, text=True, check=True).stdout
+        names = {line.split()[-1] for line in out.splitlines() if line.strip()}
+        if sys.platform == "darwin":
+            names = {n[1:] if n.startswith("_") else n for n in names}
+        self.assertIn("atexit", names)  # the inspection reads real imports
+        self.assertEqual(sorted(names & FORBIDDEN_IMPORTS), [])
+        self.assertLessEqual(names & FILE_CALLS, FLUSH_CALLS)
+        self.assertIn("mkstemp", names)
+
+    def assert_only_the_orderly_flush_writes(self, lines: list[str]) -> None:
+        mine = [ln for ln in lines if not ln.endswith(" stdio")]
+        self.assertEqual([ln for ln in mine if not ln.startswith("exit ")][:5], [], "a file call before the flush")
+        self.assertEqual([ln for ln in mine if " mmap " in ln or " msync " in ln or " munmap " in ln][:5], [])
+        self.assertRegex("".join(ln.split(" ", 1)[1] + "\n" for ln in mine), PUBLICATION)
+
+    def test_io_trace_writes_only_at_the_orderly_flush(self) -> None:
+        """COV-FMT-011/012: two seconds of live counting, with time passing,
+        touch no file and map nothing; leaving main (or exit(1), the contract
+        failure path) runs exactly one SPEC 23.4 publication of a complete,
+        valid profile."""
+        for how in ((), ("exit1",)):
+            with self.subTest(exit=how or "return"):
+                p, lines, d = self.trace("trace", "2000", *how)
+                self.assertEqual(p.returncode, 1 if how else 0, p.stderr.decode())
+                self.assertEqual(p.stderr, b"")
+                self.assertIn(b"user-code", p.stdout)
+                self.assertTrue(any(ln.startswith("user ") or ln.startswith("exit ") for ln in lines), lines)
+                self.assert_only_the_orderly_flush_writes(lines)
+                (name,) = os.listdir(d)
+                prof = decode(Path(d, name).read_bytes(), map_counter_count=70, expected_map_id=MAP_ID)
+                self.assertEqual(len(prof.counts), 70)  # every counter was live before the flush
+
+    def test_the_trace_sees_early_writes_and_a_killed_flush(self) -> None:
+        """Controls for the empty pre-exit trace: a file written before exit
+        (the driver occupying the profile name) is traced, and the shim
+        intercepts the runtime itself: killed inside its flush, the trace
+        stops at the temporary it had just made."""
+        p, lines, d = self.trace("collide")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("pre open profile", lines)
+        self.assertIn("pre write profile", lines)
+        self.assertIn("pre rename tmp>profile", lines)  # the refused commit (no phase marks here)
+        p, lines, d = self.trace("trace", "50", RT_DRIVER_KILL_IN_FLUSH="1")
+        self.assertEqual(p.returncode, -9)
+        self.assertEqual([ln for ln in lines if not ln.endswith(" stdio")], ["exit mkstemp tmp", "exit fchmod tmp"])
+        (temp,) = os.listdir(d)
+        self.assertRegex(temp, r"^\.[0-9a-f]{32}-[0-9a-f]{32}\.sv0profraw\.tmp-")
+
+    def f0_write(self) -> tuple[bytes, tuple[str, ...]]:
+        """The f0 fixture map, and the driver arguments that publish its expected counts."""
+        data, m, counts = fixture_inputs("f0")
+        counter = {p["point_id"]: p["counter_index"] for p in m["points"] if p["counter_index"] is not None}
+        hits = [f"{counter[pid]}={c}" for pid, c in counts.items() if c]
+        return data, ("write", m["map_id"], str(m["program_counter_count"]), *hits)
+
+    def merge(self, *runs: dict[str, str], override: bool = False, parallel: bool = False) -> tuple[int, list, dict | None]:
+        """Run the f0 driver once per `runs` environment into one profile
+        directory (all at once with `parallel`), then `sv0cov merge` it."""
+        data, write = self.f0_write()
+        top = Path(tempfile.mkdtemp(dir=self.tmp.name))
+        (top / "maps").mkdir()
+        (top / "maps" / "f0.sv0covmap.json").write_bytes(data)
+        (top / "profiles").mkdir()
+        if parallel:
+            base = {k: v for k, v in os.environ.items() if not k.startswith(("SV0COV", "RT_"))}
+            base.update({"SV0COV_PROFILE_DIR": str(top / "profiles"), "SV0COV_RUN_ID": RUN_ID, "SV0COV_REQUIRED": "1"})
+            procs = [subprocess.Popen([str(self.driver), *write], env={**base, **env}) for env in runs]
+            self.assertEqual([p.wait(timeout=120) for p in procs], [0] * len(runs))
+        else:
+            for env in runs:
+                self.run_driver(self.driver, str(top / "profiles"), *write, **env)
+        out, err = io.StringIO(), io.StringIO()
+        args = ["merge", "--diagnostic-format=json-lines", "maps", "profiles", "--expect-run", RUN_ID,
+                "--output", "e.json", *(["--allow-rejected-inputs"] if override else [])]
+        code = cli.main(args, stdout=out, stderr=err, cwd=top)
+        got = sorted(r["code"] for r in records(err.getvalue()))
+        ev = read_indexed((top / "e.json").read_bytes()) if (top / "e.json").exists() else None
+        self.profile_names = sorted(os.listdir(top / "profiles"))
+        return code, got, ev
+
+    def test_parallel_shards_publish_side_by_side(self) -> None:
+        """R1-G6 parallel shards: 16 processes of one run, started together
+        and publishing into one directory at once, each publish one complete
+        profile under its own profile ID with no temporary left, and the
+        merge is complete with exactly 16 times the counts."""
+        counts = fixture_inputs("f0")[2]
+        code, got, ev = self.merge(*({"SV0COV_CONTEXT": f"shard-{i}"} for i in range(16)), parallel=True)
+        self.assertEqual((code, got), (0, []))
+        self.assertEqual(len(self.profile_names), 16)
+        self.assertTrue(all(re.fullmatch(RUN_ID + r"-[0-9a-f]{32}\.sv0profraw", n) for n in self.profile_names))
+        self.assertTrue(ev["semantic"]["complete"])
+        self.assertEqual(sorted(r["status"] for r in ev["profile_inputs"]), ["accepted"] * 16)
+        self.assertEqual(sum(p["count"]["value"] for p in ev["semantic"]["points"]), 16 * sum(counts.values()))
+
+    def test_hard_termination_contributes_nothing(self) -> None:
+        """AC-032 with the real runtime: a process killed before its flush
+        leaves nothing; one killed inside it leaves only its temporary,
+        which merge reports as an incomplete run (COV2011) and never counts,
+        alone or beside a complete profile of the same run. (That incomplete
+        evidence cannot pass any threshold is test_cmd_check's
+        test_incomplete_evidence_never_passes.)"""
+        counts = fixture_inputs("f0")[2]
+        # Killed before the flush ran: nothing at all is left behind.
+        d = tempfile.mkdtemp(dir=self.tmp.name)
+        self.assertEqual(self.run_driver(self.driver, d, "kill").returncode, -9)
+        self.assertEqual(os.listdir(d), [])
+
+        killed = {"RT_DRIVER_KILL_IN_FLUSH": "1"}
+        code, got, ev = self.merge()
+        self.assertEqual((code, ev), (5, None))  # no profile is not zero coverage
+        self.assertIn("COV3001", got)
+        code, got, ev = self.merge({})
+        self.assertEqual((code, got, ev["semantic"]["complete"]), (0, [], True))
+        whole = sum(p["count"]["value"] for p in ev["semantic"]["points"])
+        self.assertEqual(whole, sum(counts.values()))
+        for runs in ((killed,), ({}, killed)):
+            with self.subTest(runs=len(runs)):
+                code, got, ev = self.merge(*runs)
+                self.assertEqual((code, ev), (5, None))
+                self.assertIn("COV2011", got)
+                code, got, ev = self.merge(*runs, override=True)
+                self.assertEqual(code, 0)
+                self.assertFalse(ev["semantic"]["complete"])
+                self.assertEqual(sorted(r["status"] for r in ev["profile_inputs"]),
+                                 sorted(["incomplete"] + ["accepted"] * (len(runs) - 1)))
+                # The killed process contributes no count: only the complete run's remain.
+                self.assertEqual(sum(p["count"]["value"] for p in ev["semantic"]["points"]),
+                                 whole * (len(runs) - 1))
 
 
 if __name__ == "__main__":

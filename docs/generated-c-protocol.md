@@ -161,8 +161,16 @@ The test suite (CV-210) checks, on each host:
 `__sv0cov_start` registers an `atexit` handler once it succeeds. The
 handler runs when `main` returns, on `exit()`, and on the sv0 runtime's
 panic and contract-failure paths, which call `exit(1)`. Nothing is
-published after `_exit`, a signal, or a crash. A killed run leaves no
-profile and no temporary file.
+published after `_exit`, a signal, or a crash. A run killed before its
+flush leaves no profile and no temporary file. A run killed during its
+flush can leave its `.tmp-` temporary; `sv0cov merge` reports that as an
+incomplete run (COV2011) and never counts it.
+
+This flush is the only time the runtime touches the file system. It writes
+no periodic checkpoint and maps no counter file (SPEC COV-FMT-012). Two
+tests in `tests/test_native_runtime.py` show this. One inspects the
+production object's imports. The other traces every file and mapping call
+during seconds of live counting (CV-406).
 
 The handler writes one raw profile 1.0 (SPEC §16.4) into
 `SV0COV_PROFILE_DIR` as `<run_id>-<profile_id>.sv0profraw`, both IDs in
