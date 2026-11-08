@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -45,12 +46,22 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from sv0cov.formats.canonical_json import Limits, encode  # noqa: E402
 
-CORPUS_VERSION = "1.0"
+CORPUS_VERSION = "1.1"
+# SPEC 24.3 / COV-PERF-020: every revision states why; R1 baselines are collected on 1.1.
+REVISIONS = [{
+    "rationale": "The merge/report-scale raw profiles drew every counter independently, so a branch could count more "
+                 "outcomes than its function entries and merge rejected the evidence as corrupt (COV3002): the fixtures could "
+                 "never be timed as merge or report. Their counts are now consistent (true + false = entry). contracts-verified "
+                 "drops vm-v1, which runs contracts only in runtime mode (SS-U10). Not a reaction to any result.",
+    "overlap": "none: no baseline exists for the changed fixtures' merge and report dimensions; the provisional ingest "
+               "trend series restarts on the new digests",
+    "version": "1.1",
+}]
 # A 250,000-point map 1.0 is about 264 MB, over the 64 MiB default canonical-JSON
 # bound (an implementation choice; SPEC 23.2 requires a bound but names none).
 # Until decision D-8 settles map size limits, the scale fixtures state theirs.
 SCALE_MAX_BYTES = 1024 * 1024 * 1024
-GENERATOR = "sv0cov-bench-gen/1"
+GENERATOR = "sv0cov-bench-gen/2"  # /2: consistent scale counts (corpus 1.1)
 SCALE_LIMITS = Limits(max_bytes=SCALE_MAX_BYTES)
 MOD = 1000003
 CATEGORIES = (
@@ -90,6 +101,7 @@ class Program:
     entry: str  # a file (single-file build) or "." (project build)
     exit_code: int
     facts: dict = field(default_factory=dict)
+    stdout: bytes = b""
 
 
 def _facts(functions: int, ifs: int = 0, loops: int = 0, arms: int = 0, contracts: int = 0, short_circuit: int = 0, files: int = 1, matches: int = 0) -> dict:
@@ -295,12 +307,35 @@ def gen_vm(variant: str, iterations: int, seed: int) -> Program:
     raise ValueError(variant)
 
 
+CONTENTION_C = BENCH / "contention.c"
+CONTENTION_COUNTERS = 8
+CONTENTION_MAP_ID = "ce" + "0" * 58 + "c427"  # bench/contention.c's MAP_ID
+
+
+def contention_sum(threads: int, hits: int, seed: int) -> int:
+    """bench/contention.c's printed sum in closed form: thread t iterates
+    x -> a*x + b (mod MOD) ``hits`` times from t + 1."""
+    total = 0
+    for t in range(threads):
+        a, b = 2 + (seed * 31 + t) % 900, (seed * 17 + t * 7) % MOD
+        an = pow(a, hits, MOD)
+        total += (an * (t + 1) + b * (an - 1) * pow(a - 1, MOD - 2, MOD)) % MOD
+    return total
+
+
+def gen_contention(threads: int, sharing: str, hits: int, seed: int) -> Program:
+    facts = {"counter_hits": {str(i): hits * (threads if sharing == "shared" else 1) for i in range(1 if sharing == "shared" else threads)},
+             "hits_per_thread": hits, "planned_counters": CONTENTION_COUNTERS, "sharing": sharing, "threads": threads}
+    return Program({"contention.c": CONTENTION_C.read_bytes()}, "contention.c", 0, facts, f"{contention_sum(threads, hits, seed)}\n".encode())
+
+
 # --- merge/report scale artifacts ---------------------------------------------------
 
 
 @functools.lru_cache(maxsize=2)
-def _scale_map(points: int) -> tuple[bytes, bytes, str, int]:
-    """(source, canonical map bytes, map id, counter count) for ``points``; shared by the scale fixtures."""
+def _scale_map(points: int) -> tuple[bytes, bytes, str, int, list[tuple[int, int, int]]]:
+    """(source, canonical map bytes, map id, counter count, per-function (entry, true, false)
+    counter indexes) for ``points``; shared by the scale fixtures."""
     out = _build_scale_map(points)
     return out
 
@@ -308,17 +343,22 @@ def _scale_map(points: int) -> tuple[bytes, bytes, str, int]:
 def gen_scale(points: int, profiles: int, seed: int) -> dict[str, bytes]:
     from sv0cov.formats import rawprofile as RP
 
-    source, data, map_id, n = _scale_map(points)
+    source, data, map_id, n, triples = _scale_map(points)
     r = SplitMix64(seed)
     out = {"scale.sv0": source, "scale.sv0covmap.json": data}
     for k in range(profiles):
-        counts = tuple((i, c) for i in range(n) if (c := r.below(1000)) > 0)
+        drawn = {}
+        for entry, true, false in triples:  # a consistent run: every entry takes exactly one outcome
+            e = r.below(1000)
+            t = r.below(e + 1)
+            drawn.update({entry: e, true: t, false: e - t})
+        counts = tuple((i, c) for i, c in sorted(drawn.items()) if c > 0)
         profile = RP.RawProfile(bytes.fromhex(map_id), bytes([0xA0 + k]) * 16, bytes([k + 1]) * 16, "native", None, counts)
         out[f"profile-{k}.sv0profraw"] = RP.encode(profile, n)
     return out
 
 
-def _build_scale_map(points: int) -> tuple[bytes, bytes, str, int]:
+def _build_scale_map(points: int) -> tuple[bytes, bytes, str, int, list[tuple[int, int, int]]]:
     """A canonical map with ``points`` counted points and ``profiles`` raw profiles.
 
     Each synthetic function contributes an entry and an ``if`` (three points)
@@ -374,7 +414,11 @@ def _build_scale_map(points: int) -> tuple[bytes, bytes, str, int]:
         P.validate_map = M.validate_map
     data = encode(m)
     M.validate_map(data, sources={path: source}, limits=SCALE_LIMITS)
-    return source, data, m["map_id"], m["program_counter_count"]
+    roles: dict[int, dict] = {}
+    for pt in m["points"]:
+        roles.setdefault(pt["entity_index"], {})[pt["outcome_ordinal"]] = pt["counter_index"]
+    triples = [(r[None], r[0], r[1]) for _, r in sorted(roles.items())]
+    return source, data, m["map_id"], m["program_counter_count"], triples
 
 
 # --- snapshots ------------------------------------------------------------------------
@@ -453,6 +497,11 @@ def _snapshot_program(snapshot: str, paths: list[str], entry: str, exit_code: in
 
 
 PENDING_V2 = "vm-v2 profile pending the typed-v2 container (CV-460..463)"
+SCALE_BOUNDARY = {
+    "merge": "sv0cov merge of the map and every raw profile to stdout in a fresh -I -B interpreter",
+    "native-terminal-report": "sv0cov report --format term of the plan-time merged evidence to stdout in a fresh -I -B interpreter",
+    "html-report": "sv0cov report --format html of the plan-time merged evidence to stdout in a fresh -I -B interpreter",
+}
 MATH_LIB = [f"lib/{m}.sv0" for m in ("arith", "complex", "modular", "polar", "prelude", "random", "stats", "trig")]
 
 
@@ -470,7 +519,7 @@ def fixtures() -> list[Fixture]:
     for i, v in enumerate(("passing", "failing", "mixed")):
         fx.append(Fixture(f"contracts-{v}", "contracts", f"runtime-checked contracts, {v}", _gen("contracts", 401 + i, variant=v, count=40), lambda v=v, s=401 + i: gen_contracts(v, 40, s)))
     fx.append(Fixture("contracts-verified", "contracts", "statically verified contracts", _gen("contracts", 404, variant="passing", count=40),
-                      lambda: gen_contracts("passing", 40, 404), status="pending: contract-mode=verified needs an sv0 verify proof record in the plan", contract_mode="verified"))
+                      lambda: gen_contracts("passing", 40, 404), backends=["native"], contract_mode="verified"))
     for i, v in enumerate(("many-files", "shared-deps", "same-basename")):
         fx.append(Fixture(f"modules-{v}", "modules", f"project build, {v}", _gen("modules", 501 + i, variant=v, count=24), lambda v=v, s=501 + i: gen_modules(v, 24, s)))
     for path, code in (("test/behavior/cases/algo_collatz.sv0", 8), ("test/behavior/cases/algo_fib_iter.sv0", 55), ("test/behavior/cases/accumulate_struct.sv0", 60)):
@@ -484,9 +533,9 @@ def fixtures() -> list[Fixture]:
     for sharing in ("shared", "disjoint"):
         for threads in (1, 2, 4, 8):
             fx.append(Fixture(f"contention-{sharing}-{threads}t", "native-contention", f"{threads}-thread hits on {sharing} counters",
-                              _gen("contention", 600 + threads, threads=threads, sharing=sharing, hits_per_thread=1000000), lambda: None,
-                              budgets=["execution-wall-time", "runtime-counter-memory"], backends=["native"],
-                              status="pending: C harness against the native runtime arena (CV-114, CV-210)"))
+                              _gen("contention", 600 + threads, threads=threads, sharing=sharing, hits_per_thread=1000000),
+                              lambda t=threads, s=sharing: gen_contention(t, s, 1000000, 600 + t),
+                              budgets=["execution-wall-time", "runtime-counter-memory"], backends=["native"]))
     for i, (v, iters) in enumerate((("arith", 20000), ("branchy", 20000), ("calls", 20000))):
         fx.append(Fixture(f"vm-{v}", "vm-dispatch", f"COVER_HIT dispatch, {v}", _gen("vm", 701 + i, variant=v, iterations=iters), lambda v=v, n=iters, s=701 + i: gen_vm(v, n, s),
                           budgets=["execution-wall-time", "instrumented-compile-wall-time"], backends=["vm-v1", "vm-v2"]))
@@ -497,8 +546,8 @@ def fixtures() -> list[Fixture]:
     ):
         fx.append(Fixture(name, "merge-report-scale", f"{points} points x {profiles} profile(s)", _gen("scale", 801, points=points, profiles=profiles),
                           lambda p=points, n=profiles: gen_scale(p, n, 801), budgets=budgets, backends=[],
-                          status=f"pending: timed {budgets[0]} command (CV-227/CV-229/CV-309); ingest is measurable now",
-                          boundary={"ingest": "validate the map and decode every raw profile in a fresh -I -B interpreter"}))
+                          boundary={"ingest": "validate the map and decode every raw profile in a fresh -I -B interpreter",
+                                    budgets[0]: SCALE_BOUNDARY[budgets[0]]}))
     return fx
 
 
@@ -536,9 +585,9 @@ def manifest_entry(f: Fixture, *, heavy: bool) -> dict:
         "weight": "equal",
     }
     if prog is not None:
-        entry["expected"] = {"exit_code": prog.exit_code, "stdout_sha256": EMPTY_STDOUT}
+        entry["expected"] = {"exit_code": prog.exit_code, "stdout_sha256": hashlib.sha256(prog.stdout).hexdigest()}
         entry["scale"] = prog.facts
-        entry["build"] = {"entry": prog.entry, "mode": "project" if prog.entry == "." else "file"}
+        entry["build"] = {"entry": prog.entry, "mode": "project" if prog.entry == "." else "c" if prog.entry.endswith(".c") else "file"}
     if files:
         entry["tree_sha256"] = tree_digest(files)
         entry["files"] = len(files)
@@ -558,6 +607,7 @@ def build_manifest(*, heavy: bool = False, previous: dict | None = None) -> dict
     return {
         "categories": list(CATEGORIES),
         "corpus_version": CORPUS_VERSION,
+        "revisions": REVISIONS,
         "fixtures": entries,
         "generator": GENERATOR,
         "schema": "sv0cov.benchmark-corpus",
@@ -580,7 +630,7 @@ def check_manifest_object(m: dict) -> None:
     for f in m["fixtures"]:
         if f["weight"] != "equal":
             raise ValueError(f"{f['id']}: weighting exceptions need a recorded reason")
-        if f["status"] == "runnable-baseline" and ("expected" not in f or "tree_sha256" not in f):
+        if f["status"] == "runnable-baseline" and f["category"] != "merge-report-scale" and ("expected" not in f or "tree_sha256" not in f):
             raise ValueError(f"{f['id']}: a runnable fixture needs an expected result and a tree digest")
 
 
@@ -598,17 +648,98 @@ def write_tree(files: dict[str, bytes], target: Path) -> None:
 BENCH_RUN_ID = "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0"
 
 
+SCALE_DIMENSIONS = ("merge", "native-terminal-report", "html-report")
+DIMENSIONS = ("compile", "execute", "ingest", *SCALE_DIMENSIONS)
+SV0COV_CMD = BENCH / "sv0cov_cmd.py"
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _profile_checker(cmap: Path, exact: dict | None = None):
+    """A check that one raw profile decodes against ``cmap`` (a map, or a map ID
+    when ``exact`` gives the expected ``{counter: count}``) and counted something."""
+    from sv0cov.formats import rawprofile as RP
+
+    if exact is None:
+        m = json.loads(cmap.read_bytes())
+        n, map_id = m["program_counter_count"], m["map_id"]
+    else:
+        n, map_id = CONTENTION_COUNTERS, str(cmap)
+
+    def check(data: bytes) -> None:
+        counts = dict(RP.decode(data, map_counter_count=n, expected_map_id=bytes.fromhex(map_id)).counts)
+        if not counts or (exact is not None and counts != {int(k): v for k, v in exact.items()}):
+            raise ValueError(f"counts {sorted(counts.items())[:8]} are not the expected result")
+
+    return check
+
+
+def validate(fid: str, arms: dict, cwd: Path, check_profile=None) -> dict:
+    """COV-PERF-015: before any timing, each arm runs once and must give its expected
+    exit code and stdout; a coverage-on arm must publish exactly one profile that passes
+    ``check_profile``. Its profiles are then removed. Returns each arm's completed process."""
+    done = {}
+    for name, spec in arms.items():
+        if spec is None:
+            continue
+        r = subprocess.run(spec["argv"], cwd=cwd, env={**os.environ, **spec.get("env", {})}, capture_output=True)
+        want = spec["expect"]
+        if r.returncode != want["exit_code"] or (want["stdout_sha256"] is not None and _sha(r.stdout) != want["stdout_sha256"]):
+            raise SystemExit(f"{fid}: the {name} arm gave exit {r.returncode} and stdout {_sha(r.stdout)}, not {want}; nothing is timed")
+        directory = spec.get("env", {}).get("SV0COV_PROFILE_DIR")
+        if directory is not None:
+            raws = sorted(Path(directory).glob("*.sv0profraw"))
+            try:
+                if len(raws) != 1:
+                    raise ValueError(f"{len(raws)} profiles")
+                check_profile(raws[0].read_bytes())
+            except ValueError as exc:
+                raise SystemExit(f"{fid}: the {name} arm's profile is not the expected result ({exc}); nothing is timed") from None
+            for raw in raws:
+                raw.unlink()
+        done[name] = r
+    return done
+
+
+def _scale_evidence(fid: str, src: Path, profiles: int) -> tuple[list[str], bytes]:
+    """Merge the scale fixture once and check it against its raw profiles, decoded
+    directly: complete, every profile accepted, the same total count (COV-PERF-015)."""
+    from sv0cov.formats import rawprofile as RP
+    from sv0cov.model.indexed import read_indexed
+
+    runs = [bytes([0xA0 + k]).hex() * 16 for k in range(profiles)]
+    argv = [os.path.realpath(sys.executable), "-I", "-B", str(SV0COV_CMD), "merge", *(a for r in runs for a in ("--expect-run", r)), "--output", "-", "."]
+    r = subprocess.run(argv, cwd=src, capture_output=True)
+    total = sum(c for raw in sorted(src.glob("*.sv0profraw")) for _, c in RP.decode(raw.read_bytes()).counts)
+    ev = read_indexed(r.stdout) if r.returncode == 0 else None
+    if ev is None or not ev["semantic"]["complete"] or [p["status"] for p in ev["profile_inputs"]] != ["accepted"] * profiles \
+            or sum(p["count"]["value"] for p in ev["semantic"]["points"]) != total:
+        raise SystemExit(f"{fid}: the plan-time merge (exit {r.returncode}) is not the expected result; nothing is timed")
+    return argv, r.stdout
+
+
 def plan(toolchain: Path, work: Path, dimension: str, ids: list[str] | None) -> dict:
-    """Bind runnable fixtures to paired coverage-off and coverage-on commands (CV-410): the
-    native build without and with ``--coverage=instrument``, and their executables, the
-    instrumented one writing its profiles to a per-fixture directory. Ingest stays one arm."""
+    """Bind runnable fixtures to paired coverage-off and coverage-on commands (CV-410, CV-427):
+    the native build without and with ``--coverage=instrument`` (``--contract-mode`` as the
+    fixture states), or the VM-v1 build for VM-only fixtures, or the C contention harness
+    without and with the native runtime; and the built programs, the instrumented one writing
+    its profiles to a per-fixture directory. Ingest and the merge/report commands of the scale
+    fixtures stay one arm. Every arm is validated once before it is planned (``validate``)."""
     sv0 = str(toolchain / "scripts" / "sv0")
+    py = os.path.realpath(sys.executable)
     recorded = {f["id"]: f for f in json.loads(MANIFEST.read_bytes())["fixtures"]}
     out = []
     for f in fixtures():
         if ids and f.id not in ids:
             continue
-        if f.status != "runnable-baseline" and not (dimension == "ingest" and f.category == "merge-report-scale"):
+        scale = f.category == "merge-report-scale"
+        if f.status != "runnable-baseline" or scale != (dimension in ("ingest", *SCALE_DIMENSIONS)):
+            continue
+        if dimension in SCALE_DIMENSIONS and f.budgets[0] != dimension:
+            continue
+        if f.category == "native-contention" and dimension == "compile":
             continue
         files, prog = materialize_one(f)
         want = recorded.get(f.id, {}).get("tree_sha256")
@@ -617,32 +748,78 @@ def plan(toolchain: Path, work: Path, dimension: str, ids: list[str] | None) -> 
         src = work / f.id
         write_tree(files, src)
         if dimension == "ingest":
-            if f.category != "merge-report-scale":
-                continue
-            argv = [os.path.realpath(sys.executable), "-I", "-B", str(BENCH / "ingest.py"), str(src)]
+            argv = [py, "-I", "-B", str(BENCH / "ingest.py"), str(src)]
             out.append({"arms": {"off": {"argv": argv, "expect": {"exit_code": 0, "stdout_sha256": None}}, "on": None},
                         "category": f.category, "cwd": str(src), "id": f"{f.id}/ingest"})
             continue
-        if prog is None or "native" not in f.backends:
+        if scale:
+            merge_argv, evidence = _scale_evidence(f.id, src, f.source["params"]["profiles"])
+            if dimension == "merge":  # _scale_evidence has just run and checked this very command
+                arms = {"off": {"argv": merge_argv, "expect": {"exit_code": 0, "stdout_sha256": None}}, "on": None}
+                stdout = evidence
+            else:
+                data = work / f"{f.id}.sv0covdata.json"
+                data.write_bytes(evidence)
+                argv = [py, "-I", "-B", str(SV0COV_CMD), "report", "--format", "term" if dimension == "native-terminal-report" else "html", "--output", "-", str(data)]
+                arms = {"off": {"argv": argv, "expect": {"exit_code": 0, "stdout_sha256": None}}, "on": None}
+                stdout = validate(f.id, arms, src)["off"].stdout
+            if dimension == "html-report":
+                from sv0cov.formats.html import check_html
+
+                check_html(stdout)
+            arms["off"]["expect"]["stdout_sha256"] = _sha(stdout)  # each timed run must reproduce it
+            out.append({"arms": arms, "category": f.category, "cwd": str(src), "id": f"{f.id}/{dimension}"})
             continue
-        exe, exe_on, cmap = work / f"{f.id}.exe", work / f"{f.id}.cov.exe", work / f"{f.id}.sv0covmap.json"
+        if prog is None:
+            continue
+        profiles = work / f"{f.id}.profiles"
+        profiles.mkdir(exist_ok=True)
+        cov_env = {"SV0COV_RUN_ID": BENCH_RUN_ID, "SV0COV_PROFILE_DIR": str(profiles)}
+        expect = {"exit_code": prog.exit_code, "stdout_sha256": _sha(prog.stdout)}
+        if f.category == "native-contention":
+            exe, exe_on = work / f"{f.id}.exe", work / f"{f.id}.cov.exe"
+            cc = [os.environ.get("CC") or shutil.which("cc") or "cc", "-std=c11", "-O2", "-pthread"]
+            subprocess.run([*cc, "-o", str(exe), str(src / prog.entry)], check=True, capture_output=True)
+            subprocess.run([*cc, "-DSV0COV_ON", "-I", str(ROOT / "runtime" / "c"), "-o", str(exe_on), str(src / prog.entry),
+                            str(ROOT / "runtime" / "c" / "sv0cov_rt.c")], check=True, capture_output=True)
+            p = f.source["params"]
+            run = [str(p["threads"]), p["sharing"], str(p["hits_per_thread"]), str(f.source["seed"])]
+            arms = {"off": {"argv": [str(exe), *run], "expect": expect},
+                    "on": {"argv": [str(exe_on), *run], "env": cov_env, "expect": expect}}
+            done = validate(f.id, arms, work, _profile_checker(Path(CONTENTION_MAP_ID), prog.facts["counter_hits"]))
+            facts = {"affinity": done["off"].stderr.decode().strip().removeprefix("affinity: "),
+                     "artifact_bytes": {"off": exe.stat().st_size, "on": exe_on.stat().st_size}, "planned_points": CONTENTION_COUNTERS}
+            out.append({"arms": arms, "category": f.category, "cwd": str(work), "facts": facts, "id": f"{f.id}/{dimension}"})
+            continue
         target = ["--project", str(src)] if prog.entry == "." else [str(src / prog.entry)]
-        compile_argv = [sv0, "native-compile", "-o", str(exe), *target]
-        compile_on = [sv0, "native-compile", "--coverage=instrument", "--coverage-map", str(cmap), "-o", str(exe_on), *target]
+        cmap = work / f"{f.id}.sv0covmap.json"
+        if "native" in f.backends:
+            exe, exe_on = work / f"{f.id}.exe", work / f"{f.id}.cov.exe"
+            contract = [] if f.contract_mode == "runtime" else [f"--contract-mode={f.contract_mode}"]
+            compile_argv = [sv0, "native-compile", *contract, "-o", str(exe), *target]
+            compile_on = [sv0, "native-compile", *contract, "--coverage=instrument", "--coverage-map", str(cmap), "-o", str(exe_on), *target]
+            run_off, run_on = [str(exe)], [str(exe_on)]
+        elif "vm-v1" in f.backends:  # VM dispatch (v2 joins after CV-463); vm-run's stdout echoes the SML session
+            exe, exe_on = work / f"{f.id}.sv0b", work / f"{f.id}.cov.sv0b"
+            compile_argv = [sv0, "vm-native-compile", *target, str(exe)]
+            compile_on = [sv0, "vm-native-compile", *target, str(exe_on), "--coverage=instrument", "--coverage-map", str(cmap)]
+            run_off = [sv0, "vm-run", str(exe)]
+            run_on = [sv0, "vm-run", "--coverage-binding", str(work / f"{f.id}.cov.sv0covbind.json"), str(exe_on)]
+            expect = {**expect, "stdout_sha256": None}
+        else:
+            continue
         # Both builds once at plan time: the facts the budgets compare with (CV-410).
         subprocess.run(compile_argv, check=True, capture_output=True)
         subprocess.run(compile_on, check=True, capture_output=True)
         facts = {"artifact_bytes": {"off": exe.stat().st_size, "on": exe_on.stat().st_size},
                  "planned_points": json.loads(cmap.read_bytes())["program_counter_count"]}
+        execute = {"off": {"argv": run_off, "expect": expect}, "on": {"argv": run_on, "env": cov_env, "expect": expect}}
+        validate(f.id, execute, work, _profile_checker(cmap))
         if dimension == "compile":
             ok = {"exit_code": 0, "stdout_sha256": None}
             arms = {"off": {"argv": compile_argv, "expect": ok}, "on": {"argv": compile_on, "expect": ok}}
         else:
-            profiles = work / f"{f.id}.profiles"
-            profiles.mkdir(exist_ok=True)
-            expect = {"exit_code": prog.exit_code, "stdout_sha256": EMPTY_STDOUT}
-            arms = {"off": {"argv": [str(exe)], "expect": expect},
-                    "on": {"argv": [str(exe_on)], "env": {"SV0COV_RUN_ID": BENCH_RUN_ID, "SV0COV_PROFILE_DIR": str(profiles)}, "expect": expect}}
+            arms = execute
         out.append({"arms": arms, "category": f.category, "cwd": str(work), "facts": facts, "id": f"{f.id}/{dimension}"})
     return {"corpus": {"generator": GENERATOR, "manifest_sha256": hashlib.sha256(MANIFEST.read_bytes()).hexdigest(), "version": CORPUS_VERSION}, "fixtures": out}
 
@@ -669,7 +846,7 @@ def main() -> int:
     pl = sub.add_parser("plan")
     pl.add_argument("--toolchain", type=Path)
     pl.add_argument("--work", type=Path, required=True)
-    pl.add_argument("--dimension", choices=("compile", "execute", "ingest"), required=True)
+    pl.add_argument("--dimension", choices=DIMENSIONS, required=True)
     pl.add_argument("--id", action="append")
     rs = sub.add_parser("refresh-snapshots")
     rs.add_argument("--toolchain", type=Path, required=True)

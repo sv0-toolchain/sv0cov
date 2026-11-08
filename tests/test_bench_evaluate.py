@@ -216,15 +216,16 @@ class GateTest(unittest.TestCase):
         g = gate(env.run([env.campaign()]), "execution-wall-time")
         self.assertEqual((g["result"], g["campaigns"][0]["pending"]), ("incomplete", ["b1"]))
 
-    def test_the_real_corpus_is_not_complete_yet(self) -> None:
-        """Pending fixtures (contention, verified contracts, timed merge and reports) and VM
-        dispatch keep every gate incomplete today: nothing passes by omission."""
+    def test_the_real_corpus_is_complete(self) -> None:
+        """CV-427: no fixture of the frozen corpus is pending, so a gate is incomplete only
+        through a missing, invalid or one-arm result, and every gate has runnable fixtures."""
         man = json.loads(E.MANIFEST.read_bytes())
-        for gid in GATES:
+        for gid in [*GATES, "merge", "native-terminal-report", "html-report"]:
             runnable, pending = E._applicable(man, gid)
             with self.subTest(gid):
-                self.assertTrue(pending or gid == "generated-artifact-size")
-        self.assertIn("contention-shared-8t", E._applicable(man, "execution-wall-time")[1])
+                self.assertEqual(pending, [])
+                self.assertTrue(runnable)
+        self.assertIn("contention-shared-8t", E._applicable(man, "execution-wall-time")[0])
 
 
 class CommandTest(unittest.TestCase):
