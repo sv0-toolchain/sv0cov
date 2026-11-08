@@ -301,16 +301,23 @@ def _maxrss_bytes(ru_maxrss: int) -> int:
     return ru_maxrss if sys.platform == "darwin" else ru_maxrss * 1024
 
 
+def arm_env(env: dict | None) -> dict:
+    """The inherited environment without any SV0COV_* variable, plus ``env`` (a
+    coverage-on arm's run ID and profile directory). The runtime refuses to profile
+    when an unrecognized SV0COV_* name is set (SPEC 14.3), so a stray one such as
+    SV0COV_RUNNER_LABEL would silently time an arm that records nothing."""
+    return {**{k: v for k, v in os.environ.items() if not k.startswith("SV0COV_")}, **(env or {})}
+
+
 def run_once(argv: list[str], cwd: str, expect: dict, timeout: int, env: dict | None = None) -> dict:
     """One measured process: wall time and its own max RSS (wait4), then validation.
-    ``env`` adds variables to the inherited environment (a coverage-on arm's
-    run ID and profile directory)."""
+    ``env`` is added to the inherited environment as ``arm_env`` builds it."""
     with tempfile.TemporaryFile() as out:
         fired = threading.Event()
         try:
             start = time.perf_counter_ns()
             proc = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.DEVNULL,
-                                    env=None if env is None else {**os.environ, **env})
+                                    env=arm_env(env))
         except OSError as exc:
             return {"detail": type(exc).__name__, "invalid": "spawn-failure"}
 

@@ -83,6 +83,13 @@ class ProtocolTest(unittest.TestCase):
 
 
 class ExecutionTest(unittest.TestCase):
+    def test_an_arm_does_not_inherit_stray_sv0cov_variables(self) -> None:
+        # CI sets e.g. SV0COV_RUNNER_LABEL; the runtime refuses to profile under any unknown SV0COV_* name.
+        with mock.patch.dict(H.os.environ, {"SV0COV_RUNNER_LABEL": "x", "KEEP": "1"}):
+            env, off = H.arm_env({"SV0COV_RUN_ID": "ab"}), H.arm_env(None)
+        self.assertEqual((env.get("SV0COV_RUNNER_LABEL"), env["KEEP"], env["SV0COV_RUN_ID"]), (None, "1", "ab"))
+        self.assertNotIn("SV0COV_RUNNER_LABEL", off)
+
     def test_paired_fixture(self) -> None:
         f = fixture([PY, "-c", "print('ok')"], [PY, "-c", "print('ok')"])
         r = H.run_fixture(f, small_protocol())

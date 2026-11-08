@@ -45,6 +45,7 @@ MANIFEST = BENCH / "corpus" / "manifest.json"
 sys.path.insert(0, str(ROOT / "src"))
 
 from sv0cov.formats.canonical_json import Limits, encode  # noqa: E402
+from harness import arm_env  # noqa: E402
 
 CORPUS_VERSION = "1.1"
 # SPEC 24.3 / COV-PERF-020: every revision states why; R1 baselines are collected on 1.1.
@@ -684,7 +685,7 @@ def validate(fid: str, arms: dict, cwd: Path, check_profile=None) -> dict:
     for name, spec in arms.items():
         if spec is None:
             continue
-        r = subprocess.run(spec["argv"], cwd=cwd, env={**os.environ, **spec.get("env", {})}, capture_output=True)
+        r = subprocess.run(spec["argv"], cwd=cwd, env=arm_env(spec.get("env")), capture_output=True)
         want = spec["expect"]
         if r.returncode != want["exit_code"] or (want["stdout_sha256"] is not None and _sha(r.stdout) != want["stdout_sha256"]):
             raise SystemExit(f"{fid}: the {name} arm gave exit {r.returncode} and stdout {_sha(r.stdout)}, not {want}; nothing is timed")
