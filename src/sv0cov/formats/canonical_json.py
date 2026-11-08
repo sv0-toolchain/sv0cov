@@ -26,6 +26,7 @@ as raw UTF-8.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -113,24 +114,34 @@ def _reject_constant(token: str) -> Any:
 
 
 def _check_values(value: Any, limits: Limits) -> None:
-    stack = [value]
+    if value.__class__ is str:
+        _check_string(value, limits)
+    if value.__class__ not in (list, dict):
+        return
+    if limits.max_depth < 1:
+        raise CanonicalJsonError("depth_limit", f"nesting exceeds {limits.max_depth}")
+    stack = [(value, 1)]
     while stack:
-        v = stack.pop()
-        if isinstance(v, str):
-            _check_string(v, limits)
-        elif isinstance(v, list):
-            if len(v) > limits.max_container_items:
-                raise CanonicalJsonError("container_limit", f"array of {len(v)} items")
-            stack.extend(v)
-        elif isinstance(v, dict):
-            if len(v) > limits.max_container_items:
-                raise CanonicalJsonError("container_limit", f"object of {len(v)} members")
-            for k, item in v.items():
+        v, depth = stack.pop()
+        if len(v) > limits.max_container_items:
+            raise CanonicalJsonError("container_limit", f"{'array' if v.__class__ is list else 'object'} of {len(v)} {'items' if v.__class__ is list else 'members'}")
+        if v.__class__ is dict:
+            for k in v:
                 _check_string(k, limits)
-                stack.append(item)
+            v = v.values()
+        for item in v:
+            cls = item.__class__
+            if cls is str:
+                _check_string(item, limits)
+            elif cls is list or cls is dict:
+                if depth >= limits.max_depth:
+                    raise CanonicalJsonError("depth_limit", f"nesting exceeds {limits.max_depth}")
+                stack.append((item, depth + 1))
 
 
 def _check_string(s: str, limits: Limits) -> None:
+    if s.isascii() and len(s) <= limits.max_string_bytes:
+        return
     try:
         encoded = s.encode("utf-8")
     except UnicodeEncodeError as exc:  # lone surrogate from a \\u escape
@@ -156,7 +167,9 @@ def decode(data: bytes, limits: Limits = DEFAULT_LIMITS) -> JsonValue:
         text = bytes(data).decode("utf-8")
     except UnicodeDecodeError as exc:
         raise CanonicalJsonError("invalid_utf8", str(exc)) from exc
-    _scan_depth(text, limits.max_depth)
+    # The bracket scan is a per-character Python loop, so it runs only when parsing fails
+    # (a depth violation must still win over any other finding); a parsed value's own
+    # nesting is its bracket depth, which _check_values measures.
     try:
         value = json.loads(
             text,
@@ -166,17 +179,87 @@ def decode(data: bytes, limits: Limits = DEFAULT_LIMITS) -> JsonValue:
             parse_constant=_reject_constant,
         )
     except CanonicalJsonError:
+        _scan_depth(text, limits.max_depth)
         raise
     except (json.JSONDecodeError, RecursionError) as exc:
+        _scan_depth(text, limits.max_depth)
         raise CanonicalJsonError("syntax", str(exc)) from exc
     _check_values(value, limits)
     return value
 
 
+def _fast_canonical(data: bytes, limits: Limits) -> tuple[JsonValue] | None:
+    """``(value,)`` when ``data`` is certainly canonical JSON within ``limits``, else ``None``.
+
+    Parses without the per-pair and per-integer hooks of :func:`decode`, then lets the
+    canonical re-encoding stand in for them: a duplicate key would shorten it and a
+    noncanonical integer would print differently. A lone surrogate (only reachable through a
+    ``\\u`` escape, which canonical bytes use for control characters alone) fails the UTF-8
+    encode. What remains is checked by one walk: depth, container sizes, string sizes, and
+    integer range (only when a 19-digit run makes a range violation possible)."""
+    if (not isinstance(data, (bytes, bytearray)) or len(data) > limits.max_bytes or data.startswith(b"\xef\xbb\xbf")
+            or not data.endswith(b"\n") or data.endswith(b"\n\n") or limits.max_depth > DEFAULT_LIMITS.max_depth):
+        return None
+    try:
+        value = json.loads(bytes(data).decode("utf-8"), parse_float=_reject_float, parse_constant=_reject_constant)
+        if not _fits(value, limits, _LONG_DIGITS.search(data) is not None):
+            return None
+        canonical = _dumps(value).encode("utf-8")
+        if len(canonical) + 1 != len(data) or not data.startswith(canonical):
+            return None
+    except (ValueError, RecursionError):  # CanonicalJsonError, JSONDecodeError, UnicodeError
+        return None
+    return (value,)
+
+
+_LONG_DIGITS = re.compile(rb"[0-9]{19}")
+
+
+def _fits(value: Any, limits: Limits, check_ints: bool) -> bool:
+    """Depth, container and string limits, and (when asked) the integer range, of a parsed value."""
+    if value.__class__ is str:
+        return len(value.encode("utf-8")) <= limits.max_string_bytes
+    if value.__class__ is int:
+        return not check_ints or INT_MIN <= value <= INT_MAX
+    if value.__class__ not in (list, dict):
+        return True
+    chars = limits.max_string_bytes // 4  # a string of at most this many characters fits in any encoding
+    level, depth = [value], 1
+    while level:
+        if depth > limits.max_depth:
+            return False
+        nxt: list = []
+        for c in level:
+            if len(c) > limits.max_container_items:
+                return False
+            if c.__class__ is dict:
+                if c and max(map(len, c)) > chars and any(len(k.encode("utf-8")) > limits.max_string_bytes for k in c):
+                    return False
+                c = c.values()
+            for x in c:
+                cls = x.__class__
+                if cls is str:
+                    if len(x) > chars and len(x.encode("utf-8")) > limits.max_string_bytes:
+                        return False
+                elif cls is list or cls is dict:
+                    nxt.append(x)
+                elif check_ints and cls is int and not INT_MIN <= x <= INT_MAX:
+                    return False
+        level, depth = nxt, depth + 1
+    return True
+
+
 def decode_canonical(data: bytes, limits: Limits = DEFAULT_LIMITS) -> JsonValue:
     """Decode and require that ``data`` is exactly the canonical encoding."""
+    fast = _fast_canonical(data, limits)
+    if fast is not None:
+        return fast[0]
+    # Anything the fast path could not vouch for gets the full checks, and their findings.
     value = decode(data, limits)
-    if encode(value) != bytes(data):
+    # decode has proven every property encode checks (types, ranges, keys, scalar values),
+    # except depth when the caller allows deeper nesting than encode does.
+    canonical = _dumps(value).encode("utf-8") + b"\n" if limits.max_depth <= DEFAULT_LIMITS.max_depth else encode(value)
+    if canonical != bytes(data):
         raise CanonicalJsonError("noncanonical", "bytes differ from the canonical encoding")
     return value
 
@@ -247,9 +330,63 @@ def _encode_value(value: Any, out: list[str], depth: int) -> None:
         raise CanonicalJsonError("unsupported_type", type(value).__name__)
 
 
+# The stdlib C encoder writes exactly the canonical form (Python orders str keys by code
+# point, which is UTF-8 byte order for scalar values; control characters get the short or
+# lowercase \\u00xx escapes) but rejects none of what SPEC 16.2 forbids, so encode checks first.
+_encoder = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"), sort_keys=True, allow_nan=False, check_circular=False)
+_c_encoder = getattr(json.encoder, "c_make_encoder", None)
+if _c_encoder is not None:  # built once: JSONEncoder.encode rebuilds it on every call, which dominates small values
+    _c_encoder = _c_encoder(None, _encoder.default, json.encoder.encode_basestring, None, ":", ",", True, False, False)
+
+    def _dumps(value: Any) -> str:
+        return "".join(_c_encoder(value, 0))
+else:
+    _dumps = _encoder.encode
+_SCALARS = (str, bool, type(None))
+
+
+def _check_encodable(value: Any) -> None:
+    """Raise what :func:`_encode_value` would for ``value``, without encoding it. Exact
+    builtin types take the fast path; anything else is handed to ``_encode_value``."""
+    limit = DEFAULT_LIMITS.max_depth
+    stack = [(value, 1)]
+    while stack:
+        v, depth = stack.pop()
+        cls = v.__class__
+        if cls is dict:
+            for key in v:
+                if key.__class__ is not str:
+                    _encode_value(v, [], depth)  # raises for the bad key
+            items = v.values()
+        elif cls is list or cls is tuple:
+            items = v
+        else:
+            _encode_value(v, [], depth)
+            continue
+        if not v:
+            continue
+        if depth >= limit:
+            raise CanonicalJsonError("depth_limit", f"nesting exceeds {limit}")
+        for item in items:
+            cls = item.__class__
+            if cls in _SCALARS:
+                continue
+            if cls is int:
+                if not INT_MIN <= item <= INT_MAX:
+                    raise CanonicalJsonError("integer_range", str(item))
+                continue
+            stack.append((item, depth + 1))
+
+
 def encode(value: JsonValue) -> bytes:
     """Return the canonical UTF-8 bytes of ``value``, including the final LF."""
-    out: list[str] = []
-    _encode_value(value, out, 1)
-    out.append("\n")
-    return "".join(out).encode("utf-8")
+    if value.__class__ not in (dict, list, tuple):
+        out: list[str] = []
+        _encode_value(value, out, 1)
+        out.append("\n")
+        return "".join(out).encode("utf-8")
+    _check_encodable(value)
+    try:
+        return _dumps(value).encode("utf-8") + b"\n"
+    except UnicodeEncodeError as exc:
+        raise CanonicalJsonError("invalid_unicode", "unpaired surrogate") from exc

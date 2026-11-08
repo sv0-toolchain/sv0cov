@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.doctor-1.0.schema.json
 # schema-sha256: 12eb3144d4e875fbb7047b713191ef247cf28df23fc481d391ba271b4b6a6893
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.doctor 1.0."""
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from . import sv0cov_version_1_0 as _m_sv0cov_version_1_0
 SCHEMA_NAME = 'sv0cov.doctor'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '12eb3144d4e875fbb7047b713191ef247cf28df23fc481d391ba271b4b6a6893'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -39,8 +39,20 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('compatibility_policy', 'diagnostics', 'doctor_sha256', 'mode', 'probes', 'schema', 'status', 'summary', 'toolchain', 'version', 'version_manifest'))
+_C1 = frozenset(('standalone', 'toolchain'))
+_C2 = frozenset(('fail', 'pass'))
+_C3 = frozenset(('failed', 'not_applicable', 'passed', 'skipped', 'total'))
+_C4 = frozenset(('root_revision', 'root_worktree', 'submodule_revision', 'submodule_worktree'))
+_C5 = frozenset(('clean', 'dirty', 'unavailable'))
+_C6 = frozenset(('clean', 'dirty', 'unavailable'))
+_C7 = frozenset(('name', 'value'))
+_C8 = frozenset(('blocked_by', 'diagnostic_code', 'facts', 'id', 'status'))
+_C9 = frozenset(('fail', 'not_applicable', 'pass', 'skipped'))
+
+
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 64:
@@ -69,7 +81,7 @@ def _s6(v: object, p: str) -> None:
 
 
 def _s5(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 18:
@@ -83,7 +95,7 @@ def _s7(v: object, p: str) -> None:
 
 
 def _s8(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('standalone', 'toolchain')):
+    if not (v.__class__ is str and v in _C1) and not any(json_equal(v, e) for e in ('standalone', 'toolchain')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -92,7 +104,7 @@ def _s10(v: object, p: str) -> None:
 
 
 def _s9(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 18:
@@ -104,19 +116,19 @@ def _s9(v: object, p: str) -> None:
 
 
 def _s11(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.doctor'):
+    if not (v.__class__ is str and v == 'sv0cov.doctor') and not json_equal(v, 'sv0cov.doctor'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s12(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('fail', 'pass')):
+    if not (v.__class__ is str and v in _C2) and not any(json_equal(v, e) for e in ('fail', 'pass')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s14(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 18:
@@ -124,9 +136,9 @@ def _s14(v: object, p: str) -> None:
 
 
 def _s15(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 18:
@@ -134,9 +146,9 @@ def _s15(v: object, p: str) -> None:
 
 
 def _s16(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 18:
@@ -144,9 +156,9 @@ def _s16(v: object, p: str) -> None:
 
 
 def _s17(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 18:
@@ -154,9 +166,9 @@ def _s17(v: object, p: str) -> None:
 
 
 def _s18(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 18:
@@ -164,7 +176,7 @@ def _s18(v: object, p: str) -> None:
 
 
 def _s13(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'failed' not in v:
@@ -177,19 +189,20 @@ def _s13(v: object, p: str) -> None:
             fail(p, 'required', 'missing property skipped')
         if 'total' not in v:
             fail(p, 'required', 'missing property total')
-        for k in sorted(v, key=_utf8):
-            if k not in ('failed', 'not_applicable', 'passed', 'skipped', 'total'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C3:
+            for k in sorted(v, key=_utf8):
+                if k not in ('failed', 'not_applicable', 'passed', 'skipped', 'total'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'failed' in v:
-            _s14(v['failed'], child(p, 'failed'))
+            _s14(v['failed'], p + '/failed')
         if 'not_applicable' in v:
-            _s15(v['not_applicable'], child(p, 'not_applicable'))
+            _s15(v['not_applicable'], p + '/not_applicable')
         if 'passed' in v:
-            _s16(v['passed'], child(p, 'passed'))
+            _s16(v['passed'], p + '/passed')
         if 'skipped' in v:
-            _s17(v['skipped'], child(p, 'skipped'))
+            _s17(v['skipped'], p + '/skipped')
         if 'total' in v:
-            _s18(v['total'], child(p, 'total'))
+            _s18(v['total'], p + '/total')
 
 
 def _s20(v: object, p: str) -> None:
@@ -203,7 +216,7 @@ def _s23(v: object, p: str) -> None:
 
 
 def _s24(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 40:
@@ -219,7 +232,7 @@ def _s22(v: object, p: str) -> None:
 
 
 def _s25(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('clean', 'dirty', 'unavailable')):
+    if not (v.__class__ is str and v in _C5) and not any(json_equal(v, e) for e in ('clean', 'dirty', 'unavailable')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -229,7 +242,7 @@ def _s27(v: object, p: str) -> None:
 
 
 def _s28(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 40:
@@ -245,12 +258,12 @@ def _s26(v: object, p: str) -> None:
 
 
 def _s29(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('clean', 'dirty', 'unavailable')):
+    if not (v.__class__ is str and v in _C6) and not any(json_equal(v, e) for e in ('clean', 'dirty', 'unavailable')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s21(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'root_revision' not in v:
@@ -261,17 +274,18 @@ def _s21(v: object, p: str) -> None:
             fail(p, 'required', 'missing property submodule_revision')
         if 'submodule_worktree' not in v:
             fail(p, 'required', 'missing property submodule_worktree')
-        for k in sorted(v, key=_utf8):
-            if k not in ('root_revision', 'root_worktree', 'submodule_revision', 'submodule_worktree'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C4:
+            for k in sorted(v, key=_utf8):
+                if k not in ('root_revision', 'root_worktree', 'submodule_revision', 'submodule_worktree'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'root_revision' in v:
-            _s22(v['root_revision'], child(p, 'root_revision'))
+            _s22(v['root_revision'], p + '/root_revision')
         if 'root_worktree' in v:
-            _s25(v['root_worktree'], child(p, 'root_worktree'))
+            _s25(v['root_worktree'], p + '/root_worktree')
         if 'submodule_revision' in v:
-            _s26(v['submodule_revision'], child(p, 'submodule_revision'))
+            _s26(v['submodule_revision'], p + '/submodule_revision')
         if 'submodule_worktree' in v:
-            _s29(v['submodule_worktree'], child(p, 'submodule_worktree'))
+            _s29(v['submodule_worktree'], p + '/submodule_worktree')
 
 
 def _s19(v: object, p: str) -> None:
@@ -281,7 +295,7 @@ def _s19(v: object, p: str) -> None:
 
 
 def _s30(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
@@ -290,7 +304,7 @@ def _s31(v: object, p: str) -> None:
 
 
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'compatibility_policy' not in v:
@@ -315,35 +329,36 @@ def _s1(v: object, p: str) -> None:
             fail(p, 'required', 'missing property version')
         if 'version_manifest' not in v:
             fail(p, 'required', 'missing property version_manifest')
-        for k in sorted(v, key=_utf8):
-            if k not in ('compatibility_policy', 'diagnostics', 'doctor_sha256', 'mode', 'probes', 'schema', 'status', 'summary', 'toolchain', 'version', 'version_manifest'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('compatibility_policy', 'diagnostics', 'doctor_sha256', 'mode', 'probes', 'schema', 'status', 'summary', 'toolchain', 'version', 'version_manifest'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'compatibility_policy' in v:
-            _s2(v['compatibility_policy'], child(p, 'compatibility_policy'))
+            _s2(v['compatibility_policy'], p + '/compatibility_policy')
         if 'diagnostics' in v:
-            _s5(v['diagnostics'], child(p, 'diagnostics'))
+            _s5(v['diagnostics'], p + '/diagnostics')
         if 'doctor_sha256' in v:
-            _s7(v['doctor_sha256'], child(p, 'doctor_sha256'))
+            _s7(v['doctor_sha256'], p + '/doctor_sha256')
         if 'mode' in v:
-            _s8(v['mode'], child(p, 'mode'))
+            _s8(v['mode'], p + '/mode')
         if 'probes' in v:
-            _s9(v['probes'], child(p, 'probes'))
+            _s9(v['probes'], p + '/probes')
         if 'schema' in v:
-            _s11(v['schema'], child(p, 'schema'))
+            _s11(v['schema'], p + '/schema')
         if 'status' in v:
-            _s12(v['status'], child(p, 'status'))
+            _s12(v['status'], p + '/status')
         if 'summary' in v:
-            _s13(v['summary'], child(p, 'summary'))
+            _s13(v['summary'], p + '/summary')
         if 'toolchain' in v:
-            _s19(v['toolchain'], child(p, 'toolchain'))
+            _s19(v['toolchain'], p + '/toolchain')
         if 'version' in v:
-            _s30(v['version'], child(p, 'version'))
+            _s30(v['version'], p + '/version')
         if 'version_manifest' in v:
-            _s31(v['version_manifest'], child(p, 'version_manifest'))
+            _s31(v['version_manifest'], p + '/version_manifest')
 
 
 def _s33(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -358,14 +373,14 @@ def _s35(v: object, p: str) -> None:
 
 
 def _s36(v: object, p: str) -> None:
-    if not is_type(v, 'boolean'):
+    if v.__class__ is not bool and not is_type(v, 'boolean'):
         fail(p, 'type', 'expected boolean')
 
 
 def _s37(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < -9223372036854775808:
             fail(p, 'minimum', 'below -9223372036854775808')
         if v > 9223372036854775807:
@@ -373,7 +388,7 @@ def _s37(v: object, p: str) -> None:
 
 
 def _s38(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) > 4096:
@@ -387,24 +402,25 @@ def _s34(v: object, p: str) -> None:
 
 
 def _s32(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'name' not in v:
             fail(p, 'required', 'missing property name')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('name', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C7:
+            for k in sorted(v, key=_utf8):
+                if k not in ('name', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'name' in v:
-            _s33(v['name'], child(p, 'name'))
+            _s33(v['name'], p + '/name')
         if 'value' in v:
-            _s34(v['value'], child(p, 'value'))
+            _s34(v['value'], p + '/value')
 
 
 def _s41(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 4:
@@ -414,7 +430,7 @@ def _s41(v: object, p: str) -> None:
 
 
 def _s40(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 17:
@@ -429,7 +445,7 @@ def _s43(v: object, p: str) -> None:
 
 
 def _s44(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 7:
@@ -449,7 +465,7 @@ def _s46(v: object, p: str) -> None:
 
 
 def _s45(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 3:
@@ -459,7 +475,7 @@ def _s45(v: object, p: str) -> None:
 
 
 def _s47(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 4:
@@ -469,12 +485,12 @@ def _s47(v: object, p: str) -> None:
 
 
 def _s48(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('fail', 'not_applicable', 'pass', 'skipped')):
+    if not (v.__class__ is str and v in _C9) and not any(json_equal(v, e) for e in ('fail', 'not_applicable', 'pass', 'skipped')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s39(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'blocked_by' not in v:
@@ -487,19 +503,20 @@ def _s39(v: object, p: str) -> None:
             fail(p, 'required', 'missing property id')
         if 'status' not in v:
             fail(p, 'required', 'missing property status')
-        for k in sorted(v, key=_utf8):
-            if k not in ('blocked_by', 'diagnostic_code', 'facts', 'id', 'status'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C8:
+            for k in sorted(v, key=_utf8):
+                if k not in ('blocked_by', 'diagnostic_code', 'facts', 'id', 'status'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'blocked_by' in v:
-            _s40(v['blocked_by'], child(p, 'blocked_by'))
+            _s40(v['blocked_by'], p + '/blocked_by')
         if 'diagnostic_code' in v:
-            _s42(v['diagnostic_code'], child(p, 'diagnostic_code'))
+            _s42(v['diagnostic_code'], p + '/diagnostic_code')
         if 'facts' in v:
-            _s45(v['facts'], child(p, 'facts'))
+            _s45(v['facts'], p + '/facts')
         if 'id' in v:
-            _s47(v['id'], child(p, 'id'))
+            _s47(v['id'], p + '/id')
         if 'status' in v:
-            _s48(v['status'], child(p, 'status'))
+            _s48(v['status'], p + '/status')
 
 
 def _s49(v: object, p: str) -> None:

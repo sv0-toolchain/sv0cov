@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.diagnostic-registry-1.0.schema.json
 # schema-sha256: 1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.diagnostic-registry 1.0."""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sv0cov.formats.structural import (
 SCHEMA_NAME = 'sv0cov.diagnostic-registry'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '1199242829b6947822217a148d360657d0b92fe8921d68b14fcc10cd887f739b'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -36,8 +36,14 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('code', 'default_severity', 'domain', 'title'))
+_C1 = frozenset(('error', 'note', 'warning'))
+_C2 = frozenset(('collection', 'distribution', 'evidence', 'internal', 'invocation', 'merge', 'planning', 'reporting', 'reserved', 'security'))
+_C3 = frozenset(('entries', 'registry_sha256', 'revision', 'schema', 'version'))
+
+
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 64:
@@ -47,7 +53,7 @@ def _s0(v: object, p: str) -> None:
 
 
 def _s2(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 7:
@@ -57,17 +63,17 @@ def _s2(v: object, p: str) -> None:
 
 
 def _s3(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('error', 'note', 'warning')):
+    if not (v.__class__ is str and v in _C1) and not any(json_equal(v, e) for e in ('error', 'note', 'warning')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s4(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('collection', 'distribution', 'evidence', 'internal', 'invocation', 'merge', 'planning', 'reporting', 'reserved', 'security')):
+    if not (v.__class__ is str and v in _C2) and not any(json_equal(v, e) for e in ('collection', 'distribution', 'evidence', 'internal', 'invocation', 'merge', 'planning', 'reporting', 'reserved', 'security')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s5(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -77,7 +83,7 @@ def _s5(v: object, p: str) -> None:
 
 
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'code' not in v:
@@ -88,17 +94,18 @@ def _s1(v: object, p: str) -> None:
             fail(p, 'required', 'missing property domain')
         if 'title' not in v:
             fail(p, 'required', 'missing property title')
-        for k in sorted(v, key=_utf8):
-            if k not in ('code', 'default_severity', 'domain', 'title'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('code', 'default_severity', 'domain', 'title'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'code' in v:
-            _s2(v['code'], child(p, 'code'))
+            _s2(v['code'], p + '/code')
         if 'default_severity' in v:
-            _s3(v['default_severity'], child(p, 'default_severity'))
+            _s3(v['default_severity'], p + '/default_severity')
         if 'domain' in v:
-            _s4(v['domain'], child(p, 'domain'))
+            _s4(v['domain'], p + '/domain')
         if 'title' in v:
-            _s5(v['title'], child(p, 'title'))
+            _s5(v['title'], p + '/title')
 
 
 def _s8(v: object, p: str) -> None:
@@ -106,7 +113,7 @@ def _s8(v: object, p: str) -> None:
 
 
 def _s7(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -122,9 +129,9 @@ def _s9(v: object, p: str) -> None:
 
 
 def _s10(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 1:
             fail(p, 'minimum', 'below 1')
         if v > 4294967295:
@@ -132,17 +139,17 @@ def _s10(v: object, p: str) -> None:
 
 
 def _s11(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.diagnostic-registry'):
+    if not (v.__class__ is str and v == 'sv0cov.diagnostic-registry') and not json_equal(v, 'sv0cov.diagnostic-registry'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s12(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s6(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'entries' not in v:
@@ -155,19 +162,20 @@ def _s6(v: object, p: str) -> None:
             fail(p, 'required', 'missing property schema')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('entries', 'registry_sha256', 'revision', 'schema', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C3:
+            for k in sorted(v, key=_utf8):
+                if k not in ('entries', 'registry_sha256', 'revision', 'schema', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'entries' in v:
-            _s7(v['entries'], child(p, 'entries'))
+            _s7(v['entries'], p + '/entries')
         if 'registry_sha256' in v:
-            _s9(v['registry_sha256'], child(p, 'registry_sha256'))
+            _s9(v['registry_sha256'], p + '/registry_sha256')
         if 'revision' in v:
-            _s10(v['revision'], child(p, 'revision'))
+            _s10(v['revision'], p + '/revision')
         if 'schema' in v:
-            _s11(v['schema'], child(p, 'schema'))
+            _s11(v['schema'], p + '/schema')
         if 'version' in v:
-            _s12(v['version'], child(p, 'version'))
+            _s12(v['version'], p + '/version')
 
 
 _def_digest = _s0

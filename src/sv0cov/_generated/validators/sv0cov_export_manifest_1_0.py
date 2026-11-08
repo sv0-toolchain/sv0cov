@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.export-manifest-1.0.schema.json
 # schema-sha256: 12f083f284a27d3d020c8058c50e6411254250767bb929c3f2f1c3f98ed35301
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.export-manifest 1.0."""
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from . import sv0cov_map_1_0 as _m_sv0cov_map_1_0
 SCHEMA_NAME = 'sv0cov.export-manifest'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '12f083f284a27d3d020c8058c50e6411254250767bb929c3f2f1c3f98ed35301'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -37,10 +37,25 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('byte_length', 'destination', 'media_type', 'name', 'role', 'sha256'))
+_C1 = frozenset(('file', 'stdout'))
+_C2 = frozenset(('application/json', 'application/xml; charset=utf-8', 'text/plain; charset=utf-8'))
+_C3 = frozenset(('native', 'primary'))
+_C4 = frozenset(('artifacts', 'compatibility_reference', 'context_projection', 'format', 'indexed_input_sha256', 'omissions', 'placeholders', 'producer', 'profile', 'projections', 'report_configuration_sha256', 'saturation_disposition', 'schema', 'version'))
+_C5 = frozenset(('cobertura:coverage-04.dtd@e5eea8679ebce047ec6ccdfdbf6cf2c14b376875:sha256:e467cb8252e20feb794fc2dedfbea7b4957921669c758f0282d525df88897917', 'lcov:1.16+2.5'))
+_C6 = frozenset(('cobertura', 'lcov'))
+_C7 = frozenset(('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero'))
+_C8 = frozenset(('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero'))
+_C9 = frozenset(('name', 'version'))
+_C10 = frozenset(('sv0cov-cobertura-r1-core', 'sv0cov-lcov-r1-core'))
+_C11 = frozenset(('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero'))
+_C12 = frozenset(('exact', 'lossy_hit_only'))
+
+
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 9223372036854775807:
@@ -48,12 +63,12 @@ def _s1(v: object, p: str) -> None:
 
 
 def _s2(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('file', 'stdout')):
+    if not (v.__class__ is str and v in _C1) and not any(json_equal(v, e) for e in ('file', 'stdout')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s3(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('application/json', 'application/xml; charset=utf-8', 'text/plain; charset=utf-8')):
+    if not (v.__class__ is str and v in _C2) and not any(json_equal(v, e) for e in ('application/json', 'application/xml; charset=utf-8', 'text/plain; charset=utf-8')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -63,7 +78,7 @@ def _s5(v: object, p: str) -> None:
 
 
 def _s6(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -79,7 +94,7 @@ def _s4(v: object, p: str) -> None:
 
 
 def _s7(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('native', 'primary')):
+    if not (v.__class__ is str and v in _C3) and not any(json_equal(v, e) for e in ('native', 'primary')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -88,7 +103,7 @@ def _s8(v: object, p: str) -> None:
 
 
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'byte_length' not in v:
@@ -103,21 +118,22 @@ def _s0(v: object, p: str) -> None:
             fail(p, 'required', 'missing property role')
         if 'sha256' not in v:
             fail(p, 'required', 'missing property sha256')
-        for k in sorted(v, key=_utf8):
-            if k not in ('byte_length', 'destination', 'media_type', 'name', 'role', 'sha256'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('byte_length', 'destination', 'media_type', 'name', 'role', 'sha256'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'byte_length' in v:
-            _s1(v['byte_length'], child(p, 'byte_length'))
+            _s1(v['byte_length'], p + '/byte_length')
         if 'destination' in v:
-            _s2(v['destination'], child(p, 'destination'))
+            _s2(v['destination'], p + '/destination')
         if 'media_type' in v:
-            _s3(v['media_type'], child(p, 'media_type'))
+            _s3(v['media_type'], p + '/media_type')
         if 'name' in v:
-            _s4(v['name'], child(p, 'name'))
+            _s4(v['name'], p + '/name')
         if 'role' in v:
-            _s7(v['role'], child(p, 'role'))
+            _s7(v['role'], p + '/role')
         if 'sha256' in v:
-            _s8(v['sha256'], child(p, 'sha256'))
+            _s8(v['sha256'], p + '/sha256')
 
 
 def _s11(v: object, p: str) -> None:
@@ -125,7 +141,7 @@ def _s11(v: object, p: str) -> None:
 
 
 def _s10(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 2:
@@ -137,17 +153,17 @@ def _s10(v: object, p: str) -> None:
 
 
 def _s12(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cobertura:coverage-04.dtd@e5eea8679ebce047ec6ccdfdbf6cf2c14b376875:sha256:e467cb8252e20feb794fc2dedfbea7b4957921669c758f0282d525df88897917', 'lcov:1.16+2.5')):
+    if not (v.__class__ is str and v in _C5) and not any(json_equal(v, e) for e in ('cobertura:coverage-04.dtd@e5eea8679ebce047ec6ccdfdbf6cf2c14b376875:sha256:e467cb8252e20feb794fc2dedfbea7b4957921669c758f0282d525df88897917', 'lcov:1.16+2.5')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s13(v: object, p: str) -> None:
-    if not json_equal(v, 'aggregate'):
+    if not (v.__class__ is str and v == 'aggregate') and not json_equal(v, 'aggregate'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s14(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cobertura', 'lcov')):
+    if not (v.__class__ is str and v in _C6) and not any(json_equal(v, e) for e in ('cobertura', 'lcov')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -156,12 +172,12 @@ def _s15(v: object, p: str) -> None:
 
 
 def _s17(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero')):
+    if not (v.__class__ is str and v in _C7) and not any(json_equal(v, e) for e in ('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s16(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 9:
@@ -171,12 +187,12 @@ def _s16(v: object, p: str) -> None:
 
 
 def _s19(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero')):
+    if not (v.__class__ is str and v in _C8) and not any(json_equal(v, e) for e in ('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s18(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 9:
@@ -186,12 +202,12 @@ def _s18(v: object, p: str) -> None:
 
 
 def _s21(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov'):
+    if not (v.__class__ is str and v == 'sv0cov') and not json_equal(v, 'sv0cov'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s22(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -201,34 +217,35 @@ def _s22(v: object, p: str) -> None:
 
 
 def _s20(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'name' not in v:
             fail(p, 'required', 'missing property name')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('name', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C9:
+            for k in sorted(v, key=_utf8):
+                if k not in ('name', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'name' in v:
-            _s21(v['name'], child(p, 'name'))
+            _s21(v['name'], p + '/name')
         if 'version' in v:
-            _s22(v['version'], child(p, 'version'))
+            _s22(v['version'], p + '/version')
 
 
 def _s23(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('sv0cov-cobertura-r1-core', 'sv0cov-lcov-r1-core')):
+    if not (v.__class__ is str and v in _C10) and not any(json_equal(v, e) for e in ('sv0cov-cobertura-r1-core', 'sv0cov-lcov-r1-core')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s25(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero')):
+    if not (v.__class__ is str and v in _C11) and not any(json_equal(v, e) for e in ('branch_outcomes_as_brda', 'branch_outcomes_as_conditions', 'complexity_unavailable_as_0.0', 'condition_percentage_floor_integer', 'contexts_aggregated', 'contract_coverage', 'exact_branch_outcome_counts', 'exclusion_inventory', 'function_entry_counts', 'java_signature_unavailable_as_empty', 'line_status_binary_covered_only', 'line_status_binary_executed', 'named_contexts', 'partial_line_state', 'provenance_detail', 'rates_six_fractional_half_even', 'region_coverage', 'saturation_qualifiers', 'source_root_as_dot', 'timestamp_from_reproducible_epoch', 'unit_lines_as_first_executable_line', 'zero_denominators_as_zero')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s24(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 9:
@@ -242,22 +259,22 @@ def _s26(v: object, p: str) -> None:
 
 
 def _s27(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('exact', 'lossy_hit_only')):
+    if not (v.__class__ is str and v in _C12) and not any(json_equal(v, e) for e in ('exact', 'lossy_hit_only')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s28(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.export-manifest'):
+    if not (v.__class__ is str and v == 'sv0cov.export-manifest') and not json_equal(v, 'sv0cov.export-manifest'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s29(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s9(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'artifacts' not in v:
@@ -288,37 +305,38 @@ def _s9(v: object, p: str) -> None:
             fail(p, 'required', 'missing property schema')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('artifacts', 'compatibility_reference', 'context_projection', 'format', 'indexed_input_sha256', 'omissions', 'placeholders', 'producer', 'profile', 'projections', 'report_configuration_sha256', 'saturation_disposition', 'schema', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C4:
+            for k in sorted(v, key=_utf8):
+                if k not in ('artifacts', 'compatibility_reference', 'context_projection', 'format', 'indexed_input_sha256', 'omissions', 'placeholders', 'producer', 'profile', 'projections', 'report_configuration_sha256', 'saturation_disposition', 'schema', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'artifacts' in v:
-            _s10(v['artifacts'], child(p, 'artifacts'))
+            _s10(v['artifacts'], p + '/artifacts')
         if 'compatibility_reference' in v:
-            _s12(v['compatibility_reference'], child(p, 'compatibility_reference'))
+            _s12(v['compatibility_reference'], p + '/compatibility_reference')
         if 'context_projection' in v:
-            _s13(v['context_projection'], child(p, 'context_projection'))
+            _s13(v['context_projection'], p + '/context_projection')
         if 'format' in v:
-            _s14(v['format'], child(p, 'format'))
+            _s14(v['format'], p + '/format')
         if 'indexed_input_sha256' in v:
-            _s15(v['indexed_input_sha256'], child(p, 'indexed_input_sha256'))
+            _s15(v['indexed_input_sha256'], p + '/indexed_input_sha256')
         if 'omissions' in v:
-            _s16(v['omissions'], child(p, 'omissions'))
+            _s16(v['omissions'], p + '/omissions')
         if 'placeholders' in v:
-            _s18(v['placeholders'], child(p, 'placeholders'))
+            _s18(v['placeholders'], p + '/placeholders')
         if 'producer' in v:
-            _s20(v['producer'], child(p, 'producer'))
+            _s20(v['producer'], p + '/producer')
         if 'profile' in v:
-            _s23(v['profile'], child(p, 'profile'))
+            _s23(v['profile'], p + '/profile')
         if 'projections' in v:
-            _s24(v['projections'], child(p, 'projections'))
+            _s24(v['projections'], p + '/projections')
         if 'report_configuration_sha256' in v:
-            _s26(v['report_configuration_sha256'], child(p, 'report_configuration_sha256'))
+            _s26(v['report_configuration_sha256'], p + '/report_configuration_sha256')
         if 'saturation_disposition' in v:
-            _s27(v['saturation_disposition'], child(p, 'saturation_disposition'))
+            _s27(v['saturation_disposition'], p + '/saturation_disposition')
         if 'schema' in v:
-            _s28(v['schema'], child(p, 'schema'))
+            _s28(v['schema'], p + '/schema')
         if 'version' in v:
-            _s29(v['version'], child(p, 'version'))
+            _s29(v['version'], p + '/version')
 
 
 def _s30(v: object, p: str) -> None:

@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.run-set-1.0.schema.json
 # schema-sha256: 05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.run-set 1.0."""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sv0cov.formats.structural import (
 SCHEMA_NAME = 'sv0cov.run-set'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '05bf27899a20b46db9553936e762d7cdd8f54e01dddb5152c4b9642b454123f2'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -36,8 +36,11 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('run_ids', 'schema', 'version'))
+
+
 def _s2(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 32:
@@ -47,7 +50,7 @@ def _s2(v: object, p: str) -> None:
 
 
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -57,17 +60,17 @@ def _s1(v: object, p: str) -> None:
 
 
 def _s3(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.run-set'):
+    if not (v.__class__ is str and v == 'sv0cov.run-set') and not json_equal(v, 'sv0cov.run-set'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s4(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'run_ids' not in v:
@@ -76,15 +79,16 @@ def _s0(v: object, p: str) -> None:
             fail(p, 'required', 'missing property schema')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('run_ids', 'schema', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('run_ids', 'schema', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'run_ids' in v:
-            _s1(v['run_ids'], child(p, 'run_ids'))
+            _s1(v['run_ids'], p + '/run_ids')
         if 'schema' in v:
-            _s3(v['schema'], child(p, 'schema'))
+            _s3(v['schema'], p + '/schema')
         if 'version' in v:
-            _s4(v['version'], child(p, 'version'))
+            _s4(v['version'], p + '/version')
 
 
 

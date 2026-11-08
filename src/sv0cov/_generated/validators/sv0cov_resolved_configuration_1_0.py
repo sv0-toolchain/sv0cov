@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.resolved-configuration-1.0.schema.json
 # schema-sha256: 4aab6d7ed16e9b02a4cacd0ff4d43692f0bfc2fde8281f531db3140ae7923cab
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.resolved-configuration 1.0."""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sv0cov.formats.structural import (
 SCHEMA_NAME = 'sv0cov.resolved-configuration'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '4aab6d7ed16e9b02a4cacd0ff4d43692f0bfc2fde8281f531db3140ae7923cab'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -36,8 +36,128 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('coverage', 'report', 'schema', 'version'))
+_C1 = frozenset(('context', 'diff', 'empty', 'entities', 'exclusions', 'integrity', 'limits', 'output_dir', 'ratchet', 'reports', 'reproducible_epoch', 'schema', 'scopes', 'thresholds'))
+_C2 = frozenset(('source', 'value'))
+_C3 = frozenset(('cli', 'default', 'sv0.toml'))
+_C4 = frozenset(('base', 'branch', 'line', 'region'))
+_C5 = frozenset(('source', 'value'))
+_C6 = frozenset(('cli', 'default', 'sv0.toml'))
+_C7 = frozenset(('source', 'value'))
+_C8 = frozenset(('cli', 'default', 'sv0.toml'))
+_C9 = frozenset(('source', 'value'))
+_C10 = frozenset(('cli', 'default', 'sv0.toml'))
+_C11 = frozenset(('source', 'value'))
+_C12 = frozenset(('cli', 'default', 'sv0.toml'))
+_C13 = frozenset(('source', 'value'))
+_C14 = frozenset(('cli', 'default', 'sv0.toml'))
+_C15 = frozenset(('fail', 'pass'))
+_C16 = frozenset(('branch', 'contract', 'function', 'kind', 'line', 'name', 'qualified_name', 'region', 'source'))
+_C17 = frozenset(('source', 'value'))
+_C18 = frozenset(('cli', 'default', 'sv0.toml'))
+_C19 = frozenset(('source', 'value'))
+_C20 = frozenset(('cli', 'default', 'sv0.toml'))
+_C21 = frozenset(('source', 'value'))
+_C22 = frozenset(('cli', 'default', 'sv0.toml'))
+_C23 = frozenset(('source', 'value'))
+_C24 = frozenset(('cli', 'default', 'sv0.toml'))
+_C25 = frozenset(('contract', 'function'))
+_C26 = frozenset(('source', 'value'))
+_C27 = frozenset(('cli', 'default', 'sv0.toml'))
+_C28 = frozenset(('source', 'value'))
+_C29 = frozenset(('cli', 'default', 'sv0.toml'))
+_C30 = frozenset(('source', 'value'))
+_C31 = frozenset(('cli', 'default', 'sv0.toml'))
+_C32 = frozenset(('source', 'value'))
+_C33 = frozenset(('cli', 'default', 'sv0.toml'))
+_C34 = frozenset(('source', 'value'))
+_C35 = frozenset(('cli', 'default', 'sv0.toml'))
+_C36 = frozenset(('branch_basis_points', 'contract_basis_points', 'forbidden_reasons', 'forbidden_sources', 'function_basis_points', 'line_basis_points', 'max_records', 'region_basis_points'))
+_C37 = frozenset(('source', 'value'))
+_C38 = frozenset(('cli', 'default', 'sv0.toml'))
+_C39 = frozenset(('source', 'value'))
+_C40 = frozenset(('cli', 'default', 'sv0.toml'))
+_C41 = frozenset(('source', 'value'))
+_C42 = frozenset(('cli', 'default', 'sv0.toml'))
+_C43 = frozenset(('source', 'value'))
+_C44 = frozenset(('cli', 'default', 'sv0.toml'))
+_C45 = frozenset(('source', 'value'))
+_C46 = frozenset(('cli', 'default', 'sv0.toml'))
+_C47 = frozenset(('source', 'value'))
+_C48 = frozenset(('cli', 'default', 'sv0.toml'))
+_C49 = frozenset(('source', 'value'))
+_C50 = frozenset(('cli', 'default', 'sv0.toml'))
+_C51 = frozenset(('source', 'value'))
+_C52 = frozenset(('cli', 'default', 'sv0.toml'))
+_C53 = frozenset(('saturation',))
+_C54 = frozenset(('source', 'value'))
+_C55 = frozenset(('cli', 'default', 'sv0.toml'))
+_C56 = frozenset(('allow-ordinary', 'fail'))
+_C57 = frozenset(('raw_profile',))
+_C58 = frozenset(('max_bytes', 'max_counters', 'tier'))
+_C59 = frozenset(('source', 'value'))
+_C60 = frozenset(('cli', 'default', 'sv0.toml'))
+_C61 = frozenset(('source', 'value'))
+_C62 = frozenset(('cli', 'default', 'sv0.toml'))
+_C63 = frozenset(('source', 'value'))
+_C64 = frozenset(('cli', 'default', 'sv0.toml'))
+_C65 = frozenset(('custom', 'large', 'standard'))
+_C66 = frozenset(('source', 'value'))
+_C67 = frozenset(('cli', 'default', 'sv0.toml'))
+_C68 = frozenset(('baseline', 'metrics', 'tolerance_basis_points'))
+_C69 = frozenset(('source', 'value'))
+_C70 = frozenset(('cli', 'default', 'sv0.toml'))
+_C71 = frozenset(('source', 'value'))
+_C72 = frozenset(('cli', 'default', 'sv0.toml'))
+_C73 = frozenset(('branch', 'contract', 'function', 'line', 'region'))
+_C74 = frozenset(('source', 'value'))
+_C75 = frozenset(('cli', 'default', 'sv0.toml'))
+_C76 = frozenset(('source', 'value'))
+_C77 = frozenset(('cli', 'default', 'sv0.toml'))
+_C78 = frozenset(('cobertura', 'html', 'json', 'lcov', 'term'))
+_C79 = frozenset(('source', 'value'))
+_C80 = frozenset(('cli', 'default', 'sv0.toml'))
+_C81 = frozenset(('source', 'value'))
+_C82 = frozenset(('cli', 'default', 'sv0.toml'))
+_C83 = frozenset(('branch', 'contract', 'function', 'include', 'line', 'name', 'packages', 'region', 'sources'))
+_C84 = frozenset(('source', 'value'))
+_C85 = frozenset(('cli', 'default', 'sv0.toml'))
+_C86 = frozenset(('source', 'value'))
+_C87 = frozenset(('cli', 'default', 'sv0.toml'))
+_C88 = frozenset(('source', 'value'))
+_C89 = frozenset(('cli', 'default', 'sv0.toml'))
+_C90 = frozenset(('source', 'value'))
+_C91 = frozenset(('cli', 'default', 'sv0.toml'))
+_C92 = frozenset(('source', 'value'))
+_C93 = frozenset(('cli', 'default', 'sv0.toml'))
+_C94 = frozenset(('source', 'value'))
+_C95 = frozenset(('cli', 'default', 'sv0.toml'))
+_C96 = frozenset(('source', 'value'))
+_C97 = frozenset(('cli', 'default', 'sv0.toml'))
+_C98 = frozenset(('source', 'value'))
+_C99 = frozenset(('cli', 'default', 'sv0.toml'))
+_C100 = frozenset(('source', 'value'))
+_C101 = frozenset(('cli', 'default', 'sv0.toml'))
+_C102 = frozenset(('branch', 'contract', 'function', 'line', 'region'))
+_C103 = frozenset(('source', 'value'))
+_C104 = frozenset(('cli', 'default', 'sv0.toml'))
+_C105 = frozenset(('source', 'value'))
+_C106 = frozenset(('cli', 'default', 'sv0.toml'))
+_C107 = frozenset(('source', 'value'))
+_C108 = frozenset(('cli', 'default', 'sv0.toml'))
+_C109 = frozenset(('source', 'value'))
+_C110 = frozenset(('cli', 'default', 'sv0.toml'))
+_C111 = frozenset(('source', 'value'))
+_C112 = frozenset(('cli', 'default', 'sv0.toml'))
+_C113 = frozenset(('allow_lossy_saturated_export', 'allow_source_mismatch'))
+_C114 = frozenset(('source', 'value'))
+_C115 = frozenset(('cli', 'default', 'sv0.toml'))
+_C116 = frozenset(('source', 'value'))
+_C117 = frozenset(('cli', 'default', 'sv0.toml'))
+
+
 def _s3(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C3) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -47,7 +167,7 @@ def _s5(v: object, p: str) -> None:
 
 
 def _s6(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) > 4096:
@@ -61,20 +181,21 @@ def _s4(v: object, p: str) -> None:
 
 
 def _s2(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C2:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s3(v['source'], child(p, 'source'))
+            _s3(v['source'], p + '/source')
         if 'value' in v:
-            _s4(v['value'], child(p, 'value'))
+            _s4(v['value'], p + '/value')
 
 
 def _s8(v: object, p: str) -> None:
@@ -83,12 +204,12 @@ def _s8(v: object, p: str) -> None:
 
 
 def _s11(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C6) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s12(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -98,24 +219,25 @@ def _s12(v: object, p: str) -> None:
 
 
 def _s10(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C5:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s11(v['source'], child(p, 'source'))
+            _s11(v['source'], p + '/source')
         if 'value' in v:
-            _s12(v['value'], child(p, 'value'))
+            _s12(v['value'], p + '/value')
 
 
 def _s14(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C8) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -125,9 +247,9 @@ def _s16(v: object, p: str) -> None:
 
 
 def _s17(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -141,24 +263,25 @@ def _s15(v: object, p: str) -> None:
 
 
 def _s13(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C7:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s14(v['source'], child(p, 'source'))
+            _s14(v['source'], p + '/source')
         if 'value' in v:
-            _s15(v['value'], child(p, 'value'))
+            _s15(v['value'], p + '/value')
 
 
 def _s19(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C10) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -168,9 +291,9 @@ def _s21(v: object, p: str) -> None:
 
 
 def _s22(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -184,24 +307,25 @@ def _s20(v: object, p: str) -> None:
 
 
 def _s18(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C9:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s19(v['source'], child(p, 'source'))
+            _s19(v['source'], p + '/source')
         if 'value' in v:
-            _s20(v['value'], child(p, 'value'))
+            _s20(v['value'], p + '/value')
 
 
 def _s24(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C12) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -211,9 +335,9 @@ def _s26(v: object, p: str) -> None:
 
 
 def _s27(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -227,24 +351,25 @@ def _s25(v: object, p: str) -> None:
 
 
 def _s23(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C11:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s24(v['source'], child(p, 'source'))
+            _s24(v['source'], p + '/source')
         if 'value' in v:
-            _s25(v['value'], child(p, 'value'))
+            _s25(v['value'], p + '/value')
 
 
 def _s9(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'base' not in v:
@@ -255,17 +380,18 @@ def _s9(v: object, p: str) -> None:
             fail(p, 'required', 'missing property line')
         if 'region' not in v:
             fail(p, 'required', 'missing property region')
-        for k in sorted(v, key=_utf8):
-            if k not in ('base', 'branch', 'line', 'region'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C4:
+            for k in sorted(v, key=_utf8):
+                if k not in ('base', 'branch', 'line', 'region'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'base' in v:
-            _s10(v['base'], child(p, 'base'))
+            _s10(v['base'], p + '/base')
         if 'branch' in v:
-            _s13(v['branch'], child(p, 'branch'))
+            _s13(v['branch'], p + '/branch')
         if 'line' in v:
-            _s18(v['line'], child(p, 'line'))
+            _s18(v['line'], p + '/line')
         if 'region' in v:
-            _s23(v['region'], child(p, 'region'))
+            _s23(v['region'], p + '/region')
 
 
 def _s7(v: object, p: str) -> None:
@@ -275,34 +401,35 @@ def _s7(v: object, p: str) -> None:
 
 
 def _s29(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C14) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s30(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('fail', 'pass')):
+    if not (v.__class__ is str and v in _C15) and not any(json_equal(v, e) for e in ('fail', 'pass')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s28(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C13:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s29(v['source'], child(p, 'source'))
+            _s29(v['source'], p + '/source')
         if 'value' in v:
-            _s30(v['value'], child(p, 'value'))
+            _s30(v['value'], p + '/value')
 
 
 def _s34(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C18) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -312,9 +439,9 @@ def _s36(v: object, p: str) -> None:
 
 
 def _s37(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -328,24 +455,25 @@ def _s35(v: object, p: str) -> None:
 
 
 def _s33(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C17:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s34(v['source'], child(p, 'source'))
+            _s34(v['source'], p + '/source')
         if 'value' in v:
-            _s35(v['value'], child(p, 'value'))
+            _s35(v['value'], p + '/value')
 
 
 def _s39(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C20) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -355,9 +483,9 @@ def _s41(v: object, p: str) -> None:
 
 
 def _s42(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -371,24 +499,25 @@ def _s40(v: object, p: str) -> None:
 
 
 def _s38(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C19:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s39(v['source'], child(p, 'source'))
+            _s39(v['source'], p + '/source')
         if 'value' in v:
-            _s40(v['value'], child(p, 'value'))
+            _s40(v['value'], p + '/value')
 
 
 def _s44(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C22) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -398,9 +527,9 @@ def _s46(v: object, p: str) -> None:
 
 
 def _s47(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -414,51 +543,53 @@ def _s45(v: object, p: str) -> None:
 
 
 def _s43(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C21:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s44(v['source'], child(p, 'source'))
+            _s44(v['source'], p + '/source')
         if 'value' in v:
-            _s45(v['value'], child(p, 'value'))
+            _s45(v['value'], p + '/value')
 
 
 def _s49(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C24) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s50(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('contract', 'function')):
+    if not (v.__class__ is str and v in _C25) and not any(json_equal(v, e) for e in ('contract', 'function')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s48(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C23:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s49(v['source'], child(p, 'source'))
+            _s49(v['source'], p + '/source')
         if 'value' in v:
-            _s50(v['value'], child(p, 'value'))
+            _s50(v['value'], p + '/value')
 
 
 def _s52(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C27) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -468,9 +599,9 @@ def _s54(v: object, p: str) -> None:
 
 
 def _s55(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -484,29 +615,30 @@ def _s53(v: object, p: str) -> None:
 
 
 def _s51(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C26:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s52(v['source'], child(p, 'source'))
+            _s52(v['source'], p + '/source')
         if 'value' in v:
-            _s53(v['value'], child(p, 'value'))
+            _s53(v['value'], p + '/value')
 
 
 def _s57(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C29) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s58(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -516,29 +648,30 @@ def _s58(v: object, p: str) -> None:
 
 
 def _s56(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C28:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s57(v['source'], child(p, 'source'))
+            _s57(v['source'], p + '/source')
         if 'value' in v:
-            _s58(v['value'], child(p, 'value'))
+            _s58(v['value'], p + '/value')
 
 
 def _s60(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C31) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s61(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -548,24 +681,25 @@ def _s61(v: object, p: str) -> None:
 
 
 def _s59(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C30:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s60(v['source'], child(p, 'source'))
+            _s60(v['source'], p + '/source')
         if 'value' in v:
-            _s61(v['value'], child(p, 'value'))
+            _s61(v['value'], p + '/value')
 
 
 def _s63(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C33) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -575,9 +709,9 @@ def _s65(v: object, p: str) -> None:
 
 
 def _s66(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -591,29 +725,30 @@ def _s64(v: object, p: str) -> None:
 
 
 def _s62(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C32:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s63(v['source'], child(p, 'source'))
+            _s63(v['source'], p + '/source')
         if 'value' in v:
-            _s64(v['value'], child(p, 'value'))
+            _s64(v['value'], p + '/value')
 
 
 def _s68(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C35) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s69(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -623,24 +758,25 @@ def _s69(v: object, p: str) -> None:
 
 
 def _s67(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C34:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s68(v['source'], child(p, 'source'))
+            _s68(v['source'], p + '/source')
         if 'value' in v:
-            _s69(v['value'], child(p, 'value'))
+            _s69(v['value'], p + '/value')
 
 
 def _s32(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'branch' not in v:
@@ -661,31 +797,32 @@ def _s32(v: object, p: str) -> None:
             fail(p, 'required', 'missing property region')
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
-        for k in sorted(v, key=_utf8):
-            if k not in ('branch', 'contract', 'function', 'kind', 'line', 'name', 'qualified_name', 'region', 'source'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C16:
+            for k in sorted(v, key=_utf8):
+                if k not in ('branch', 'contract', 'function', 'kind', 'line', 'name', 'qualified_name', 'region', 'source'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'branch' in v:
-            _s33(v['branch'], child(p, 'branch'))
+            _s33(v['branch'], p + '/branch')
         if 'contract' in v:
-            _s38(v['contract'], child(p, 'contract'))
+            _s38(v['contract'], p + '/contract')
         if 'function' in v:
-            _s43(v['function'], child(p, 'function'))
+            _s43(v['function'], p + '/function')
         if 'kind' in v:
-            _s48(v['kind'], child(p, 'kind'))
+            _s48(v['kind'], p + '/kind')
         if 'line' in v:
-            _s51(v['line'], child(p, 'line'))
+            _s51(v['line'], p + '/line')
         if 'name' in v:
-            _s56(v['name'], child(p, 'name'))
+            _s56(v['name'], p + '/name')
         if 'qualified_name' in v:
-            _s59(v['qualified_name'], child(p, 'qualified_name'))
+            _s59(v['qualified_name'], p + '/qualified_name')
         if 'region' in v:
-            _s62(v['region'], child(p, 'region'))
+            _s62(v['region'], p + '/region')
         if 'source' in v:
-            _s67(v['source'], child(p, 'source'))
+            _s67(v['source'], p + '/source')
 
 
 def _s31(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -693,7 +830,7 @@ def _s31(v: object, p: str) -> None:
 
 
 def _s72(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C38) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -703,9 +840,9 @@ def _s74(v: object, p: str) -> None:
 
 
 def _s75(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -719,24 +856,25 @@ def _s73(v: object, p: str) -> None:
 
 
 def _s71(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C37:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s72(v['source'], child(p, 'source'))
+            _s72(v['source'], p + '/source')
         if 'value' in v:
-            _s73(v['value'], child(p, 'value'))
+            _s73(v['value'], p + '/value')
 
 
 def _s77(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C40) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -746,9 +884,9 @@ def _s79(v: object, p: str) -> None:
 
 
 def _s80(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -762,29 +900,30 @@ def _s78(v: object, p: str) -> None:
 
 
 def _s76(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C39:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s77(v['source'], child(p, 'source'))
+            _s77(v['source'], p + '/source')
         if 'value' in v:
-            _s78(v['value'], child(p, 'value'))
+            _s78(v['value'], p + '/value')
 
 
 def _s82(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C42) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s84(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -794,7 +933,7 @@ def _s84(v: object, p: str) -> None:
 
 
 def _s83(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -802,29 +941,30 @@ def _s83(v: object, p: str) -> None:
 
 
 def _s81(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C41:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s82(v['source'], child(p, 'source'))
+            _s82(v['source'], p + '/source')
         if 'value' in v:
-            _s83(v['value'], child(p, 'value'))
+            _s83(v['value'], p + '/value')
 
 
 def _s86(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C44) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s88(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) > 4096:
@@ -832,7 +972,7 @@ def _s88(v: object, p: str) -> None:
 
 
 def _s87(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -840,24 +980,25 @@ def _s87(v: object, p: str) -> None:
 
 
 def _s85(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C43:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s86(v['source'], child(p, 'source'))
+            _s86(v['source'], p + '/source')
         if 'value' in v:
-            _s87(v['value'], child(p, 'value'))
+            _s87(v['value'], p + '/value')
 
 
 def _s90(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C46) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -867,9 +1008,9 @@ def _s92(v: object, p: str) -> None:
 
 
 def _s93(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -883,24 +1024,25 @@ def _s91(v: object, p: str) -> None:
 
 
 def _s89(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C45:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s90(v['source'], child(p, 'source'))
+            _s90(v['source'], p + '/source')
         if 'value' in v:
-            _s91(v['value'], child(p, 'value'))
+            _s91(v['value'], p + '/value')
 
 
 def _s95(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C48) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -910,9 +1052,9 @@ def _s97(v: object, p: str) -> None:
 
 
 def _s98(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -926,24 +1068,25 @@ def _s96(v: object, p: str) -> None:
 
 
 def _s94(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C47:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s95(v['source'], child(p, 'source'))
+            _s95(v['source'], p + '/source')
         if 'value' in v:
-            _s96(v['value'], child(p, 'value'))
+            _s96(v['value'], p + '/value')
 
 
 def _s100(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C50) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -953,9 +1096,9 @@ def _s102(v: object, p: str) -> None:
 
 
 def _s103(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 4294967295:
@@ -969,24 +1112,25 @@ def _s101(v: object, p: str) -> None:
 
 
 def _s99(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C49:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s100(v['source'], child(p, 'source'))
+            _s100(v['source'], p + '/source')
         if 'value' in v:
-            _s101(v['value'], child(p, 'value'))
+            _s101(v['value'], p + '/value')
 
 
 def _s105(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C52) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -996,9 +1140,9 @@ def _s107(v: object, p: str) -> None:
 
 
 def _s108(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1012,24 +1156,25 @@ def _s106(v: object, p: str) -> None:
 
 
 def _s104(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C51:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s105(v['source'], child(p, 'source'))
+            _s105(v['source'], p + '/source')
         if 'value' in v:
-            _s106(v['value'], child(p, 'value'))
+            _s106(v['value'], p + '/value')
 
 
 def _s70(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'branch_basis_points' not in v:
@@ -1048,69 +1193,72 @@ def _s70(v: object, p: str) -> None:
             fail(p, 'required', 'missing property max_records')
         if 'region_basis_points' not in v:
             fail(p, 'required', 'missing property region_basis_points')
-        for k in sorted(v, key=_utf8):
-            if k not in ('branch_basis_points', 'contract_basis_points', 'forbidden_reasons', 'forbidden_sources', 'function_basis_points', 'line_basis_points', 'max_records', 'region_basis_points'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C36:
+            for k in sorted(v, key=_utf8):
+                if k not in ('branch_basis_points', 'contract_basis_points', 'forbidden_reasons', 'forbidden_sources', 'function_basis_points', 'line_basis_points', 'max_records', 'region_basis_points'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'branch_basis_points' in v:
-            _s71(v['branch_basis_points'], child(p, 'branch_basis_points'))
+            _s71(v['branch_basis_points'], p + '/branch_basis_points')
         if 'contract_basis_points' in v:
-            _s76(v['contract_basis_points'], child(p, 'contract_basis_points'))
+            _s76(v['contract_basis_points'], p + '/contract_basis_points')
         if 'forbidden_reasons' in v:
-            _s81(v['forbidden_reasons'], child(p, 'forbidden_reasons'))
+            _s81(v['forbidden_reasons'], p + '/forbidden_reasons')
         if 'forbidden_sources' in v:
-            _s85(v['forbidden_sources'], child(p, 'forbidden_sources'))
+            _s85(v['forbidden_sources'], p + '/forbidden_sources')
         if 'function_basis_points' in v:
-            _s89(v['function_basis_points'], child(p, 'function_basis_points'))
+            _s89(v['function_basis_points'], p + '/function_basis_points')
         if 'line_basis_points' in v:
-            _s94(v['line_basis_points'], child(p, 'line_basis_points'))
+            _s94(v['line_basis_points'], p + '/line_basis_points')
         if 'max_records' in v:
-            _s99(v['max_records'], child(p, 'max_records'))
+            _s99(v['max_records'], p + '/max_records')
         if 'region_basis_points' in v:
-            _s104(v['region_basis_points'], child(p, 'region_basis_points'))
+            _s104(v['region_basis_points'], p + '/region_basis_points')
 
 
 def _s111(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C55) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s112(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('allow-ordinary', 'fail')):
+    if not (v.__class__ is str and v in _C56) and not any(json_equal(v, e) for e in ('allow-ordinary', 'fail')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s110(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C54:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s111(v['source'], child(p, 'source'))
+            _s111(v['source'], p + '/source')
         if 'value' in v:
-            _s112(v['value'], child(p, 'value'))
+            _s112(v['value'], p + '/value')
 
 
 def _s109(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'saturation' not in v:
             fail(p, 'required', 'missing property saturation')
-        for k in sorted(v, key=_utf8):
-            if k not in ('saturation',):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C53:
+            for k in sorted(v, key=_utf8):
+                if k not in ('saturation',):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'saturation' in v:
-            _s110(v['saturation'], child(p, 'saturation'))
+            _s110(v['saturation'], p + '/saturation')
 
 
 def _s116(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C60) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1120,9 +1268,9 @@ def _s118(v: object, p: str) -> None:
 
 
 def _s119(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 1:
             fail(p, 'minimum', 'below 1')
         if v > 68719476736:
@@ -1136,24 +1284,25 @@ def _s117(v: object, p: str) -> None:
 
 
 def _s115(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C59:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s116(v['source'], child(p, 'source'))
+            _s116(v['source'], p + '/source')
         if 'value' in v:
-            _s117(v['value'], child(p, 'value'))
+            _s117(v['value'], p + '/value')
 
 
 def _s121(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C62) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1163,9 +1312,9 @@ def _s123(v: object, p: str) -> None:
 
 
 def _s124(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 1:
             fail(p, 'minimum', 'below 1')
         if v > 4294967295:
@@ -1179,51 +1328,53 @@ def _s122(v: object, p: str) -> None:
 
 
 def _s120(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C61:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s121(v['source'], child(p, 'source'))
+            _s121(v['source'], p + '/source')
         if 'value' in v:
-            _s122(v['value'], child(p, 'value'))
+            _s122(v['value'], p + '/value')
 
 
 def _s126(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C64) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s127(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('custom', 'large', 'standard')):
+    if not (v.__class__ is str and v in _C65) and not any(json_equal(v, e) for e in ('custom', 'large', 'standard')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s125(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C63:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s126(v['source'], child(p, 'source'))
+            _s126(v['source'], p + '/source')
         if 'value' in v:
-            _s127(v['value'], child(p, 'value'))
+            _s127(v['value'], p + '/value')
 
 
 def _s114(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'max_bytes' not in v:
@@ -1232,37 +1383,39 @@ def _s114(v: object, p: str) -> None:
             fail(p, 'required', 'missing property max_counters')
         if 'tier' not in v:
             fail(p, 'required', 'missing property tier')
-        for k in sorted(v, key=_utf8):
-            if k not in ('max_bytes', 'max_counters', 'tier'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C58:
+            for k in sorted(v, key=_utf8):
+                if k not in ('max_bytes', 'max_counters', 'tier'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'max_bytes' in v:
-            _s115(v['max_bytes'], child(p, 'max_bytes'))
+            _s115(v['max_bytes'], p + '/max_bytes')
         if 'max_counters' in v:
-            _s120(v['max_counters'], child(p, 'max_counters'))
+            _s120(v['max_counters'], p + '/max_counters')
         if 'tier' in v:
-            _s125(v['tier'], child(p, 'tier'))
+            _s125(v['tier'], p + '/tier')
 
 
 def _s113(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'raw_profile' not in v:
             fail(p, 'required', 'missing property raw_profile')
-        for k in sorted(v, key=_utf8):
-            if k not in ('raw_profile',):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C57:
+            for k in sorted(v, key=_utf8):
+                if k not in ('raw_profile',):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'raw_profile' in v:
-            _s114(v['raw_profile'], child(p, 'raw_profile'))
+            _s114(v['raw_profile'], p + '/raw_profile')
 
 
 def _s129(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C67) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s130(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -1272,20 +1425,21 @@ def _s130(v: object, p: str) -> None:
 
 
 def _s128(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C66:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s129(v['source'], child(p, 'source'))
+            _s129(v['source'], p + '/source')
         if 'value' in v:
-            _s130(v['value'], child(p, 'value'))
+            _s130(v['value'], p + '/value')
 
 
 def _s132(v: object, p: str) -> None:
@@ -1294,12 +1448,12 @@ def _s132(v: object, p: str) -> None:
 
 
 def _s135(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C70) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s136(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -1309,34 +1463,35 @@ def _s136(v: object, p: str) -> None:
 
 
 def _s134(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C69:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s135(v['source'], child(p, 'source'))
+            _s135(v['source'], p + '/source')
         if 'value' in v:
-            _s136(v['value'], child(p, 'value'))
+            _s136(v['value'], p + '/value')
 
 
 def _s138(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C72) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s140(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('branch', 'contract', 'function', 'line', 'region')):
+    if not (v.__class__ is str and v in _C73) and not any(json_equal(v, e) for e in ('branch', 'contract', 'function', 'line', 'region')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s139(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 5:
@@ -1346,31 +1501,32 @@ def _s139(v: object, p: str) -> None:
 
 
 def _s137(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C71:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s138(v['source'], child(p, 'source'))
+            _s138(v['source'], p + '/source')
         if 'value' in v:
-            _s139(v['value'], child(p, 'value'))
+            _s139(v['value'], p + '/value')
 
 
 def _s142(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C75) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s143(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1378,24 +1534,25 @@ def _s143(v: object, p: str) -> None:
 
 
 def _s141(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C74:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s142(v['source'], child(p, 'source'))
+            _s142(v['source'], p + '/source')
         if 'value' in v:
-            _s143(v['value'], child(p, 'value'))
+            _s143(v['value'], p + '/value')
 
 
 def _s133(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'baseline' not in v:
@@ -1404,15 +1561,16 @@ def _s133(v: object, p: str) -> None:
             fail(p, 'required', 'missing property metrics')
         if 'tolerance_basis_points' not in v:
             fail(p, 'required', 'missing property tolerance_basis_points')
-        for k in sorted(v, key=_utf8):
-            if k not in ('baseline', 'metrics', 'tolerance_basis_points'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C68:
+            for k in sorted(v, key=_utf8):
+                if k not in ('baseline', 'metrics', 'tolerance_basis_points'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'baseline' in v:
-            _s134(v['baseline'], child(p, 'baseline'))
+            _s134(v['baseline'], p + '/baseline')
         if 'metrics' in v:
-            _s137(v['metrics'], child(p, 'metrics'))
+            _s137(v['metrics'], p + '/metrics')
         if 'tolerance_basis_points' in v:
-            _s141(v['tolerance_basis_points'], child(p, 'tolerance_basis_points'))
+            _s141(v['tolerance_basis_points'], p + '/tolerance_basis_points')
 
 
 def _s131(v: object, p: str) -> None:
@@ -1422,17 +1580,17 @@ def _s131(v: object, p: str) -> None:
 
 
 def _s145(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C77) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s147(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cobertura', 'html', 'json', 'lcov', 'term')):
+    if not (v.__class__ is str and v in _C78) and not any(json_equal(v, e) for e in ('cobertura', 'html', 'json', 'lcov', 'term')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s146(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 5:
@@ -1442,31 +1600,32 @@ def _s146(v: object, p: str) -> None:
 
 
 def _s144(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C76:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s145(v['source'], child(p, 'source'))
+            _s145(v['source'], p + '/source')
         if 'value' in v:
-            _s146(v['value'], child(p, 'value'))
+            _s146(v['value'], p + '/value')
 
 
 def _s149(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C80) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s150(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 9223372036854775807:
@@ -1474,51 +1633,53 @@ def _s150(v: object, p: str) -> None:
 
 
 def _s148(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C79:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s149(v['source'], child(p, 'source'))
+            _s149(v['source'], p + '/source')
         if 'value' in v:
-            _s150(v['value'], child(p, 'value'))
+            _s150(v['value'], p + '/value')
 
 
 def _s152(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C82) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s153(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s151(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C81:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s152(v['source'], child(p, 'source'))
+            _s152(v['source'], p + '/source')
         if 'value' in v:
-            _s153(v['value'], child(p, 'value'))
+            _s153(v['value'], p + '/value')
 
 
 def _s157(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C85) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1528,9 +1689,9 @@ def _s159(v: object, p: str) -> None:
 
 
 def _s160(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1544,24 +1705,25 @@ def _s158(v: object, p: str) -> None:
 
 
 def _s156(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C84:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s157(v['source'], child(p, 'source'))
+            _s157(v['source'], p + '/source')
         if 'value' in v:
-            _s158(v['value'], child(p, 'value'))
+            _s158(v['value'], p + '/value')
 
 
 def _s162(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C87) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1571,9 +1733,9 @@ def _s164(v: object, p: str) -> None:
 
 
 def _s165(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1587,24 +1749,25 @@ def _s163(v: object, p: str) -> None:
 
 
 def _s161(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C86:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s162(v['source'], child(p, 'source'))
+            _s162(v['source'], p + '/source')
         if 'value' in v:
-            _s163(v['value'], child(p, 'value'))
+            _s163(v['value'], p + '/value')
 
 
 def _s167(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C89) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1614,9 +1777,9 @@ def _s169(v: object, p: str) -> None:
 
 
 def _s170(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1630,24 +1793,25 @@ def _s168(v: object, p: str) -> None:
 
 
 def _s166(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C88:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s167(v['source'], child(p, 'source'))
+            _s167(v['source'], p + '/source')
         if 'value' in v:
-            _s168(v['value'], child(p, 'value'))
+            _s168(v['value'], p + '/value')
 
 
 def _s172(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C91) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1657,7 +1821,7 @@ def _s174(v: object, p: str) -> None:
 
 
 def _s176(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) > 4096:
@@ -1665,7 +1829,7 @@ def _s176(v: object, p: str) -> None:
 
 
 def _s175(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -1679,24 +1843,25 @@ def _s173(v: object, p: str) -> None:
 
 
 def _s171(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C90:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s172(v['source'], child(p, 'source'))
+            _s172(v['source'], p + '/source')
         if 'value' in v:
-            _s173(v['value'], child(p, 'value'))
+            _s173(v['value'], p + '/value')
 
 
 def _s178(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C93) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1706,9 +1871,9 @@ def _s180(v: object, p: str) -> None:
 
 
 def _s181(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1722,29 +1887,30 @@ def _s179(v: object, p: str) -> None:
 
 
 def _s177(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C92:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s178(v['source'], child(p, 'source'))
+            _s178(v['source'], p + '/source')
         if 'value' in v:
-            _s179(v['value'], child(p, 'value'))
+            _s179(v['value'], p + '/value')
 
 
 def _s183(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C95) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s184(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -1754,24 +1920,25 @@ def _s184(v: object, p: str) -> None:
 
 
 def _s182(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C94:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s183(v['source'], child(p, 'source'))
+            _s183(v['source'], p + '/source')
         if 'value' in v:
-            _s184(v['value'], child(p, 'value'))
+            _s184(v['value'], p + '/value')
 
 
 def _s186(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C97) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1781,7 +1948,7 @@ def _s188(v: object, p: str) -> None:
 
 
 def _s190(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -1791,7 +1958,7 @@ def _s190(v: object, p: str) -> None:
 
 
 def _s189(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -1805,24 +1972,25 @@ def _s187(v: object, p: str) -> None:
 
 
 def _s185(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C96:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s186(v['source'], child(p, 'source'))
+            _s186(v['source'], p + '/source')
         if 'value' in v:
-            _s187(v['value'], child(p, 'value'))
+            _s187(v['value'], p + '/value')
 
 
 def _s192(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C99) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1832,9 +2000,9 @@ def _s194(v: object, p: str) -> None:
 
 
 def _s195(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1848,24 +2016,25 @@ def _s193(v: object, p: str) -> None:
 
 
 def _s191(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C98:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s192(v['source'], child(p, 'source'))
+            _s192(v['source'], p + '/source')
         if 'value' in v:
-            _s193(v['value'], child(p, 'value'))
+            _s193(v['value'], p + '/value')
 
 
 def _s197(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C101) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1875,7 +2044,7 @@ def _s199(v: object, p: str) -> None:
 
 
 def _s201(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -1885,7 +2054,7 @@ def _s201(v: object, p: str) -> None:
 
 
 def _s200(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -1899,24 +2068,25 @@ def _s198(v: object, p: str) -> None:
 
 
 def _s196(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C100:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s197(v['source'], child(p, 'source'))
+            _s197(v['source'], p + '/source')
         if 'value' in v:
-            _s198(v['value'], child(p, 'value'))
+            _s198(v['value'], p + '/value')
 
 
 def _s155(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'branch' not in v:
@@ -1937,31 +2107,32 @@ def _s155(v: object, p: str) -> None:
             fail(p, 'required', 'missing property region')
         if 'sources' not in v:
             fail(p, 'required', 'missing property sources')
-        for k in sorted(v, key=_utf8):
-            if k not in ('branch', 'contract', 'function', 'include', 'line', 'name', 'packages', 'region', 'sources'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C83:
+            for k in sorted(v, key=_utf8):
+                if k not in ('branch', 'contract', 'function', 'include', 'line', 'name', 'packages', 'region', 'sources'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'branch' in v:
-            _s156(v['branch'], child(p, 'branch'))
+            _s156(v['branch'], p + '/branch')
         if 'contract' in v:
-            _s161(v['contract'], child(p, 'contract'))
+            _s161(v['contract'], p + '/contract')
         if 'function' in v:
-            _s166(v['function'], child(p, 'function'))
+            _s166(v['function'], p + '/function')
         if 'include' in v:
-            _s171(v['include'], child(p, 'include'))
+            _s171(v['include'], p + '/include')
         if 'line' in v:
-            _s177(v['line'], child(p, 'line'))
+            _s177(v['line'], p + '/line')
         if 'name' in v:
-            _s182(v['name'], child(p, 'name'))
+            _s182(v['name'], p + '/name')
         if 'packages' in v:
-            _s185(v['packages'], child(p, 'packages'))
+            _s185(v['packages'], p + '/packages')
         if 'region' in v:
-            _s191(v['region'], child(p, 'region'))
+            _s191(v['region'], p + '/region')
         if 'sources' in v:
-            _s196(v['sources'], child(p, 'sources'))
+            _s196(v['sources'], p + '/sources')
 
 
 def _s154(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         for i in range(0, len(v)):
@@ -1969,7 +2140,7 @@ def _s154(v: object, p: str) -> None:
 
 
 def _s204(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C104) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -1979,9 +2150,9 @@ def _s206(v: object, p: str) -> None:
 
 
 def _s207(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -1995,24 +2166,25 @@ def _s205(v: object, p: str) -> None:
 
 
 def _s203(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C103:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s204(v['source'], child(p, 'source'))
+            _s204(v['source'], p + '/source')
         if 'value' in v:
-            _s205(v['value'], child(p, 'value'))
+            _s205(v['value'], p + '/value')
 
 
 def _s209(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C106) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -2022,9 +2194,9 @@ def _s211(v: object, p: str) -> None:
 
 
 def _s212(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -2038,24 +2210,25 @@ def _s210(v: object, p: str) -> None:
 
 
 def _s208(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C105:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s209(v['source'], child(p, 'source'))
+            _s209(v['source'], p + '/source')
         if 'value' in v:
-            _s210(v['value'], child(p, 'value'))
+            _s210(v['value'], p + '/value')
 
 
 def _s214(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C108) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -2065,9 +2238,9 @@ def _s216(v: object, p: str) -> None:
 
 
 def _s217(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -2081,24 +2254,25 @@ def _s215(v: object, p: str) -> None:
 
 
 def _s213(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C107:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s214(v['source'], child(p, 'source'))
+            _s214(v['source'], p + '/source')
         if 'value' in v:
-            _s215(v['value'], child(p, 'value'))
+            _s215(v['value'], p + '/value')
 
 
 def _s219(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C110) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -2108,9 +2282,9 @@ def _s221(v: object, p: str) -> None:
 
 
 def _s222(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -2124,24 +2298,25 @@ def _s220(v: object, p: str) -> None:
 
 
 def _s218(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C109:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s219(v['source'], child(p, 'source'))
+            _s219(v['source'], p + '/source')
         if 'value' in v:
-            _s220(v['value'], child(p, 'value'))
+            _s220(v['value'], p + '/value')
 
 
 def _s224(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C112) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -2151,9 +2326,9 @@ def _s226(v: object, p: str) -> None:
 
 
 def _s227(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 10000:
@@ -2167,24 +2342,25 @@ def _s225(v: object, p: str) -> None:
 
 
 def _s223(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C111:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s224(v['source'], child(p, 'source'))
+            _s224(v['source'], p + '/source')
         if 'value' in v:
-            _s225(v['value'], child(p, 'value'))
+            _s225(v['value'], p + '/value')
 
 
 def _s202(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'branch' not in v:
@@ -2197,23 +2373,24 @@ def _s202(v: object, p: str) -> None:
             fail(p, 'required', 'missing property line')
         if 'region' not in v:
             fail(p, 'required', 'missing property region')
-        for k in sorted(v, key=_utf8):
-            if k not in ('branch', 'contract', 'function', 'line', 'region'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C102:
+            for k in sorted(v, key=_utf8):
+                if k not in ('branch', 'contract', 'function', 'line', 'region'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'branch' in v:
-            _s203(v['branch'], child(p, 'branch'))
+            _s203(v['branch'], p + '/branch')
         if 'contract' in v:
-            _s208(v['contract'], child(p, 'contract'))
+            _s208(v['contract'], p + '/contract')
         if 'function' in v:
-            _s213(v['function'], child(p, 'function'))
+            _s213(v['function'], p + '/function')
         if 'line' in v:
-            _s218(v['line'], child(p, 'line'))
+            _s218(v['line'], p + '/line')
         if 'region' in v:
-            _s223(v['region'], child(p, 'region'))
+            _s223(v['region'], p + '/region')
 
 
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'context' not in v:
@@ -2244,122 +2421,126 @@ def _s1(v: object, p: str) -> None:
             fail(p, 'required', 'missing property scopes')
         if 'thresholds' not in v:
             fail(p, 'required', 'missing property thresholds')
-        for k in sorted(v, key=_utf8):
-            if k not in ('context', 'diff', 'empty', 'entities', 'exclusions', 'integrity', 'limits', 'output_dir', 'ratchet', 'reports', 'reproducible_epoch', 'schema', 'scopes', 'thresholds'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C1:
+            for k in sorted(v, key=_utf8):
+                if k not in ('context', 'diff', 'empty', 'entities', 'exclusions', 'integrity', 'limits', 'output_dir', 'ratchet', 'reports', 'reproducible_epoch', 'schema', 'scopes', 'thresholds'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'context' in v:
-            _s2(v['context'], child(p, 'context'))
+            _s2(v['context'], p + '/context')
         if 'diff' in v:
-            _s7(v['diff'], child(p, 'diff'))
+            _s7(v['diff'], p + '/diff')
         if 'empty' in v:
-            _s28(v['empty'], child(p, 'empty'))
+            _s28(v['empty'], p + '/empty')
         if 'entities' in v:
-            _s31(v['entities'], child(p, 'entities'))
+            _s31(v['entities'], p + '/entities')
         if 'exclusions' in v:
-            _s70(v['exclusions'], child(p, 'exclusions'))
+            _s70(v['exclusions'], p + '/exclusions')
         if 'integrity' in v:
-            _s109(v['integrity'], child(p, 'integrity'))
+            _s109(v['integrity'], p + '/integrity')
         if 'limits' in v:
-            _s113(v['limits'], child(p, 'limits'))
+            _s113(v['limits'], p + '/limits')
         if 'output_dir' in v:
-            _s128(v['output_dir'], child(p, 'output_dir'))
+            _s128(v['output_dir'], p + '/output_dir')
         if 'ratchet' in v:
-            _s131(v['ratchet'], child(p, 'ratchet'))
+            _s131(v['ratchet'], p + '/ratchet')
         if 'reports' in v:
-            _s144(v['reports'], child(p, 'reports'))
+            _s144(v['reports'], p + '/reports')
         if 'reproducible_epoch' in v:
-            _s148(v['reproducible_epoch'], child(p, 'reproducible_epoch'))
+            _s148(v['reproducible_epoch'], p + '/reproducible_epoch')
         if 'schema' in v:
-            _s151(v['schema'], child(p, 'schema'))
+            _s151(v['schema'], p + '/schema')
         if 'scopes' in v:
-            _s154(v['scopes'], child(p, 'scopes'))
+            _s154(v['scopes'], p + '/scopes')
         if 'thresholds' in v:
-            _s202(v['thresholds'], child(p, 'thresholds'))
+            _s202(v['thresholds'], p + '/thresholds')
 
 
 def _s230(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C115) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s231(v: object, p: str) -> None:
-    if not is_type(v, 'boolean'):
+    if v.__class__ is not bool and not is_type(v, 'boolean'):
         fail(p, 'type', 'expected boolean')
 
 
 def _s229(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C114:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s230(v['source'], child(p, 'source'))
+            _s230(v['source'], p + '/source')
         if 'value' in v:
-            _s231(v['value'], child(p, 'value'))
+            _s231(v['value'], p + '/value')
 
 
 def _s233(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
+    if not (v.__class__ is str and v in _C117) and not any(json_equal(v, e) for e in ('cli', 'default', 'sv0.toml')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s234(v: object, p: str) -> None:
-    if not is_type(v, 'boolean'):
+    if v.__class__ is not bool and not is_type(v, 'boolean'):
         fail(p, 'type', 'expected boolean')
 
 
 def _s232(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'source' not in v:
             fail(p, 'required', 'missing property source')
         if 'value' not in v:
             fail(p, 'required', 'missing property value')
-        for k in sorted(v, key=_utf8):
-            if k not in ('source', 'value'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C116:
+            for k in sorted(v, key=_utf8):
+                if k not in ('source', 'value'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'source' in v:
-            _s233(v['source'], child(p, 'source'))
+            _s233(v['source'], p + '/source')
         if 'value' in v:
-            _s234(v['value'], child(p, 'value'))
+            _s234(v['value'], p + '/value')
 
 
 def _s228(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'allow_lossy_saturated_export' not in v:
             fail(p, 'required', 'missing property allow_lossy_saturated_export')
         if 'allow_source_mismatch' not in v:
             fail(p, 'required', 'missing property allow_source_mismatch')
-        for k in sorted(v, key=_utf8):
-            if k not in ('allow_lossy_saturated_export', 'allow_source_mismatch'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C113:
+            for k in sorted(v, key=_utf8):
+                if k not in ('allow_lossy_saturated_export', 'allow_source_mismatch'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'allow_lossy_saturated_export' in v:
-            _s229(v['allow_lossy_saturated_export'], child(p, 'allow_lossy_saturated_export'))
+            _s229(v['allow_lossy_saturated_export'], p + '/allow_lossy_saturated_export')
         if 'allow_source_mismatch' in v:
-            _s232(v['allow_source_mismatch'], child(p, 'allow_source_mismatch'))
+            _s232(v['allow_source_mismatch'], p + '/allow_source_mismatch')
 
 
 def _s235(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.resolved-configuration'):
+    if not (v.__class__ is str and v == 'sv0cov.resolved-configuration') and not json_equal(v, 'sv0cov.resolved-configuration'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s236(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'coverage' not in v:
@@ -2370,17 +2551,18 @@ def _s0(v: object, p: str) -> None:
             fail(p, 'required', 'missing property schema')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('coverage', 'report', 'schema', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('coverage', 'report', 'schema', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'coverage' in v:
-            _s1(v['coverage'], child(p, 'coverage'))
+            _s1(v['coverage'], p + '/coverage')
         if 'report' in v:
-            _s228(v['report'], child(p, 'report'))
+            _s228(v['report'], p + '/report')
         if 'schema' in v:
-            _s235(v['schema'], child(p, 'schema'))
+            _s235(v['schema'], p + '/schema')
         if 'version' in v:
-            _s236(v['version'], child(p, 'version'))
+            _s236(v['version'], p + '/version')
 
 
 def _s237(v: object, p: str) -> None:

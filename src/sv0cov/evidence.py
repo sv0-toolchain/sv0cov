@@ -185,8 +185,11 @@ def report_of(ctx: cli.Context, data: bytes, *, standard_export: bool = False,
         except gitdiff.GitDiffError as exc:
             raise git_stop(exc) from None
     try:
-        build = build_report if native is None else rebuild_report
-        encoded = encode(build(data, config, sources, standard_export=standard_export, changes=changes, ratchet=ratchet_input(ctx)))
+        args = dict(standard_export=standard_export, changes=changes, ratchet=ratchet_input(ctx))
+        if native is None:  # the evidence was read above; it is not read twice
+            encoded = encode(build_report(data, config, sources, read=indexed, **args))
+        else:
+            encoded = encode(rebuild_report(data, config, sources, **args))
         return read_report(encoded, tier=tier), encoded
     except ReportError as exc:
         if exc.code in REFUSAL_EXIT:

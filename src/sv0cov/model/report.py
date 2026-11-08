@@ -71,6 +71,8 @@ does not have), ``COV5001`` something this build cannot evaluate.
 
 from __future__ import annotations
 
+import functools
+
 import hashlib
 from bisect import bisect_left
 from math import gcd
@@ -136,6 +138,36 @@ class _Detail:
     def _root(self, rec: dict) -> bool:
         return rec["source_index"] in self.root
 
+    @functools.cached_property
+    def _by_entity(self) -> dict:
+        """Per-entity unit lists, each in the order of the full list it filters, so the per-entity
+        queries below cost what the entity owns instead of a scan of every unit (CV-428)."""
+        r = self.r
+        regions: dict = {}
+        for i in self.regions:
+            regions.setdefault(r["regions"][i]["entity_index"], []).append(i)
+        outcomes: dict = {}
+        for b, o in self.outcomes:
+            outcomes.setdefault(r["branches"][b]["entity_index"], []).append((b, o))
+        clauses: dict = {}
+        for field in ("entity_index", "function_entity_index"):
+            by: dict = {}
+            for i in self.clauses:
+                by.setdefault(r["contracts"][i][field], []).append(i)
+            clauses[field] = by
+        lines_of: dict = {}  # region index -> positions of the lines listing it, ascending
+        for k, line in enumerate(r["lines"]):
+            for i in line["region_indices"]:
+                lines_of.setdefault(i, []).append(k)
+        return {"regions": regions, "outcomes": outcomes, "clauses": clauses, "lines_of": lines_of,
+                "functions": set(self.functions), "clause_set": set(self.clauses)}
+
+    def _owned_lines(self, n: int) -> tuple[set[int], list[int]]:
+        """The regions entity ``n`` owns and, ascending, the positions of the lines that list one."""
+        ix = self._by_entity
+        owned = set(ix["regions"].get(n, ()))
+        return owned, sorted({k for i in owned for k in ix["lines_of"].get(i, ())})
+
     def _metric(self, covered: int, total: int, partial: int | None = None) -> dict:
         return {"covered": covered, "partial": partial, "ratio": ratio(covered, total), "total": total}
 
@@ -168,25 +200,28 @@ class _Detail:
 
     def entity(self, e: dict) -> dict:
         """SPEC 22.2.1: only what the entity owns."""
-        n, r = e["entity_index"], self.r
+        n, r, ix = e["entity_index"], self.r, self._by_entity
         if e["kind"] == "contract":
-            own = [c for c in r["contracts"] if c["entity_index"] == n and c["clause_index"] in self.clauses]
+            own = [c for c in r["contracts"] if c["entity_index"] == n and c["clause_index"] in ix["clause_set"]]
             covered = sum(c["count_true"]["value"] + c["count_false"]["value"] > 0 for c in own)
             return {"branch": None, "contract": self._metric(covered, len(own)), "function": None, "line": None, "region": None}
-        owned = {i for i in self.regions if r["regions"][i]["entity_index"] == n}
+        owned, line_positions = self._owned_lines(n)
         covered = partial = total = 0
-        for line in r["lines"]:
-            ran = [r["regions"][i]["count"]["value"] > 0 for i in line["region_indices"] if i in owned]
+        for k in line_positions:
+            ran = [r["regions"][i]["count"]["value"] > 0 for i in r["lines"][k]["region_indices"] if i in owned]
             if ran:
                 total += 1
                 covered += all(ran)
                 partial += any(ran) and not all(ran)
-        mine = lambda rec: rec["entity_index"] == n  # noqa: E731
-        return {"branch": self._branches(mine),
-                "contract": self._contracts(lambda c: c["function_entity_index"] == n),
-                "function": self._metric(int(n in self.functions and self.entry[n]["count"]["value"] > 0), int(n in self.functions)),
+        outcomes = ix["outcomes"].get(n, [])
+        regions = [r["regions"][i] for i in ix["regions"].get(n, ())]
+        contracts = [r["contracts"][i] for i in ix["clauses"]["function_entity_index"].get(n, ())]
+        is_function = n in ix["functions"]
+        return {"branch": self._metric(sum(o["status"] == "covered" for _, o in outcomes), len(outcomes)),
+                "contract": self._metric(sum(c["count_true"]["value"] + c["count_false"]["value"] > 0 for c in contracts), len(contracts)),
+                "function": self._metric(int(is_function and self.entry[n]["count"]["value"] > 0), int(is_function)),
                 "line": self._metric(covered, total, partial),
-                "region": self._regions(mine)}
+                "region": self._metric(sum(x["count"]["value"] > 0 for x in regions), len(regions))}
 
     def members(self, metric: str, keep=None) -> list[int]:
         """The denominator membership of ``metric`` over the units ``keep``
@@ -205,18 +240,17 @@ class _Detail:
 
     def entity_members(self, e: dict, metric: str) -> list[int]:
         """SPEC 22.2.1: the denominator membership of ``metric`` for the entity."""
-        n, r = e["entity_index"], self.r
+        n, r, ix = e["entity_index"], self.r, self._by_entity
         if metric == "function":
             return [n]
         if metric == "contract":
             field = "entity_index" if e["kind"] == "contract" else "function_entity_index"
-            return [i for i in self.clauses if r["contracts"][i][field] == n]
+            return list(ix["clauses"][field].get(n, ()))
         if metric == "region":
-            return [i for i in self.regions if r["regions"][i]["entity_index"] == n]
+            return list(ix["regions"].get(n, ()))
         if metric == "branch":
-            return sorted({b for b, _ in self.outcomes if r["branches"][b]["entity_index"] == n})
-        owned = {i for i in self.regions if r["regions"][i]["entity_index"] == n}
-        return [x["line_index"] for x in r["lines"] if any(i in owned for i in x["region_indices"])]
+            return sorted({b for b, _ in ix["outcomes"].get(n, ())})
+        return [r["lines"][k]["line_index"] for k in self._owned_lines(n)[1]]
 
 
 def _line_indices(r: dict, affected: dict) -> list[int]:
@@ -708,7 +742,8 @@ def _ineligible_uses(r: dict, standard_export: bool) -> list[str]:
 
 
 def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes | None], *, standard_export: bool = False,
-                 tool_version: str | None = None, changes: dict | None = None, ratchet: dict | None = None) -> dict:
+                 tool_version: str | None = None, changes: dict | None = None, ratchet: dict | None = None,
+                 read: dict | None = None) -> dict:
     """The ``sv0cov.report`` 1.0 object for canonical indexed bytes.
 
     ``sources`` gives the current bytes of each source path of the evidence
@@ -719,10 +754,12 @@ def build_report(indexed: bytes, config: Resolved, sources: Mapping[str, bytes |
     policy is configured. ``ratchet`` is what a ratchet policy compares
     with: ``{"data": <baseline bytes or None>, "head": <commit or None>,
     "ancestor": <bool or None>}``, required exactly when one is configured.
+    ``read``, when given, is what :func:`sv0cov.model.indexed.read_indexed`
+    returned for these very bytes under this tier; it is not read again.
     Raises
     :class:`ReportError`, or ``IndexedError`` for invalid evidence."""
     tier = config.tier().name
-    ix = _ix.read_indexed(indexed, tier=tier)
+    ix = read if read is not None else _ix.read_indexed(indexed, tier=tier)
     return _produce(ix, hashlib.sha256(indexed).hexdigest(), config, sources, standard_export=standard_export,
                     tool_version=tool_version, changes=changes, ratchet=ratchet)
 

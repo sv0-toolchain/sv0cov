@@ -83,7 +83,8 @@ def check_expression(expr: object, counted: Iterable[str] | None = None) -> list
     COV1010. ``counted`` (when given) is the set of runtime-counted point IDs."""
     if not isinstance(expr, dict) or set(expr) != {"terms"} or not isinstance(expr["terms"], list):
         raise ExprError("COV1010", "a counter expression is an object with exactly `terms` (an array)")
-    allowed = None if counted is None else set(counted)
+    # Callers pass one point set for every region of a map: copying it per call is quadratic.
+    allowed = None if counted is None else counted if isinstance(counted, (set, frozenset, dict)) else set(counted)
     out: list[tuple[int, str]] = []
     prev: bytes | None = None
     for t in expr["terms"]:

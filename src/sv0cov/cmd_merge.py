@@ -56,7 +56,6 @@ from sv0cov import cli
 from sv0cov.diagnostics import Diagnostic
 from sv0cov.formats.map import map_limits
 from sv0cov.formats.rawprofile import Tier
-from sv0cov.model.indexed import read_indexed
 from sv0cov.model.merge import Artifact, MergeError, merge, select_runs
 from sv0cov.publish import PublishError, check_destination, publish_file, publish_stdout
 
@@ -197,14 +196,13 @@ def cmd_merge(ctx: cli.Context) -> int:
     if not result.publishable:
         return cli.EXIT_EVIDENCE
 
-    def validate(data: bytes) -> None:
-        read_indexed(data, tier=tier.name)
-
+    # No second validator: merge() has already read these very bytes back with read_indexed,
+    # and publication compares what it wrote with them.
     try:
         if to_stdout:
-            publish_stdout(console.binary_stdout(), result.data, validate=validate)
+            publish_stdout(console.binary_stdout(), result.data)
         else:
-            publish_file(final, result.data, anchor=anchor, validate=validate)
+            publish_file(final, result.data, anchor=anchor)
     except PublishError as exc:
         if to_stdout:
             console.abandon_stdout()

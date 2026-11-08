@@ -32,7 +32,11 @@ def fail(pointer: str, keyword: str, detail: str) -> None:
 
 def child(pointer: str, token: str | int) -> str:
     """Append one JSON pointer reference token."""
-    t = str(token).replace("~", "~0").replace("/", "~1")
+    if token.__class__ is int:  # called for every array element: skip the escaping
+        return f"{pointer}/{token}"
+    t = str(token)
+    if "~" in t or "/" in t:
+        t = t.replace("~", "~0").replace("/", "~1")
     return f"{pointer}/{t}"
 
 

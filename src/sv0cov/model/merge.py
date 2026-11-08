@@ -200,8 +200,19 @@ def merge(
     saturation_policy: str = "fail",
 ) -> MergeResult:
     """Classify every input, then combine the accepted ones."""
-    tier = tier or Tier.standard()
-    map_arts, profile_arts = list(maps), list(profiles)
+    args = (list(maps), list(profiles), run_selection, allow_rejected_inputs, tier or Tier.standard(), execution,
+            tool_version, saturation_policy)
+    # Checking map compatibility costs a whole semantic build. The combined build covers it: when
+    # it succeeds over every valid map, the maps are compatible and the check would have found no
+    # conflict. Anything else is redone from scratch with the check, so results never differ.
+    try:
+        return _merge(*args, optimistic=True)
+    except Exception:  # noqa: BLE001 - the checked path below raises whatever applies
+        return _merge(*args, optimistic=False)
+
+
+def _merge(map_arts: list[Artifact], profile_arts: list[Artifact], run_selection: RunSelection, allow_rejected_inputs: bool,
+           tier: Tier, execution: dict | None, tool_version: str | None, saturation_policy: str, *, optimistic: bool) -> MergeResult:
     # A finding belongs to the artifact, not to its name: two files may share a basename.
     found: dict[tuple[str, Artifact], dict[str, str]] = {}
 
@@ -221,7 +232,7 @@ def merge(
             decoded[a] = validate_map(a.data, limits=map_limits(tier.name))
         except MapError as exc:
             reject("map", a, exc.code, exc.detail)
-    conflicting = _conflicting({m["map_id"]: m for m in decoded.values()})
+    conflicting = set() if optimistic else _conflicting({m["map_id"]: m for m in decoded.values()})
     accepted_maps: dict[str, dict] = {}
     for a, m in decoded.items():
         if m["map_id"] in conflicting:
@@ -294,12 +305,16 @@ def merge(
                             allow_rejected_inputs=allow_rejected_inputs, tier=tier, tool_version=tool_version,
                             saturation_policy=saturation_policy)
         data = encode(obj)
-        read_indexed(data, tier=tier.name)
+        diagnostics, complete = obj["diagnostics"], obj["semantic"]["complete"]
+        # The build-side objects are dead; drop them before the read-back holds its own copy.
+        del obj, map_inputs, profile_inputs, decoded, accepted_maps, alone, accepted, regions
+        m = None  # the map loop variable, when there was a map, still pins one
+        indexed = read_indexed(data, tier=tier.name)
     except (ModelError, IndexedError) as exc:
         raise MergeError("COV3002", f"the classified inputs do not form valid evidence: {exc}") from exc
 
     findings = [Finding(code, kind, a.name, detail) for (kind, a), by_code in found.items() for code, detail in by_code.items()]
-    findings += [Finding(code, "merge", None, GLOBAL_DETAIL[code]) for code in obj["diagnostics"]]
+    findings += [Finding(code, "merge", None, GLOBAL_DETAIL[code]) for code in diagnostics]
     duplicates = []
     for kind, arts in (("map", map_arts), ("profile", profile_arts)):
         names: dict[str, list[str]] = {}
@@ -308,8 +323,7 @@ def merge(
                 names.setdefault(hashlib.sha256(a.data).hexdigest(), []).append(a.name)
         duplicates += [Duplicate(kind, min(ns, key=lambda n: n.encode("utf-8")), sha, len(ns) - 1)
                        for sha, ns in names.items() if len(ns) > 1]
-    complete = obj["semantic"]["complete"]
     return MergeResult(
-        indexed=obj, data=data, complete=complete, publishable=complete or allow_rejected_inputs,
+        indexed=indexed, data=data, complete=complete, publishable=complete or allow_rejected_inputs,
         findings=tuple(sorted(set(findings), key=lambda f: (f.kind, (f.name or "").encode("utf-8"), f.code, f.detail))),
         duplicates=tuple(sorted(duplicates, key=lambda d: (d.kind, d.artifact_sha256))))

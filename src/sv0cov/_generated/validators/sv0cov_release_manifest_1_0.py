@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.release-manifest-1.0.schema.json
 # schema-sha256: a78bda572fea2095538191fb0a62d9c35d3fe3716be1cea5b1a8230588e6454c
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.release-manifest 1.0."""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sv0cov.formats.structural import (
 SCHEMA_NAME = 'sv0cov.release-manifest'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = 'a78bda572fea2095538191fb0a62d9c35d3fe3716be1cea5b1a8230588e6454c'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -36,8 +36,15 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('filename', 'media_type', 'role', 'sha256', 'size'))
+_C1 = frozenset(('conformance', 'documentation', 'evidence', 'license', 'package', 'protocol', 'sbom', 'source', 'support'))
+_C2 = frozenset(('expected_issuer', 'offline_bundle_retention', 'online_verification', 'repository', 'subject_digest_algorithm', 'workflow'))
+_C3 = frozenset(('artifacts', 'attestation_policy', 'compatibility_policy_sha256', 'diagnostic_registry', 'evidence_manifest_sha256', 'license_inventory_sha256', 'product', 'release_commit', 'release_manifest_sha256', 'release_tag', 'sbom_sha256', 'schema', 'source_date_epoch', 'version'))
+_C4 = frozenset(('revision', 'sha256'))
+
+
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -47,7 +54,7 @@ def _s1(v: object, p: str) -> None:
 
 
 def _s2(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -57,9 +64,9 @@ def _s2(v: object, p: str) -> None:
 
 
 def _s3(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
-    if not any(json_equal(v, e) for e in ('conformance', 'documentation', 'evidence', 'license', 'package', 'protocol', 'sbom', 'source', 'support')):
+    if not (v.__class__ is str and v in _C1) and not any(json_equal(v, e) for e in ('conformance', 'documentation', 'evidence', 'license', 'package', 'protocol', 'sbom', 'source', 'support')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -68,9 +75,9 @@ def _s4(v: object, p: str) -> None:
 
 
 def _s5(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 68719476736:
@@ -78,7 +85,7 @@ def _s5(v: object, p: str) -> None:
 
 
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'filename' not in v:
@@ -91,23 +98,24 @@ def _s0(v: object, p: str) -> None:
             fail(p, 'required', 'missing property sha256')
         if 'size' not in v:
             fail(p, 'required', 'missing property size')
-        for k in sorted(v, key=_utf8):
-            if k not in ('filename', 'media_type', 'role', 'sha256', 'size'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('filename', 'media_type', 'role', 'sha256', 'size'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'filename' in v:
-            _s1(v['filename'], child(p, 'filename'))
+            _s1(v['filename'], p + '/filename')
         if 'media_type' in v:
-            _s2(v['media_type'], child(p, 'media_type'))
+            _s2(v['media_type'], p + '/media_type')
         if 'role' in v:
-            _s3(v['role'], child(p, 'role'))
+            _s3(v['role'], p + '/role')
         if 'sha256' in v:
-            _s4(v['sha256'], child(p, 'sha256'))
+            _s4(v['sha256'], p + '/sha256')
         if 'size' in v:
-            _s5(v['size'], child(p, 'size'))
+            _s5(v['size'], p + '/size')
 
 
 def _s7(v: object, p: str) -> None:
-    if not json_equal(v, 'https://token.actions.githubusercontent.com'):
+    if not (v.__class__ is str and v == 'https://token.actions.githubusercontent.com') and not json_equal(v, 'https://token.actions.githubusercontent.com'):
         fail(p, 'const', 'value differs from the constant')
 
 
@@ -122,22 +130,22 @@ def _s9(v: object, p: str) -> None:
 
 
 def _s10(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0-toolchain/sv0cov'):
+    if not (v.__class__ is str and v == 'sv0-toolchain/sv0cov') and not json_equal(v, 'sv0-toolchain/sv0cov'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s11(v: object, p: str) -> None:
-    if not json_equal(v, 'sha256'):
+    if not (v.__class__ is str and v == 'sha256') and not json_equal(v, 'sha256'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s12(v: object, p: str) -> None:
-    if not json_equal(v, '.github/workflows/release.yml'):
+    if not (v.__class__ is str and v == '.github/workflows/release.yml') and not json_equal(v, '.github/workflows/release.yml'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s6(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'expected_issuer' not in v:
@@ -152,25 +160,26 @@ def _s6(v: object, p: str) -> None:
             fail(p, 'required', 'missing property subject_digest_algorithm')
         if 'workflow' not in v:
             fail(p, 'required', 'missing property workflow')
-        for k in sorted(v, key=_utf8):
-            if k not in ('expected_issuer', 'offline_bundle_retention', 'online_verification', 'repository', 'subject_digest_algorithm', 'workflow'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C2:
+            for k in sorted(v, key=_utf8):
+                if k not in ('expected_issuer', 'offline_bundle_retention', 'online_verification', 'repository', 'subject_digest_algorithm', 'workflow'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'expected_issuer' in v:
-            _s7(v['expected_issuer'], child(p, 'expected_issuer'))
+            _s7(v['expected_issuer'], p + '/expected_issuer')
         if 'offline_bundle_retention' in v:
-            _s8(v['offline_bundle_retention'], child(p, 'offline_bundle_retention'))
+            _s8(v['offline_bundle_retention'], p + '/offline_bundle_retention')
         if 'online_verification' in v:
-            _s9(v['online_verification'], child(p, 'online_verification'))
+            _s9(v['online_verification'], p + '/online_verification')
         if 'repository' in v:
-            _s10(v['repository'], child(p, 'repository'))
+            _s10(v['repository'], p + '/repository')
         if 'subject_digest_algorithm' in v:
-            _s11(v['subject_digest_algorithm'], child(p, 'subject_digest_algorithm'))
+            _s11(v['subject_digest_algorithm'], p + '/subject_digest_algorithm')
         if 'workflow' in v:
-            _s12(v['workflow'], child(p, 'workflow'))
+            _s12(v['workflow'], p + '/workflow')
 
 
 def _s13(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 64:
@@ -184,7 +193,7 @@ def _s16(v: object, p: str) -> None:
 
 
 def _s15(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 3:
@@ -216,12 +225,12 @@ def _s21(v: object, p: str) -> None:
 
 
 def _s22(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov'):
+    if not (v.__class__ is str and v == 'sv0cov') and not json_equal(v, 'sv0cov'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s23(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 40:
@@ -235,7 +244,7 @@ def _s24(v: object, p: str) -> None:
 
 
 def _s25(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 6:
@@ -249,14 +258,14 @@ def _s26(v: object, p: str) -> None:
 
 
 def _s27(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.release-manifest'):
+    if not (v.__class__ is str and v == 'sv0cov.release-manifest') and not json_equal(v, 'sv0cov.release-manifest'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s28(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 0:
             fail(p, 'minimum', 'below 0')
         if v > 9223372036854775807:
@@ -264,12 +273,12 @@ def _s28(v: object, p: str) -> None:
 
 
 def _s29(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s14(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'artifacts' not in v:
@@ -300,43 +309,44 @@ def _s14(v: object, p: str) -> None:
             fail(p, 'required', 'missing property source_date_epoch')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('artifacts', 'attestation_policy', 'compatibility_policy_sha256', 'diagnostic_registry', 'evidence_manifest_sha256', 'license_inventory_sha256', 'product', 'release_commit', 'release_manifest_sha256', 'release_tag', 'sbom_sha256', 'schema', 'source_date_epoch', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C3:
+            for k in sorted(v, key=_utf8):
+                if k not in ('artifacts', 'attestation_policy', 'compatibility_policy_sha256', 'diagnostic_registry', 'evidence_manifest_sha256', 'license_inventory_sha256', 'product', 'release_commit', 'release_manifest_sha256', 'release_tag', 'sbom_sha256', 'schema', 'source_date_epoch', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'artifacts' in v:
-            _s15(v['artifacts'], child(p, 'artifacts'))
+            _s15(v['artifacts'], p + '/artifacts')
         if 'attestation_policy' in v:
-            _s17(v['attestation_policy'], child(p, 'attestation_policy'))
+            _s17(v['attestation_policy'], p + '/attestation_policy')
         if 'compatibility_policy_sha256' in v:
-            _s18(v['compatibility_policy_sha256'], child(p, 'compatibility_policy_sha256'))
+            _s18(v['compatibility_policy_sha256'], p + '/compatibility_policy_sha256')
         if 'diagnostic_registry' in v:
-            _s19(v['diagnostic_registry'], child(p, 'diagnostic_registry'))
+            _s19(v['diagnostic_registry'], p + '/diagnostic_registry')
         if 'evidence_manifest_sha256' in v:
-            _s20(v['evidence_manifest_sha256'], child(p, 'evidence_manifest_sha256'))
+            _s20(v['evidence_manifest_sha256'], p + '/evidence_manifest_sha256')
         if 'license_inventory_sha256' in v:
-            _s21(v['license_inventory_sha256'], child(p, 'license_inventory_sha256'))
+            _s21(v['license_inventory_sha256'], p + '/license_inventory_sha256')
         if 'product' in v:
-            _s22(v['product'], child(p, 'product'))
+            _s22(v['product'], p + '/product')
         if 'release_commit' in v:
-            _s23(v['release_commit'], child(p, 'release_commit'))
+            _s23(v['release_commit'], p + '/release_commit')
         if 'release_manifest_sha256' in v:
-            _s24(v['release_manifest_sha256'], child(p, 'release_manifest_sha256'))
+            _s24(v['release_manifest_sha256'], p + '/release_manifest_sha256')
         if 'release_tag' in v:
-            _s25(v['release_tag'], child(p, 'release_tag'))
+            _s25(v['release_tag'], p + '/release_tag')
         if 'sbom_sha256' in v:
-            _s26(v['sbom_sha256'], child(p, 'sbom_sha256'))
+            _s26(v['sbom_sha256'], p + '/sbom_sha256')
         if 'schema' in v:
-            _s27(v['schema'], child(p, 'schema'))
+            _s27(v['schema'], p + '/schema')
         if 'source_date_epoch' in v:
-            _s28(v['source_date_epoch'], child(p, 'source_date_epoch'))
+            _s28(v['source_date_epoch'], p + '/source_date_epoch')
         if 'version' in v:
-            _s29(v['version'], child(p, 'version'))
+            _s29(v['version'], p + '/version')
 
 
 def _s31(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 1:
             fail(p, 'minimum', 'below 1')
         if v > 4294967295:
@@ -348,20 +358,21 @@ def _s32(v: object, p: str) -> None:
 
 
 def _s30(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'revision' not in v:
             fail(p, 'required', 'missing property revision')
         if 'sha256' not in v:
             fail(p, 'required', 'missing property sha256')
-        for k in sorted(v, key=_utf8):
-            if k not in ('revision', 'sha256'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C4:
+            for k in sorted(v, key=_utf8):
+                if k not in ('revision', 'sha256'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'revision' in v:
-            _s31(v['revision'], child(p, 'revision'))
+            _s31(v['revision'], p + '/revision')
         if 'sha256' in v:
-            _s32(v['sha256'], child(p, 'sha256'))
+            _s32(v['sha256'], p + '/sha256')
 
 
 def _s33(v: object, p: str) -> None:

@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from sv0cov.formats import canonical_json  # noqa: E402
 from sv0cov.formats.canonical_json import (  # noqa: E402
     INT_MAX,
     INT_MIN,
@@ -165,3 +166,52 @@ class LimitsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FastPathTest(unittest.TestCase):
+    """The stdlib-encoder fast paths (CV-428) agree with the reference paths on every input."""
+
+    INPUTS = [
+        b'{"a":1,"b":[true,null,"x"]}\n', b'{"a":1,"a":1}\n', b'{"a":1,"a":2}\n', b'{"b":1,"a":2}\n', b'-0\n', b'01\n',
+        b'1.0\n', b'1e3\n', b'NaN\n', b'18446744073709551615\n', b'18446744073709551616\n', b'-9223372036854775808\n',
+        b'-9223372036854775809\n', b'[18446744073709551616]\n', b'"\\ud800"\n', b'"\\u0041"\n', b'"\\u001f"\n', b'"\\u001F"\n',
+        b'"\\/"\n', b'"\x7f\xc3\xa9"\n', b'[ 1]\n', b'[1]', b'[1]\n\n', b'\xef\xbb\xbf[1]\n', b'"\xff"\n', b'[1,]\n',
+        b'{"k":"' + b"0" * 30 + b'"}\n', b"[" * 64 + b"]" * 64 + b"\n", b"[" * 65 + b"]" * 65 + b"\n", b"[" * 65 + b"\n",
+        b'{"a":{"b":{}}}\n', b'"' + b"x" * 40 + b'"\n',
+    ]
+
+    def outcome(self, fn, *args):
+        try:
+            return ("ok", fn(*args))
+        except CanonicalJsonError as exc:
+            return ("err", exc.reason)
+        except UnicodeEncodeError:  # the reference's lone-surrogate key; encode now names it invalid_unicode
+            return ("err", "invalid_unicode")
+
+    def test_decode_canonical_matches_the_reference(self) -> None:
+        def reference(data: bytes, limits: Limits) -> object:
+            value = decode(data, limits)
+            out: list[str] = []
+            canonical_json._encode_value(value, out, 1)
+            if ("".join(out) + "\n").encode("utf-8") != data:
+                raise CanonicalJsonError("noncanonical")
+            return value
+
+        for limits in (Limits(), Limits(max_string_bytes=32, max_container_items=2, max_depth=3)):
+            for data in self.INPUTS:
+                with self.subTest(data=data[:40], limits=limits):
+                    self.assertEqual(self.outcome(decode_canonical, data, limits), self.outcome(reference, data, limits))
+
+    def test_encode_matches_the_reference(self) -> None:
+        nested: list = []
+        for _ in range(70):
+            nested = [nested]
+        values = [{"b": [1, "x\x01\"\\\x7f\xe9\u2028", None, True, {"z": -5, "a": []}], "a": ""}, (1, (2,)), [INT_MAX + 1],
+                  [1.5], {1: 2}, ["\ud800"], {"\ud800": 1}, [object()], nested, [[[]]] * 3, [True, False, 0]]
+        for value in values:
+            with self.subTest(value=repr(value)[:40]):
+                def reference(v=value) -> bytes:
+                    out: list[str] = []
+                    canonical_json._encode_value(v, out, 1)
+                    return ("".join(out) + "\n").encode("utf-8")
+                self.assertEqual(self.outcome(encode, value), self.outcome(reference))

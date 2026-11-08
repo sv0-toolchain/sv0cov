@@ -38,7 +38,7 @@ import preflight  # noqa: E402
 
 from sv0cov.formats.canonical_json import decode_canonical  # noqa: E402  (path set by preflight)
 
-GENERATOR_FORMAT = "2"
+GENERATOR_FORMAT = "3"
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCHEMAS = ROOT / "schemas"
 DEFAULT_OUT = ROOT / "src" / "sv0cov" / "_generated" / "validators"
@@ -60,6 +60,14 @@ class _ModuleWriter:
         self.functions: list[str] = []
         self.count = 0
         self.imports: set[str] = set()
+        self.constants: list[str] = []
+
+    def constant(self, members: tuple[str, ...]) -> str:
+        """A module-level frozenset of ``members`` (written in byte order, so output stays
+        deterministic), so a check does not rebuild it per call."""
+        name = f"_C{len(self.constants)}"
+        self.constants.append(f"{name} = frozenset({tuple(sorted(members, key=_utf8_key))!r})\n")
+        return name
 
     def def_function(self, file: str, name: str) -> str:
         fn = f"_def_{re.sub(r'[^A-Za-z0-9]', '_', name)}"
@@ -82,16 +90,22 @@ class _ModuleWriter:
             emit(f"    {self.def_function(target, m.group('name'))}(v, p)")
         if "type" in s:
             t = s["type"]
-            emit(f"    if not is_type(v, {t!r}):")
+            # An exact builtin class decides the common case without the is_type call.
+            fast = {"object": "dict", "array": "list", "string": "str", "integer": "int", "boolean": "bool"}.get(t)
+            guard = f"v.__class__ is not {fast} and " if fast else ""
+            emit(f"    if {guard}not is_type(v, {t!r}):")
             emit(f"        fail(p, 'type', {('expected ' + t)!r})")
         if "const" in s:
-            emit(f"    if not json_equal(v, {s['const']!r}):")
+            guard = f"not (v.__class__ is str and v == {s['const']!r}) and " if isinstance(s["const"], str) else ""
+            emit(f"    if {guard}not json_equal(v, {s['const']!r}):")
             emit("        fail(p, 'const', 'value differs from the constant')")
         if "enum" in s:
-            emit(f"    if not any(json_equal(v, e) for e in {tuple(s['enum'])!r}):")
+            strings = all(isinstance(e, str) for e in s["enum"])
+            guard = f"not (v.__class__ is str and v in {self.constant(tuple(s['enum']))}) and " if strings else ""
+            emit(f"    if {guard}not any(json_equal(v, e) for e in {tuple(s['enum'])!r}):")
             emit("        fail(p, 'enum', 'value is not in the enumeration')")
         if "minimum" in s or "maximum" in s:
-            emit("    if is_number(v):")
+            emit("    if v.__class__ is int or is_number(v):")
             if "minimum" in s:
                 emit(f"        if v < {s['minimum']!r}:")
                 emit(f"            fail(p, 'minimum', {('below ' + str(s['minimum']))!r})")
@@ -143,13 +157,16 @@ class _ModuleWriter:
                 emit(f"            fail(p, 'required', {('missing property ' + key)!r})")
             if s.get("additionalProperties") is False:
                 allowed = tuple(sorted(props, key=_utf8_key))
-                emit("        for k in sorted(v, key=_utf8):")
-                emit(f"            if k not in {allowed!r}:")
-                emit("                fail(child(p, k), 'additionalProperties', 'unknown property')")
+                # Sorting is only needed to name the first unknown key, so it runs only when there is one.
+                emit(f"        if not v.keys() <= {self.constant(allowed)}:")
+                emit("            for k in sorted(v, key=_utf8):")
+                emit(f"                if k not in {allowed!r}:")
+                emit("                    fail(child(p, k), 'additionalProperties', 'unknown property')")
             for key, sub in props.items():
                 fn = self.node(sub)
                 emit(f"        if {key!r} in v:")
-                emit(f"            {fn}(v[{key!r}], child(p, {key!r}))")
+                ptr = repr("/" + key) if "~" not in key and "/" not in key else None
+                emit(f"            {fn}(v[{key!r}], " + (f"p + {ptr})" if ptr else f"child(p, {key!r}))"))
         for key in ("anyOf", "oneOf"):
             if key in s:
                 fns = [self.node(sub) for sub in s[key]]
@@ -200,6 +217,7 @@ class _ModuleWriter:
             "def _utf8(k: str) -> bytes:\n    return k.encode('utf-8', 'surrogatepass')\n\n\n",
             "def _ok(fn, v: object, p: str) -> bool:\n",
             "    try:\n        fn(v, p)\n    except StructuralError:\n        return False\n    return True\n\n\n",
+            "".join(self.constants) + ("\n\n" if self.constants else ""),
             "\n\n".join(self.functions),
             "\n\n",
             "".join(aliases),

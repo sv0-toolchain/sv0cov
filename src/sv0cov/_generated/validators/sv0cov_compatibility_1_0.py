@@ -4,7 +4,7 @@
 # or the generator and regenerate.
 # schema-file: sv0cov.compatibility-1.0.schema.json
 # schema-sha256: 04d468b205e235b08cbdf7322d8469391ce0af5d1a934f2baed7782a1c8ce07f
-# generator-format: 2
+# generator-format: 3
 """Structural validator for sv0cov.compatibility 1.0."""
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sv0cov.formats.structural import (
 SCHEMA_NAME = 'sv0cov.compatibility'
 SCHEMA_VERSION = '1.0'
 SCHEMA_SHA256 = '04d468b205e235b08cbdf7322d8469391ce0af5d1a934f2baed7782a1c8ce07f'
-GENERATOR_FORMAT = '2'
+GENERATOR_FORMAT = '3'
 
 
 def _utf8(k: str) -> bytes:
@@ -36,8 +36,21 @@ def _ok(fn, v: object, p: str) -> bool:
     return True
 
 
+_C0 = frozenset(('coverage_map', 'diagnostic', 'diagnostic_registry', 'export_manifest', 'indexed', 'indexed_semantic', 'native_report', 'raw_profile', 'resolved_configuration', 'run_set', 'vm_binding', 'vm_covr'))
+_C1 = frozenset(('allowed_diagnostic_registries', 'allowed_implementation_languages', 'compatibility_sha256', 'default_implementation_language', 'expected_artifact_versions', 'expected_revision', 'expected_tool', 'required_backends', 'required_bytecode_profiles', 'required_commands', 'required_features', 'required_hosts', 'schema', 'submodule_path', 'version', 'version_manifest_version'))
+_C2 = frozenset(('python', 'sv0'))
+_C3 = frozenset(('python', 'sv0'))
+_C4 = frozenset(('native', 'vm-v1', 'vm-v2'))
+_C5 = frozenset(('sv0vm-v1-coverage', 'sv0vm-v2-typed'))
+_C6 = frozenset(('check', 'clean', 'doctor', 'merge', 'report', 'run', 'version'))
+_C7 = frozenset(('branch-outcomes', 'changed-region', 'cobertura-r1-core', 'contexts', 'contract-coverage', 'cumulative-scopes', 'exclusion-audit', 'gitignore-scopes', 'html-report', 'lcov-r1-core', 'native-json-report', 'process-tree-spawn', 'ratchets', 'run-sets', 'saturation-lower-bounds', 'self-contained-indexed', 'source-integrity'))
+_C8 = frozenset(('linux-arm64', 'linux-x86_64', 'macos-arm64', 'macos-x86_64'))
+_C9 = frozenset(('revision', 'sha256'))
+_C10 = frozenset(('name', 'version'))
+
+
 def _s2(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -47,7 +60,7 @@ def _s2(v: object, p: str) -> None:
 
 
 def _s1(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -59,7 +72,7 @@ def _s1(v: object, p: str) -> None:
 
 
 def _s4(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -69,7 +82,7 @@ def _s4(v: object, p: str) -> None:
 
 
 def _s3(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -81,7 +94,7 @@ def _s3(v: object, p: str) -> None:
 
 
 def _s6(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -91,7 +104,7 @@ def _s6(v: object, p: str) -> None:
 
 
 def _s5(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -103,7 +116,7 @@ def _s5(v: object, p: str) -> None:
 
 
 def _s8(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -113,7 +126,7 @@ def _s8(v: object, p: str) -> None:
 
 
 def _s7(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -125,7 +138,7 @@ def _s7(v: object, p: str) -> None:
 
 
 def _s10(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -135,7 +148,7 @@ def _s10(v: object, p: str) -> None:
 
 
 def _s9(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -147,7 +160,7 @@ def _s9(v: object, p: str) -> None:
 
 
 def _s12(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -157,7 +170,7 @@ def _s12(v: object, p: str) -> None:
 
 
 def _s11(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -169,7 +182,7 @@ def _s11(v: object, p: str) -> None:
 
 
 def _s14(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -179,7 +192,7 @@ def _s14(v: object, p: str) -> None:
 
 
 def _s13(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -191,7 +204,7 @@ def _s13(v: object, p: str) -> None:
 
 
 def _s16(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -201,7 +214,7 @@ def _s16(v: object, p: str) -> None:
 
 
 def _s15(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -213,7 +226,7 @@ def _s15(v: object, p: str) -> None:
 
 
 def _s18(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -223,7 +236,7 @@ def _s18(v: object, p: str) -> None:
 
 
 def _s17(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -235,7 +248,7 @@ def _s17(v: object, p: str) -> None:
 
 
 def _s20(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -245,7 +258,7 @@ def _s20(v: object, p: str) -> None:
 
 
 def _s19(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -257,7 +270,7 @@ def _s19(v: object, p: str) -> None:
 
 
 def _s22(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -267,7 +280,7 @@ def _s22(v: object, p: str) -> None:
 
 
 def _s21(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -279,7 +292,7 @@ def _s21(v: object, p: str) -> None:
 
 
 def _s24(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 1:
@@ -289,7 +302,7 @@ def _s24(v: object, p: str) -> None:
 
 
 def _s23(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -301,7 +314,7 @@ def _s23(v: object, p: str) -> None:
 
 
 def _s0(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'coverage_map' not in v:
@@ -328,37 +341,38 @@ def _s0(v: object, p: str) -> None:
             fail(p, 'required', 'missing property vm_binding')
         if 'vm_covr' not in v:
             fail(p, 'required', 'missing property vm_covr')
-        for k in sorted(v, key=_utf8):
-            if k not in ('coverage_map', 'diagnostic', 'diagnostic_registry', 'export_manifest', 'indexed', 'indexed_semantic', 'native_report', 'raw_profile', 'resolved_configuration', 'run_set', 'vm_binding', 'vm_covr'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C0:
+            for k in sorted(v, key=_utf8):
+                if k not in ('coverage_map', 'diagnostic', 'diagnostic_registry', 'export_manifest', 'indexed', 'indexed_semantic', 'native_report', 'raw_profile', 'resolved_configuration', 'run_set', 'vm_binding', 'vm_covr'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'coverage_map' in v:
-            _s1(v['coverage_map'], child(p, 'coverage_map'))
+            _s1(v['coverage_map'], p + '/coverage_map')
         if 'diagnostic' in v:
-            _s3(v['diagnostic'], child(p, 'diagnostic'))
+            _s3(v['diagnostic'], p + '/diagnostic')
         if 'diagnostic_registry' in v:
-            _s5(v['diagnostic_registry'], child(p, 'diagnostic_registry'))
+            _s5(v['diagnostic_registry'], p + '/diagnostic_registry')
         if 'export_manifest' in v:
-            _s7(v['export_manifest'], child(p, 'export_manifest'))
+            _s7(v['export_manifest'], p + '/export_manifest')
         if 'indexed' in v:
-            _s9(v['indexed'], child(p, 'indexed'))
+            _s9(v['indexed'], p + '/indexed')
         if 'indexed_semantic' in v:
-            _s11(v['indexed_semantic'], child(p, 'indexed_semantic'))
+            _s11(v['indexed_semantic'], p + '/indexed_semantic')
         if 'native_report' in v:
-            _s13(v['native_report'], child(p, 'native_report'))
+            _s13(v['native_report'], p + '/native_report')
         if 'raw_profile' in v:
-            _s15(v['raw_profile'], child(p, 'raw_profile'))
+            _s15(v['raw_profile'], p + '/raw_profile')
         if 'resolved_configuration' in v:
-            _s17(v['resolved_configuration'], child(p, 'resolved_configuration'))
+            _s17(v['resolved_configuration'], p + '/resolved_configuration')
         if 'run_set' in v:
-            _s19(v['run_set'], child(p, 'run_set'))
+            _s19(v['run_set'], p + '/run_set')
         if 'vm_binding' in v:
-            _s21(v['vm_binding'], child(p, 'vm_binding'))
+            _s21(v['vm_binding'], p + '/vm_binding')
         if 'vm_covr' in v:
-            _s23(v['vm_covr'], child(p, 'vm_covr'))
+            _s23(v['vm_covr'], p + '/vm_covr')
 
 
 def _s25(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 64:
@@ -372,7 +386,7 @@ def _s28(v: object, p: str) -> None:
 
 
 def _s27(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -384,12 +398,12 @@ def _s27(v: object, p: str) -> None:
 
 
 def _s30(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('python', 'sv0')):
+    if not (v.__class__ is str and v in _C2) and not any(json_equal(v, e) for e in ('python', 'sv0')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s29(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) < 1:
@@ -405,7 +419,7 @@ def _s31(v: object, p: str) -> None:
 
 
 def _s32(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('python', 'sv0')):
+    if not (v.__class__ is str and v in _C3) and not any(json_equal(v, e) for e in ('python', 'sv0')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
@@ -414,7 +428,7 @@ def _s33(v: object, p: str) -> None:
 
 
 def _s34(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 40:
@@ -428,12 +442,12 @@ def _s35(v: object, p: str) -> None:
 
 
 def _s37(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('native', 'vm-v1', 'vm-v2')):
+    if not (v.__class__ is str and v in _C4) and not any(json_equal(v, e) for e in ('native', 'vm-v1', 'vm-v2')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s36(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 3:
@@ -443,12 +457,12 @@ def _s36(v: object, p: str) -> None:
 
 
 def _s39(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('sv0vm-v1-coverage', 'sv0vm-v2-typed')):
+    if not (v.__class__ is str and v in _C5) and not any(json_equal(v, e) for e in ('sv0vm-v1-coverage', 'sv0vm-v2-typed')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s38(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 2:
@@ -458,12 +472,12 @@ def _s38(v: object, p: str) -> None:
 
 
 def _s41(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('check', 'clean', 'doctor', 'merge', 'report', 'run', 'version')):
+    if not (v.__class__ is str and v in _C6) and not any(json_equal(v, e) for e in ('check', 'clean', 'doctor', 'merge', 'report', 'run', 'version')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s40(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 7:
@@ -473,12 +487,12 @@ def _s40(v: object, p: str) -> None:
 
 
 def _s43(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('branch-outcomes', 'changed-region', 'cobertura-r1-core', 'contexts', 'contract-coverage', 'cumulative-scopes', 'exclusion-audit', 'gitignore-scopes', 'html-report', 'lcov-r1-core', 'native-json-report', 'process-tree-spawn', 'ratchets', 'run-sets', 'saturation-lower-bounds', 'self-contained-indexed', 'source-integrity')):
+    if not (v.__class__ is str and v in _C7) and not any(json_equal(v, e) for e in ('branch-outcomes', 'changed-region', 'cobertura-r1-core', 'contexts', 'contract-coverage', 'cumulative-scopes', 'exclusion-audit', 'gitignore-scopes', 'html-report', 'lcov-r1-core', 'native-json-report', 'process-tree-spawn', 'ratchets', 'run-sets', 'saturation-lower-bounds', 'self-contained-indexed', 'source-integrity')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s42(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 17:
@@ -488,12 +502,12 @@ def _s42(v: object, p: str) -> None:
 
 
 def _s45(v: object, p: str) -> None:
-    if not any(json_equal(v, e) for e in ('linux-arm64', 'linux-x86_64', 'macos-arm64', 'macos-x86_64')):
+    if not (v.__class__ is str and v in _C8) and not any(json_equal(v, e) for e in ('linux-arm64', 'linux-x86_64', 'macos-arm64', 'macos-x86_64')):
         fail(p, 'enum', 'value is not in the enumeration')
 
 
 def _s44(v: object, p: str) -> None:
-    if not is_type(v, 'array'):
+    if v.__class__ is not list and not is_type(v, 'array'):
         fail(p, 'type', 'expected array')
     if isinstance(v, list):
         if len(v) > 4:
@@ -503,27 +517,27 @@ def _s44(v: object, p: str) -> None:
 
 
 def _s46(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov.compatibility'):
+    if not (v.__class__ is str and v == 'sv0cov.compatibility') and not json_equal(v, 'sv0cov.compatibility'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s47(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov'):
+    if not (v.__class__ is str and v == 'sv0cov') and not json_equal(v, 'sv0cov'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s48(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s49(v: object, p: str) -> None:
-    if not json_equal(v, '1.0'):
+    if not (v.__class__ is str and v == '1.0') and not json_equal(v, '1.0'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s26(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'allowed_diagnostic_registries' not in v:
@@ -558,47 +572,48 @@ def _s26(v: object, p: str) -> None:
             fail(p, 'required', 'missing property version')
         if 'version_manifest_version' not in v:
             fail(p, 'required', 'missing property version_manifest_version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('allowed_diagnostic_registries', 'allowed_implementation_languages', 'compatibility_sha256', 'default_implementation_language', 'expected_artifact_versions', 'expected_revision', 'expected_tool', 'required_backends', 'required_bytecode_profiles', 'required_commands', 'required_features', 'required_hosts', 'schema', 'submodule_path', 'version', 'version_manifest_version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C1:
+            for k in sorted(v, key=_utf8):
+                if k not in ('allowed_diagnostic_registries', 'allowed_implementation_languages', 'compatibility_sha256', 'default_implementation_language', 'expected_artifact_versions', 'expected_revision', 'expected_tool', 'required_backends', 'required_bytecode_profiles', 'required_commands', 'required_features', 'required_hosts', 'schema', 'submodule_path', 'version', 'version_manifest_version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'allowed_diagnostic_registries' in v:
-            _s27(v['allowed_diagnostic_registries'], child(p, 'allowed_diagnostic_registries'))
+            _s27(v['allowed_diagnostic_registries'], p + '/allowed_diagnostic_registries')
         if 'allowed_implementation_languages' in v:
-            _s29(v['allowed_implementation_languages'], child(p, 'allowed_implementation_languages'))
+            _s29(v['allowed_implementation_languages'], p + '/allowed_implementation_languages')
         if 'compatibility_sha256' in v:
-            _s31(v['compatibility_sha256'], child(p, 'compatibility_sha256'))
+            _s31(v['compatibility_sha256'], p + '/compatibility_sha256')
         if 'default_implementation_language' in v:
-            _s32(v['default_implementation_language'], child(p, 'default_implementation_language'))
+            _s32(v['default_implementation_language'], p + '/default_implementation_language')
         if 'expected_artifact_versions' in v:
-            _s33(v['expected_artifact_versions'], child(p, 'expected_artifact_versions'))
+            _s33(v['expected_artifact_versions'], p + '/expected_artifact_versions')
         if 'expected_revision' in v:
-            _s34(v['expected_revision'], child(p, 'expected_revision'))
+            _s34(v['expected_revision'], p + '/expected_revision')
         if 'expected_tool' in v:
-            _s35(v['expected_tool'], child(p, 'expected_tool'))
+            _s35(v['expected_tool'], p + '/expected_tool')
         if 'required_backends' in v:
-            _s36(v['required_backends'], child(p, 'required_backends'))
+            _s36(v['required_backends'], p + '/required_backends')
         if 'required_bytecode_profiles' in v:
-            _s38(v['required_bytecode_profiles'], child(p, 'required_bytecode_profiles'))
+            _s38(v['required_bytecode_profiles'], p + '/required_bytecode_profiles')
         if 'required_commands' in v:
-            _s40(v['required_commands'], child(p, 'required_commands'))
+            _s40(v['required_commands'], p + '/required_commands')
         if 'required_features' in v:
-            _s42(v['required_features'], child(p, 'required_features'))
+            _s42(v['required_features'], p + '/required_features')
         if 'required_hosts' in v:
-            _s44(v['required_hosts'], child(p, 'required_hosts'))
+            _s44(v['required_hosts'], p + '/required_hosts')
         if 'schema' in v:
-            _s46(v['schema'], child(p, 'schema'))
+            _s46(v['schema'], p + '/schema')
         if 'submodule_path' in v:
-            _s47(v['submodule_path'], child(p, 'submodule_path'))
+            _s47(v['submodule_path'], p + '/submodule_path')
         if 'version' in v:
-            _s48(v['version'], child(p, 'version'))
+            _s48(v['version'], p + '/version')
         if 'version_manifest_version' in v:
-            _s49(v['version_manifest_version'], child(p, 'version_manifest_version'))
+            _s49(v['version_manifest_version'], p + '/version_manifest_version')
 
 
 def _s51(v: object, p: str) -> None:
-    if not is_type(v, 'integer'):
+    if v.__class__ is not int and not is_type(v, 'integer'):
         fail(p, 'type', 'expected integer')
-    if is_number(v):
+    if v.__class__ is int or is_number(v):
         if v < 1:
             fail(p, 'minimum', 'below 1')
         if v > 4294967295:
@@ -606,7 +621,7 @@ def _s51(v: object, p: str) -> None:
 
 
 def _s52(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 64:
@@ -616,29 +631,30 @@ def _s52(v: object, p: str) -> None:
 
 
 def _s50(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'revision' not in v:
             fail(p, 'required', 'missing property revision')
         if 'sha256' not in v:
             fail(p, 'required', 'missing property sha256')
-        for k in sorted(v, key=_utf8):
-            if k not in ('revision', 'sha256'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C9:
+            for k in sorted(v, key=_utf8):
+                if k not in ('revision', 'sha256'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'revision' in v:
-            _s51(v['revision'], child(p, 'revision'))
+            _s51(v['revision'], p + '/revision')
         if 'sha256' in v:
-            _s52(v['sha256'], child(p, 'sha256'))
+            _s52(v['sha256'], p + '/sha256')
 
 
 def _s54(v: object, p: str) -> None:
-    if not json_equal(v, 'sv0cov'):
+    if not (v.__class__ is str and v == 'sv0cov') and not json_equal(v, 'sv0cov'):
         fail(p, 'const', 'value differs from the constant')
 
 
 def _s55(v: object, p: str) -> None:
-    if not is_type(v, 'string'):
+    if v.__class__ is not str and not is_type(v, 'string'):
         fail(p, 'type', 'expected string')
     if isinstance(v, str):
         if len(v) < 5:
@@ -648,20 +664,21 @@ def _s55(v: object, p: str) -> None:
 
 
 def _s53(v: object, p: str) -> None:
-    if not is_type(v, 'object'):
+    if v.__class__ is not dict and not is_type(v, 'object'):
         fail(p, 'type', 'expected object')
     if isinstance(v, dict):
         if 'name' not in v:
             fail(p, 'required', 'missing property name')
         if 'version' not in v:
             fail(p, 'required', 'missing property version')
-        for k in sorted(v, key=_utf8):
-            if k not in ('name', 'version'):
-                fail(child(p, k), 'additionalProperties', 'unknown property')
+        if not v.keys() <= _C10:
+            for k in sorted(v, key=_utf8):
+                if k not in ('name', 'version'):
+                    fail(child(p, k), 'additionalProperties', 'unknown property')
         if 'name' in v:
-            _s54(v['name'], child(p, 'name'))
+            _s54(v['name'], p + '/name')
         if 'version' in v:
-            _s55(v['version'], child(p, 'version'))
+            _s55(v['version'], p + '/version')
 
 
 def _s56(v: object, p: str) -> None:
