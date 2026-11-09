@@ -8,7 +8,7 @@
 # The bundle's series key keeps different observed hardware apart.
 #
 # sv0cov CI has no sv0 toolchain, so this job measures what is runnable here:
-# ingest of the 1,000,000 point/profile-pair merge fixture. Compile and
+# ingest of the 64,000 point/profile-pair merge fixture. Compile and
 # execute baselines run from the toolchain root (bench/corpus.py plan
 # --toolchain). Weekly and on demand, because the frozen protocol makes each
 # campaign long.
@@ -56,7 +56,7 @@ jobs:
         run: python bench/harness.py host --stage managed-ci-provisional --toolchain-revision "${{ github.sha }}" > "host-${{ matrix.host }}.json"
 
       - name: Materialize the merge-scale fixture (replay digest must match the manifest)
-        run: python bench/corpus.py plan --work "$RUNNER_TEMP/bench" --dimension ingest --id scale-merge-1m-pairs > plan.json
+        run: python bench/corpus.py plan --work "$RUNNER_TEMP/bench" --dimension ingest --id scale-merge-64k-pairs > plan.json
 
       - name: Provisional campaign
         run: >-

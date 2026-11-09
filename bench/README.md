@@ -74,10 +74,11 @@
   CV-427 (vm-v2 is a backend that joins after CV-463, not a status).
   `revisions` records why each corpus version changed (1.1: the scale
   profiles' counts were inconsistent with their map, so merge rejected
-  them). `corpus.py check` regenerates it and verifies the
-  real-project snapshots; `write --heavy` also rebuilds the 250,000-point
-  merge/report artifacts (about 3.5 minutes, 1.2 GB) and records their
-  digests.
+  them; 1.2: SPEC 0.1.74-draft resized the scale fixtures to 64,000 merge
+  pairs, a 10,000-point terminal report and a 25,000-point HTML report, so
+  the unchanged section 24 budgets are reachable). `corpus.py check` regenerates it and verifies the
+  real-project snapshots; `write --heavy` also rebuilds the scale
+  merge/report artifacts and records their digests.
 - `corpus/real/`: byte-for-byte copies of sv0c behavior cases and
   sv0-mathlib v0.2.0 at pinned commits (`REDISTRIBUTION.md`).
 - `corpus.py plan --toolchain ROOT --work DIR --dimension compile|execute|ingest|merge|native-terminal-report|html-report`
@@ -98,5 +99,5 @@
 - `region-large` (1,000 functions of 20 statements) builds and runs since
   the native compiler's Vec-handle limit was lifted (checked 2026-11-08).
 - `.github/workflows/perf-provisional.yml` runs the ingest campaign for the
-  1,000,000 point/profile-pair fixture on the four managed-CI hosts weekly
+  64,000 point/profile-pair merge fixture on the four managed-CI hosts weekly
   and on demand, as labelled provisional trend evidence.

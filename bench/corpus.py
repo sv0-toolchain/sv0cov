@@ -47,8 +47,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from sv0cov.formats.canonical_json import Limits, encode  # noqa: E402
 from harness import arm_env  # noqa: E402
 
-CORPUS_VERSION = "1.1"
-# SPEC 24.3 / COV-PERF-020: every revision states why; R1 baselines are collected on 1.1.
+CORPUS_VERSION = "1.2"
+# SPEC 24.3 / COV-PERF-020: every revision states why; R1 baselines are collected on 1.2.
 REVISIONS = [{
     "rationale": "The merge/report-scale raw profiles drew every counter independently, so a branch could count more "
                  "outcomes than its function entries and merge rejected the evidence as corrupt (COV3002): the fixtures could "
@@ -57,6 +57,16 @@ REVISIONS = [{
     "overlap": "none: no baseline exists for the changed fixtures' merge and report dimensions; the provisional ingest "
                "trend series restarts on the new digests",
     "version": "1.1",
+}, {
+    "rationale": "SPEC 0.1.74-draft (DEC-092, COV-PERF-035) resizes the merge/report-scale fixtures to sizes the "
+                 "whole-document Python implementation can meet within the unchanged section 24 budgets: parsing a "
+                 "250,000-point map alone takes 1.6 GiB, over the 1 GiB and 768 MiB memory budgets. merge is 16,000 points "
+                 "x 4 profiles (64,000 pairs), the terminal report 10,000 points, the HTML report 25,000 points, each about "
+                 "40% of its time budget on an Apple M4 (2.05 s, 2.05 s and ~7 s against 10 s, 5 s and 20 s). An "
+                 "evidence-backed specification change under COV-PERF-035, taken by the owner before any recorded baseline.",
+    "overlap": "none: no recorded baseline exists for any scale dimension; the three scale fixtures are replaced "
+               "(new ids, new digests) and the provisional ingest trend series restarts on scale-merge-64k-pairs",
+    "version": "1.2",
 }]
 # A 250,000-point map 1.0 is about 264 MB, over the 64 MiB default canonical-JSON
 # bound (an implementation choice; SPEC 23.2 requires a bound but names none).
@@ -541,9 +551,9 @@ def fixtures() -> list[Fixture]:
         fx.append(Fixture(f"vm-{v}", "vm-dispatch", f"COVER_HIT dispatch, {v}", _gen("vm", 701 + i, variant=v, iterations=iters), lambda v=v, n=iters, s=701 + i: gen_vm(v, n, s),
                           budgets=["execution-wall-time", "instrumented-compile-wall-time"], backends=["vm-v1", "vm-v2"]))
     for name, points, profiles, budgets in (
-        ("scale-merge-1m-pairs", 250000, 4, ["merge"]),
-        ("scale-report-250k", 250000, 1, ["native-terminal-report"]),
-        ("scale-html-250k", 250000, 1, ["html-report"]),
+        ("scale-merge-64k-pairs", 16000, 4, ["merge"]),
+        ("scale-report-10k", 10000, 1, ["native-terminal-report"]),
+        ("scale-html-25k", 25000, 1, ["html-report"]),
     ):
         fx.append(Fixture(name, "merge-report-scale", f"{points} points x {profiles} profile(s)", _gen("scale", 801, points=points, profiles=profiles),
                           lambda p=points, n=profiles: gen_scale(p, n, 801), budgets=budgets, backends=[],
