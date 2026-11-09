@@ -11,6 +11,13 @@ against generated C, host debug information, or VM instruction offsets. The
 goal is one coverage truth across both sv0 execution paths: generated
 C/native executables and `.sv0b` bytecode on `sv0vm`.
 
+## Platforms
+
+R1 supports exactly four hosts: macOS arm64, macOS x86-64, Linux arm64 and
+Linux x86-64, each with CPython 3.13 and 3.14. Windows is not supported,
+including through WSL, Cygwin, MSYS2, Wine or cross-compilation (SPEC 25.1,
+COV-PORT-004).
+
 ## Status
 
 **F0, R0 and R0.1 complete; R1 in progress.** F0 (2026-10-08) froze the
@@ -27,7 +34,7 @@ reliability closure. The slice-by-slice status is in the checklist
 named below. Nothing is released.
 
 The governing contract is the sv0cov specification
-(`project-specs/sv0cov/SPEC.md`, version `0.1.73-draft`). Planning and the
+(`project-specs/sv0cov/SPEC.md`, version `0.1.75-draft`). Planning and the
 slice backlog live in the `sv0-toolchain` meta-repository:
 `task/sv0cov-coverage.Rmd` (hub) and `task/sv0cov-checklist.Rmd` (`CV-###`
 slices).

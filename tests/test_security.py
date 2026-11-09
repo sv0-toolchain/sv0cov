@@ -61,7 +61,7 @@ NETWORK_EVENTS = ("socket.__new__", "socket.connect", "socket.bind", "socket.get
                   "ftplib.connect", "smtplib.connect", "imaplib.open", "poplib.connect", "nntplib.connect", "webbrowser.open")
 HOSTILE = "ctx\x1b[2J\x1b]0;title\x07\r\nnext\u202eevil\"quote'</script>]]>&amp;\\"
 
-# Runs every command in one isolated interpreter (as the launcher does: -I -B) under an audit hook.
+# Runs every command in one isolated interpreter (as the launcher does: -I -S -B) under an audit hook.
 # argv: src, project dir, fake driver; prints a JSON summary on the real stdout's last line.
 BOOT = r'''
 import io, json, os, sys
@@ -164,7 +164,7 @@ class NoNetworkTest(Project):
         driver.write_text(FAKE_DRIVER.format(py=sys.executable, map=str(self.cwd / "in" / "f0.sv0covmap.json"), src=str(ROOT / "src"),
                                              tests=str(ROOT / "tests")))
         driver.chmod(0o755)
-        p = subprocess.run([sys.executable, "-I", "-B", "-c", BOOT, str(ROOT / "src"), str(self.cwd), str(driver), json.dumps(NETWORK_EVENTS)],
+        p = subprocess.run([sys.executable, "-I", "-S", "-B", "-c", BOOT, str(ROOT / "src"), str(self.cwd), str(driver), json.dumps(NETWORK_EVENTS)],
                            capture_output=True, text=True, timeout=300, env={"PATH": os.environ.get("PATH", ""), "HOME": str(self.top)})
         self.assertNotIn("NETWORK", p.stderr)
         self.assertEqual(p.returncode, 0, p.stderr[-2000:])
@@ -351,7 +351,7 @@ print(json.dumps(out))
                  ("term", ["report", "--format", "term", "--output", "-", ".sv0cov/coverage.sv0covdata.json"]),
                  ("check", ["check", ".sv0cov/coverage.sv0covdata.json"]), ("check-fail", ["check", "--threshold-line", "100", ".sv0cov/coverage.sv0covdata.json"]),
                  ("version", ["version", "--json"]), ("doctor", ["doctor", "--json"]), ("bad", ["merge", "--diagnostic-format", "json-lines", "nothing"])]
-        p = subprocess.run([sys.executable, "-I", "-B", "-c", script, str(ROOT / "src"), str(work / "f0"), json.dumps(steps)],
+        p = subprocess.run([sys.executable, "-I", "-S", "-B", "-c", script, str(ROOT / "src"), str(work / "f0"), json.dumps(steps)],
                            capture_output=True, text=True, timeout=300, env=env)
         self.assertEqual(p.returncode, 0, p.stderr[-2000:])
         results = json.loads(p.stdout)

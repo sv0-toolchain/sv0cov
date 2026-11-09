@@ -17,7 +17,7 @@
 # 4. Probe the candidate in isolated mode (5 s, 4096 bytes): CPython,
 #    major 3, minor = basename, 64-bit, host = uname, and
 #    realpath(sys.executable) = the physical target (rejects shims).
-# 5. Recheck the snapshot, then exec the same absolute candidate with -I -B
+# 5. Recheck the snapshot, then exec the same absolute candidate with -I -S -B
 #    and a bootstrap that imports sv0cov only from this checkout's src/.
 #
 # Bootstrap failures emit exactly one diagnostic (human, or JSON Lines with
@@ -183,7 +183,7 @@ print("sv0cov-probe-1", sys.implementation.name, v.major, v.minor, v.micro, 64 i
 # a file-size limit stops a runaway writer long before it matters.
 (
     ulimit -f 16
-    exec "$candidate" -I -B -c "$PROBE" </dev/null >"$tmp/out" 2>&1
+    exec "$candidate" -I -S -B -c "$PROBE" </dev/null >"$tmp/out" 2>&1
 ) &
 probe=$!
 (
@@ -252,4 +252,4 @@ if foreign():
 sys.exit(status)'
 /bin/rm -rf "$tmp"
 tmp=
-exec "$candidate" -I -B -c "$BOOT" "$root" "$format" "$@"
+exec "$candidate" -I -S -B -c "$BOOT" "$root" "$format" "$@"

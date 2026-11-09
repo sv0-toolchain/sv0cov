@@ -12,7 +12,7 @@ property is checked across every command at once; the per-command suites
 
 - Every command (merge, report to files and to stdout, check, version,
   doctor, run with a stand-in driver, clean) runs end to end in one fresh
-  `-I -B` interpreter, as the launcher starts it. An audit hook ends the
+  `-I -S -B` interpreter, as the launcher starts it. An audit hook ends the
   process on any socket, name-resolution, URL, HTTP, mail or browser event.
   The run must also import no networking module and start no process but the
   driver and the test command.

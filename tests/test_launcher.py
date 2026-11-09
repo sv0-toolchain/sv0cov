@@ -217,6 +217,22 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(r.stdout.startswith(b"sv0cov "))
 
+    def test_poisoned_site_packages_never_run(self) -> None:
+        # CV-409, SPEC 25.2.1: -S, so a selected environment's sitecustomize and .pth hooks cannot run in sv0cov.
+        venv = self.tmp / "venv"
+        subprocess.run([REAL, "-m", "venv", "--without-pip", str(venv)], check=True, capture_output=True, timeout=120)
+        site = Path(subprocess.run([str(venv / "bin" / "python"), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+                                   check=True, capture_output=True, text=True).stdout.strip())
+        mark = self.tmp / "marker"
+        (site / "sv0cov").mkdir()
+        (site / "sv0cov" / "__init__.py").write_text("raise SystemExit('shadowed')\n")
+        (site / "sitecustomize.py").write_text(f"open({str(mark)!r}, 'w').write('sitecustomize')\n")
+        (site / "evil.pth").write_text(f"import os; open({str(mark) + '.pth'!r}, 'w').write('pth')\n")
+        r = self.run_launcher(str(venv / "bin"), "version")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.startswith(b"sv0cov "))
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir() if p.name.startswith("marker")), [])
+
     def test_argv_after_double_dash_is_not_a_format_request(self) -> None:
         d = self.dir("a")
         self.fake(d, NAME, "something else")

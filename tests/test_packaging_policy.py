@@ -157,3 +157,20 @@ class WheelMetadataTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SupportClaimTest(unittest.TestCase):
+    """COV-PORT-001/004: the four R1 hosts are claimed and Windows is explicitly not (negative support-claim audit)."""
+
+    def test_classifiers_name_only_macos_and_linux(self) -> None:
+        systems = [c for c in PYPROJECT["project"]["classifiers"] if c.startswith("Operating System ::")]
+        self.assertEqual(systems, ["Operating System :: MacOS", "Operating System :: POSIX :: Linux"])
+
+    def test_windows_is_stated_unsupported_and_never_claimed(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("Windows is not supported", readme)
+        for path in [ROOT / "README.md", ROOT / "pyproject.toml", *sorted((ROOT / "docs").rglob("*.md"))]:
+            for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                if "windows" in line.lower():
+                    self.assertRegex(line, r"Windows is not supported", f"{path.name}:{n} mentions Windows without refusing it")
+
