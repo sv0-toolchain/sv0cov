@@ -989,12 +989,11 @@ FILE_CALLS = frozenset("""
     unlink unlinkat rename renameat renamex_np renameat2 symlink
 """.split())
 FLUSH_CALLS = frozenset({"open", "mkstemp", "write", "link", "unlink", "renamex_np", "renameat2"})
-# SPEC 23.4: temporary created and made 0600, written, synchronized, closed,
-# committed under its final name without replacing, the directory synchronized.
+# SPEC 23.4: temporary created and made 0600, written, closed, committed under
+# its final name without replacing; nothing is fsynced (DEC-094).
 PUBLICATION = re.compile(
-    r"mkstemp tmp\nfchmod tmp\n(write tmp\n)+fsync tmp\nclose tmp\n"
-    r"(rename tmp>profile\n|link tmp>profile\nunlink tmp\n)"
-    r"open dir\nfsync dir\nclose dir\n\Z"
+    r"mkstemp tmp\nfchmod tmp\n(write tmp\n)+close tmp\n"
+    r"(rename tmp>profile\n|link tmp>profile\nunlink tmp\n)\Z"
 )
 
 

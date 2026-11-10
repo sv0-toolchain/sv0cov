@@ -178,11 +178,16 @@ lowercase hex:
 
 1. It streams the bytes into a mode-0600 `mkstemp` file named
    `.<name>.tmp-XXXXXX`, with a running CRC32C.
-2. It fsyncs and closes that file.
+2. It closes that file.
 3. It commits it under the final name with an atomic no-replace
    operation: `renamex_np(RENAME_EXCL)` on macOS, `renameat2(RENAME_NOREPLACE)`
    on Linux, and otherwise `link` followed by `unlink`.
-4. It fsyncs the directory.
+
+Neither the file nor the directory is fsynced (SPEC §23.4, DEC-094). Every
+byte reaches the kernel before the commit, so a crash of the process leaves
+either a complete profile or a temporary remnant. A profile is not claimed
+to survive an operating-system crash or power loss; one damaged that way
+fails its completion marker or CRC32C and is never counted.
 
 The profile's contents:
 

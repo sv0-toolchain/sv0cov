@@ -46,9 +46,11 @@
  * (both exit(1)); _exit, signals and crashes publish nothing. It writes
  * <run_id>-<profile_id>.sv0profraw into SV0COV_PROFILE_DIR: a mode-0600
  * mkstemp temporary (.<name>.tmp-XXXXXX) is streamed with a running CRC32C,
- * fsynced, closed, and committed with an atomic no-replace rename
- * (renamex_np RENAME_EXCL / renameat2 RENAME_NOREPLACE, else link+unlink);
- * the directory is then fsynced. Counters are read with one index-ordered
+ * closed, and committed with an atomic no-replace rename (renamex_np
+ * RENAME_EXCL / renameat2 RENAME_NOREPLACE, else link+unlink). Neither the
+ * file nor the directory is fsynced (SPEC 23.4, DEC-094): every byte reaches
+ * the kernel before the commit, which is all a process crash needs, and a
+ * profile an OS crash damages fails its marker or CRC. Counters are read with one index-ordered
  * relaxed load each, in two passes (size, then write). The flush first
  * moves the state from ACTIVE to FLUSHING; a hit that sees FLUSHING is not
  * counted but marks the flush late (CV-422, COV-INS-012). A late mark, or a
@@ -713,7 +715,7 @@ static void rt_flush(void) {
                          (unsigned char)(crc >> 24)};
   rt_out_bytes(o, cb, 4, 0);
   rt_out_flush(o);
-  int io_failed = o->failed || fsync(fd) != 0;
+  int io_failed = o->failed;
   io_failed |= close(fd) != 0;
   free(bitmap);
   free(o);
@@ -740,11 +742,6 @@ static void rt_flush(void) {
     else
       rt_unpublished("COV2010", "raw profile unavailable", "committing the profile failed");
     return;
-  }
-  int dfd = open(rt.profile_dir, O_RDONLY);
-  if (dfd >= 0) {
-    fsync(dfd); /* where the filesystem supports it */
-    close(dfd);
   }
   free(dst), free(tmp);
 }

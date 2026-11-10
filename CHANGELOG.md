@@ -34,7 +34,9 @@ when their gates pass.
 
 - The generated-C coverage runtime: transport, arena, flush and publication,
   raw-profile tiers, concurrency and saturation, lifecycle at every exit
-  path.
+  path. Since SPEC 0.1.76-draft (DEC-094) it no longer fsyncs a raw profile
+  or its directory; process-crash safety and the no-replace commit are
+  unchanged (CV-428).
 - Region, line, branch and contract derivation; counter expressions;
   fragment and program-map assembly; ownership of dependency sources.
 
