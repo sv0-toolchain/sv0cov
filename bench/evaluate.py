@@ -25,7 +25,11 @@ compensates for another, and nothing is pooled across host classes or
 observed hardware. Every fixture, category and campaign result stays in the
 evaluation (COV-PERF-009). A gate is ``incomplete`` when an applicable
 runnable fixture of the frozen corpus is missing or invalid, and when a
-pending fixture applies to it (the corpus is not complete yet).
+pending fixture applies to it (the corpus is not complete yet). For the
+timing (overhead) gates a native-contention fixture is invalid on a host
+with fewer than eight logical CPUs, or an unknown count (SPEC 24.3): its
+four- and eight-thread runs would time oversubscription, not contention;
+``invalid_reasons`` says so. Its memory result still counts.
 
 Where the evidence may come from (COV-PERF-023/024): ``reference-dedicated``
 campaigns stand on their own; ``managed-ci-recorded`` campaigns (at least
@@ -67,6 +71,7 @@ EXCEPTION_KEYS = ("bundles", "gates", "host_class", "measured_variance", "missin
                   "provider", "recorded_on", "risk_accepted", "runner_image", "runner_label", "schema", "series", "version")
 HARDWARE_KEYS = ("architecture", "cpu_model", "installed_memory_bytes", "logical_cpus", "virtualization")
 PPM = 1_000_000
+CONTENTION_MIN_LOGICAL_CPUS = 8  # SPEC 24.3: the native-contention fixtures need eight schedulable logical CPUs
 
 
 class EvaluationError(ValueError):
@@ -133,16 +138,21 @@ def evaluate_campaign(gate: dict, campaign: list[dict], manifest: dict) -> dict:
     if kind == "determinism":
         return {"result": "no-evidence", "reason": "determinism is evidenced by repeated-execution byte comparisons, not timings"}
     dim = {"size": "execute"}.get(kind, gate.get("dimension"))
-    fixtures, missing, invalid = {}, [], []
+    cpus = campaign[0]["host"]["logical_cpus"]
+    few_cpus = kind == "overhead" and (not isinstance(cpus, int) or cpus < CONTENTION_MIN_LOGICAL_CPUS)
+    fixtures, missing, invalid, reasons = {}, [], [], {}
     for fid in runnable:
         r = found.get(f"{fid}/{dim}")
         if r is None:
             missing.append(fid)
+        elif few_cpus and category_of[fid] == "native-contention":
+            invalid.append(fid)
+            reasons[fid] = f"native-contention needs at least {CONTENTION_MIN_LOGICAL_CPUS} logical CPUs, the host has {cpus} (SPEC 24.3)"
         elif not r["valid"] or (kind in ("overhead", "size", "memory") and r["arms"] != ["off", "on"]):
             invalid.append(fid)
         else:
             fixtures[fid] = r
-    out: dict = {"fixtures": {}, "missing": missing, "invalid": invalid, "pending": pending}
+    out: dict = {"fixtures": {}, "missing": missing, "invalid": invalid, "invalid_reasons": reasons, "pending": pending}
     if kind == "overhead":
         values = {fid: r["overhead_p95_ratio_ppm"] for fid, r in fixtures.items()}
         out["fixtures"] = {fid: {"ppm": v} for fid, v in values.items()}

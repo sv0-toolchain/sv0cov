@@ -51,6 +51,10 @@
   roots), the corpus value, ceiling failures. A gate passes only in every
   campaign (no compensation) and is `incomplete` while any applicable
   fixture of the frozen corpus is pending, missing, invalid or one-arm.
+  For the timing gates a native-contention fixture is invalid on a host
+  with fewer than eight logical CPUs or an unknown count (SPEC 24.3), with
+  the reason under `invalid_reasons`; it still runs, its raw results are
+  kept, and its counter-memory result still counts.
   Eligibility: `reference-dedicated` stands alone; `managed-ci-recorded`
   needs three campaigns and a DEC-087 exception record naming the gate,
   else `refused`; other stages are `ineligible`.

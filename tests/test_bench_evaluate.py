@@ -216,6 +216,28 @@ class GateTest(unittest.TestCase):
         g = gate(env.run([env.campaign()]), "execution-wall-time")
         self.assertEqual((g["result"], g["campaigns"][0]["pending"]), ("incomplete", ["b1"]))
 
+    def test_contention_needs_eight_logical_cpus(self) -> None:
+        """SPEC 24.3: on fewer than eight logical CPUs (or an unknown count) a native-contention
+        fixture is invalid for the timing gates, with its reason; other fixtures, and its memory result, still count."""
+        man = manifest()
+        man["fixtures"][3]["category"] = "native-contention"  # b1
+        env = Env(man)
+        self.addCleanup(env.td.cleanup)
+        for cpus, want in ((4, "incomplete"), (H.UNKNOWN, "incomplete"), (8, "pass")):
+            host = {**H.host_descriptor("managed-ci-recorded", "a" * 40), "logical_cpus": cpus}
+            c = [env.bundle([result(f, dim) for f in FIXTURES], host=host) for dim in ("compile", "execute")]
+            with self.subTest(cpus=cpus):
+                g = gate(env.run([c]), "execution-wall-time")["campaigns"][0]
+                self.assertEqual(g["result"], want)
+                if want == "incomplete":
+                    self.assertEqual(g["invalid"], ["b1"])
+                    self.assertIn("at least 8 logical CPUs", g["invalid_reasons"]["b1"])
+                    self.assertEqual(sorted(g["fixtures"]), ["a1", "a2", "a3"])
+                    mem = gate(env.run([c]), "runtime-counter-memory")["campaigns"][0]
+                    self.assertEqual((mem["result"], mem["invalid"]), ("pass", []))
+                else:
+                    self.assertEqual((g["invalid"], g["invalid_reasons"]), ([], {}))
+
     def test_the_real_corpus_is_complete(self) -> None:
         """CV-427: no fixture of the frozen corpus is pending, so a gate is incomplete only
         through a missing, invalid or one-arm result, and every gate has runnable fixtures."""
