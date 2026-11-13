@@ -82,6 +82,7 @@ def cc() -> str | None:
 
 
 class NativeRuntimeTest(unittest.TestCase):
+    split = False  # SplitNativeRuntimeTest reruns every case on the split build
     tmp: tempfile.TemporaryDirectory
     driver: Path
     profile_dir: str
@@ -94,10 +95,21 @@ class NativeRuntimeTest(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         t = Path(cls.tmp.name)
         strict = [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic"]
-        subprocess.run([*strict, "-c", str(RT / "sv0cov_rt.c"), "-o", str(t / "rt.o")], check=True)
         cls.driver = t / "rt_driver"
-        subprocess.run([*strict, "-DSV0COV_RT_TESTING", "-pthread", "-o", str(cls.driver),
-                        str(RT / "sv0cov_rt.c"), str(RT / "tests" / "rt_driver.c")], check=True)
+        if cls.split:
+            # CV-428 (D-25): the toolchain builds the runtime as two objects.
+            parts = []
+            for macro, level in (("-DSV0COV_RT_PART_HOT", "-O2"), ("-DSV0COV_RT_PART_COLD", "-O0")):
+                obj = t / f"rt{macro}.o"
+                subprocess.run([*strict, level, macro, "-DSV0COV_RT_TESTING", "-c", str(RT / "sv0cov_rt.c"),
+                                "-o", str(obj)], check=True)
+                parts.append(str(obj))
+            subprocess.run([*strict, "-DSV0COV_RT_TESTING", "-pthread", "-o", str(cls.driver), *parts,
+                            str(RT / "tests" / "rt_driver.c")], check=True)
+        else:
+            subprocess.run([*strict, "-c", str(RT / "sv0cov_rt.c"), "-o", str(t / "rt.o")], check=True)
+            subprocess.run([*strict, "-DSV0COV_RT_TESTING", "-pthread", "-o", str(cls.driver),
+                            str(RT / "sv0cov_rt.c"), str(RT / "tests" / "rt_driver.c")], check=True)
         cls.profile_dir = str(t / "profiles")
         os.mkdir(cls.profile_dir)
 
@@ -715,6 +727,12 @@ class NativeRuntimeTest(unittest.TestCase):
         self.assertNotIn(b"SV0COVRT_TEST_ENTROPY", data)
         self.assertNotIn(b"sv0cov_rt_test_", data)
 
+
+
+class SplitNativeRuntimeTest(NativeRuntimeTest):
+    """Every runtime case again, on the hot (-O2) and cold (-O0) objects the
+    toolchain links (CV-428, D-25)."""
+    split = True
 
 
 STANDARD = (4194304, 67108864)

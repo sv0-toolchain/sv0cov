@@ -269,9 +269,13 @@ its ceilings. sv0vm gets its tier from
 `sv0 vm-run --raw-profile-tier ... [--raw-profile-max-counters N --raw-profile-max-bytes N]`
 and applies the same two checks.
 
-`sv0 native-compile --coverage=instrument` compiles this file with
-`-std=c11 -O2` and links it into the executable. The program C itself stays
-`-std=gnu99`.
+`sv0 native-compile --coverage=instrument` compiles this file twice, in
+parallel, and links both objects into the executable (CV-428, D-25):
+`-std=c11 -O2 -DSV0COV_RT_PART_HOT` builds `__sv0cov_hit`, and
+`-std=c11 -O0 -DSV0COV_RT_PART_COLD` builds everything else. The two parts
+share the runtime state under the reserved hidden symbol `__sv0cov_rt_state`.
+Without either macro the file is the whole runtime, as other tools build it.
+The program C itself stays `-std=gnu99`.
 
 Two builds exist:
 

@@ -115,6 +115,24 @@ _Static_assert((SV0COV_TIER_MAX_COUNTERS) >= 1 && (SV0COV_TIER_MAX_COUNTERS) <= 
                "SV0COV_TIER_MAX_COUNTERS must be 1..4294967295");
 _Static_assert((SV0COV_TIER_MAX_BYTES) >= 1 && (SV0COV_TIER_MAX_BYTES) <= 68719476736LL,
                "SV0COV_TIER_MAX_BYTES must be 1..68719476736");
+
+/* Split build (CV-428, D-25): the toolchain compiles this file twice, with
+ * -DSV0COV_RT_PART_HOT at -O2 (__sv0cov_hit and what it calls) and with
+ * -DSV0COV_RT_PART_COLD at -O0 (everything else), so a coverage build waits
+ * only for the small optimized part. The two objects share the state under
+ * a reserved hidden name. With neither macro the file is the whole runtime,
+ * as before. */
+#if defined(SV0COV_RT_PART_HOT) && defined(SV0COV_RT_PART_COLD)
+#error "define at most one of SV0COV_RT_PART_HOT and SV0COV_RT_PART_COLD"
+#endif
+#if defined(SV0COV_RT_PART_HOT) || defined(SV0COV_RT_PART_COLD)
+#define rt __sv0cov_rt_state
+#define RT_STATE_LINKAGE __attribute__((visibility("hidden")))
+#else
+#define RT_STATE_LINKAGE static
+#endif
+
+#ifndef SV0COV_RT_PART_HOT
 static const uint64_t rt_tier_max_counters = (uint64_t)(SV0COV_TIER_MAX_COUNTERS);
 static const uint64_t rt_tier_max_bytes = (uint64_t)(SV0COV_TIER_MAX_BYTES);
 
@@ -125,8 +143,9 @@ static const char *rt_tier_name(void) {
     return "large";
   return "custom";
 }
+#endif /* !SV0COV_RT_PART_HOT */
 
-static struct {
+struct rt_state {
   atomic_int state;
   int required;
   uint32_t count;
@@ -143,7 +162,14 @@ static struct {
   pid_t pid;       /* the process image that registered */
   atomic_int late; /* a hit saw the state FLUSHING */
   atomic_int unresolved; /* an unmanaged fork happened in this image */
-} rt = {.context_len = -1};
+};
+#ifdef SV0COV_RT_PART_HOT
+extern RT_STATE_LINKAGE struct rt_state rt;
+#else
+RT_STATE_LINKAGE struct rt_state rt = {.context_len = -1};
+#endif
+
+#ifndef SV0COV_RT_PART_HOT
 
 #ifdef SV0COV_RT_TESTING
 void (*sv0cov_rt_test_flush_hook)(void);
@@ -815,7 +841,9 @@ static void rt_fork_child(void) {
   atomic_compare_exchange_strong_explicit(&rt.state, &active, SV0COV_RT_STATE_FORKED, memory_order_relaxed,
                                           memory_order_relaxed);
 }
+#endif /* !SV0COV_RT_PART_HOT */
 
+#ifndef SV0COV_RT_PART_COLD
 static void rt_forked_hit(void) {
   if (!rt.required)
     return;
@@ -857,7 +885,9 @@ void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index) {
       return;
   }
 }
+#endif /* !SV0COV_RT_PART_COLD */
 
+#ifndef SV0COV_RT_PART_HOT
 #ifdef SV0COV_RT_TESTING
 int sv0cov_rt_test_state(void) { return atomic_load(&rt.state); }
 uint32_t sv0cov_rt_test_counter_count(void) { return rt.count; }
@@ -890,3 +920,4 @@ int __sv0cov_atomic_u64_lock_free(int *build_time) {
     *build_time = ATOMIC_LLONG_LOCK_FREE;
   return atomic_is_lock_free(&probe) ? 1 : 0;
 }
+#endif /* !SV0COV_RT_PART_HOT */
